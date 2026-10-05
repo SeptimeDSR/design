@@ -1,0 +1,12 @@
+{
+  "enabledMcpjsonServers": [
+    "21st",
+    "magicui",
+    "shadcn",
+    "remotion-docs",
+    "playwright",
+    "higgsfield",
+    "runway",
+    "pika"
+  ]
+}

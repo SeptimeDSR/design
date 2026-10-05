@@ -1,0 +1,26 @@
+@import "tailwindcss";
+@import "lenis/dist/lenis.css";
+
+@theme {
+  --color-ink: #0d0d0b;
+  --color-bone: #ece7dc;
+  --color-signal: #ff4d1a;
+  --font-display: "Bricolage Grotesque Variable", system-ui, sans-serif;
+  --font-sans: "Bricolage Grotesque Variable", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+}
+
+html {
+  background: var(--color-ink);
+  color: var(--color-bone);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-variation-settings: "opsz" 14;
+}
+
+::selection {
+  background: var(--color-signal);
+  color: var(--color-ink);
+}
