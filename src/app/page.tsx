@@ -1,11 +1,11 @@
-import { Reveal } from "@/components/motion/reveal";
 import { ChapterHud } from "@/components/retention/chapter-hud";
 import { Countdown } from "@/components/retention/countdown";
 import { EndlessFeed } from "@/components/retention/endless-feed";
 import { Factory } from "@/components/retention/factory";
 import { InterruptRail } from "@/components/retention/interrupt-rail";
 import { SecretDrop } from "@/components/retention/secret-drop";
-import { SiteHeader, WHATSAPP_URL } from "@/components/retention/site-header";
+import { SiteHeader } from "@/components/retention/site-header";
+import { WHATSAPP_URL } from "@/components/retention/whatsapp";
 import { SoundToggle } from "@/components/retention/sound";
 import { StretchDriver } from "@/components/retention/stretch-driver";
 import { ViralPhone } from "@/components/retention/viral-phone";
@@ -23,12 +23,10 @@ export default function Home() {
 
       <section className="grid min-h-screen items-center gap-12 px-4 pt-28 pb-28 md:px-[8vw] lg:grid-cols-[minmax(0,1.35fr)_minmax(0,0.65fr)]">
         <div>
-          <Reveal onMount>
-            <h1 className="stretch max-w-[17ch] text-[clamp(2.8rem,6vw,6.2rem)] leading-[0.9] font-black">
-              Des sites et des vidéos qu&apos;on n&apos;arrive pas à quitter.
-            </h1>
-          </Reveal>
-          <Reveal onMount delay={0.12}>
+          <h1 className="hero-rise stretch max-w-[17ch] text-[clamp(2.8rem,6vw,6.2rem)] leading-[0.9] font-black">
+            Des sites et des vidéos qu&apos;on n&apos;arrive pas à quitter.
+          </h1>
+          <div className="hero-rise-late">
             <p className="mt-7 max-w-[46ch] text-xl text-craie/85">
               Septim est un studio à Yaoundé. On conçoit pour les marques et les créateurs qui veulent être regardés jusqu&apos;au bout.
             </p>
@@ -43,7 +41,7 @@ export default function Home() {
             <p className="mt-8 max-w-[50ch] text-brume">
               71 % des gens décident en 3 secondes s&apos;ils restent. À la fin de cette page, tu sauras ce qu&apos;on met dans ces 3 secondes.
             </p>
-          </Reveal>
+          </div>
         </div>
         <ViralPhone template="story" topic="ton attention" className="mx-auto w-full max-w-[19rem] rotate-[2deg]" />
       </section>

@@ -28,12 +28,13 @@ Le script de secours du moteur sert au démon sans Ollama. En interactif, **c'es
 
 `npm run viral -- "<sujet>" --template <t> --script <fichier>`
 
-Le moteur rend le MP4 9:16 (Remotion, 0 crédit), écrit le job dans `.septim-viral/jobs/<id>/` et envoie le message « Vidéo prête boss » (WhatsApp si lié, sinon console). Si la voix est silencieuse, dis-le clairement et donne les 2 commandes Piper du doctor.
+Le moteur rend le MP4 9:16 (Remotion, 0 crédit), écrit le job dans `.septim-viral/jobs/<id>/` et affiche le message « Vidéo prête… Réponds OUI #<ref> ». Le CLI n'ouvre jamais WhatsApp : si le démon tourne, il dépose le message dans la boîte d'envoi et c'est le démon qui l'envoie. Si la voix est silencieuse, dis-le clairement et donne les 2 commandes Piper du doctor.
 
 ## 4. Publier : uniquement sur un OUI pour cette vidéo-là
 
 - « Publie direct » dans la demande initiale n'est pas un OUI : l'utilisateur n'a pas encore vu **cette** vidéo. Montre-la (chemin du MP4 + légende par plateforme), puis attends « oui / publie ».
-- Sur OUI : le démon publie via Postiz ; en conversation, utilise le skill `postiz` (upload puis `posts:create`) avec les réglages de `publish-plan.ts`.
+- Sur OUI : `npm run viral -- --publish <ref>`. C'est le même registre que le démon : verrou, plateformes déjà en ligne jamais reprises, échec partiel signalé. N'appelle jamais Postiz toi-même.
+- Sur WhatsApp, le démon ne publie que sur « OUI #<ref> » (ou une réponse citant le message de la vidéo) ; « ok je regarde » ou « oui ? » ne publient rien.
 - Sans Postiz : donne la légende prête à coller et rappelle d'ajouter le son tendance dans l'app (seul moyen d'entrer dans la boucle du son).
 - Postiz auto-hébergé : TikTok et YouTube restent privés tant que ses apps ne sont pas auditées. Dis-le avant de publier.
 
@@ -63,4 +64,5 @@ Toujours, dans cet ordre : le MP4 (chemin), le hook, la durée et le moment de l
 | « Il a dit utilise Higgsfield » | Préférence ≠ budget. Coût affiché, oui chiffré. |
 | « J'écris vite un script de rendu à moi » | L'usine existe : `--script`, `--lint-only`, `--broll`. Pas de code de rendu ad hoc. |
 | « Le script de secours suffira » | Il est générique. Écris le script toi-même. |
+| « J'appelle Postiz directement, c'est plus simple » | Deux chemins = double publication. Toujours `--publish <ref>`. |
 | « Voix silencieuse, ça passe » | Dis-le et donne les commandes Piper. |

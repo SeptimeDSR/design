@@ -58,3 +58,37 @@ body {
     rotate: 4deg;
   }
 }
+
+/* Hero : entrée 100 % CSS, visible sans JavaScript et immédiate en mouvement réduit. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    translate: 0 18px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero-rise {
+    animation: rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .hero-rise-late {
+    animation: rise 0.45s 0.08s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+/* Rail d'interruptions : grille lisible par défaut ; défilement horizontal seulement quand GSAP l'active. */
+[data-rail="on"] {
+  display: flex;
+  height: 100vh;
+  align-items: center;
+  overflow: hidden;
+}
+[data-rail="on"] > ol {
+  flex-wrap: nowrap;
+}
+[data-rail="on"] li {
+  height: 62vh;
+}
+[data-rail="on"] li:nth-child(even) {
+  margin-top: 6rem;
+}

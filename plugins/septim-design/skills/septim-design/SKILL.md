@@ -45,16 +45,17 @@ Ensuite, importe `components/septim/retention/retention-tokens.css` dans le CSS 
 
 | Principe | Ce qu'il fait | Template |
 | --- | --- | --- |
-| Clarté en 0,5 s | Le hero dit quoi, pour qui, et l'action, sans scroller | à écrire dans la page |
+| Clarté en 0,5 s | Le hero dit quoi, pour qui, et l'action, sans scroller ; visible même sans JavaScript | classes CSS `hero-rise` / `hero-rise-late` (`retention-tokens.css`) |
 | Boucle ouverte (Zeigarnik) | Une promesse en haut, payée à ≥ 80 % de la page ; HUD « Chapitre n sur N » | `chapter-hud.tsx`, `chapters.ts` |
 | Scrollytelling | Chaque scroll révèle un chapitre | `countdown.tsx`, `interrupt-rail.tsx` |
 | Pattern interrupt | Chaque section casse le rythme de la précédente | `interrupt-rail.tsx` |
 | Récompense variable | Des secrets tirés au hasard à l'entrée dans l'écran | `secret-drop.tsx` |
 | Son | Nappe générée, **opt-in** uniquement, tic au changement de chapitre | `sound.tsx` |
 | Pas de stopping cue | Fil infini au lieu d'un footer ; mentions légales dans l'en-tête | `endless-feed.tsx`, `site-header.tsx` |
+| Un seul appel à l'action qui arrive | Tous les boutons ouvrent WhatsApp sur le numéro du client (`NEXT_PUBLIC_WHATSAPP_NUMBER`, le build prévient s'il manque) | `whatsapp.ts` |
 | Un seul geste fort | Titres qui s'étirent avec la vitesse de scroll | `stretch-driver.tsx` |
 
-Vérifie au navigateur : aucun `AudioContext` avant un clic, le fil grandit encore avec `prefers-reduced-motion`, rien ne bouge sous les yeux quand un secret ou des cartes apparaissent.
+Vérifie au navigateur : aucun `AudioContext` avant un clic, le fil grandit encore avec `prefers-reduced-motion`, rien ne bouge sous les yeux quand un secret ou des cartes apparaissent. Sans JavaScript, le hero et ses boutons sont visibles. En mouvement réduit, toutes les cartes du rail sont atteignables et aucune vidéo ne démarre seule ; toute vidéo en boucle a un bouton pause.
 
 ## 5. Règle d'or FREE / PRO
 
@@ -78,7 +79,7 @@ Avant de dire « fini » :
 | Symptôme | Cause | Correctif |
 | --- | --- | --- |
 | Le scroll saccade avec ScrollTrigger | Lenis tourne sur son propre RAF | `autoRaf: false` + `gsap.ticker` + `useLenis(ScrollTrigger.update)` (template `smooth-scroll.tsx`) |
-| Le texte du hero reste invisible | `whileInView` au-dessus de la ligne de flottaison | `<Reveal onMount>` pour le hero |
+| Le texte du hero reste invisible (avant hydratation, sans JS) | animation d'entrée pilotée par JavaScript (`whileInView`, `<Reveal>`) | entrée 100 % CSS : classes `hero-rise` / `hero-rise-late` |
 | L'objet 3D est noir | `metalness` élevé sans environnement | metalness ≤ 0,3, plus de lumières |
 | `remotion studio` ne résout pas les imports | alias `@/` dans `remotion/` | imports relatifs uniquement |
 | `tsc` casse après l'installation des skills Remotion | exemples `.tsx` dans `.agents/` | exclure `.agents` et `.claude` (fait par bootstrap) |
@@ -88,3 +89,6 @@ Avant de dire « fini » :
 | Le fil infini s'arrête de charger | la sentinelle reste visible, l'observateur ne se redéclenche pas | ré-observer après chaque chargement (template `endless-feed.tsx`) |
 | Les cartes sautent de colonne en chargeant | colonnes CSS (`columns-*`) | grille CSS |
 | `Math.random()` dans le rendu | écart serveur/client, règle de pureté React | tirer le hasard dans le callback de l'observateur |
+| Les dernières cartes du rail horizontal sont hors écran (mouvement réduit, sans JS) | la mise en page « rail » est en CSS, mais seul GSAP la fait défiler | grille par défaut ; GSAP pose `data-rail="on"` dans son `matchMedia` (template `interrupt-rail.tsx`) |
+| Un titre très étiré déborde de sa carte | taille en `vw` alors que la carte a une largeur minimale | taille en `cqi` sur une carte `@container` |
+| Vidéo en boucle impossible à arrêter (WCAG 2.2.2) | lecture auto sans contrôle | bouton pause, pas de lecture auto en mouvement réduit, pause du visiteur respectée |

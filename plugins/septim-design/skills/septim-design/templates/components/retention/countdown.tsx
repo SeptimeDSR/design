@@ -15,11 +15,12 @@ export function Countdown() {
         const tl = gsap.timeline({
           scrollTrigger: { trigger: root.current, start: "top top", end: "+=180%", pin: true, scrub: 0.6 },
         });
-        tl.from("[data-n='3']", { opacity: 0, scale: 0.6 })
+        // Les chiffres sont cachés par défaut (sans JS ils ne recouvrent rien) : GSAP les fait apparaître.
+        tl.fromTo("[data-n='3']", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1 })
           .to("[data-n='3']", { opacity: 0, scale: 1.4 })
-          .from("[data-n='2']", { opacity: 0, scale: 0.6 }, "<")
+          .fromTo("[data-n='2']", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1 }, "<")
           .to("[data-n='2']", { opacity: 0, scale: 1.4 })
-          .from("[data-n='1']", { opacity: 0, scale: 0.6 }, "<")
+          .fromTo("[data-n='1']", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1 }, "<")
           .to("[data-n='1']", { opacity: 0, scale: 1.4 })
           .from("[data-verdict]", { opacity: 0, y: 40 }, "<");
       });
@@ -34,7 +35,7 @@ export function Countdown() {
           key={n}
           data-n={n}
           aria-hidden
-          className="stretch absolute text-[clamp(14rem,48vw,34rem)] leading-none font-black text-craie motion-reduce:hidden"
+          className="stretch absolute text-[clamp(14rem,48vw,34rem)] leading-none font-black text-craie opacity-0 motion-reduce:hidden"
         >
           {n}
         </span>

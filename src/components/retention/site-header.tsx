@@ -1,10 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-
-export const WHATSAPP_URL = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER
-  ? `https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER}?text=${encodeURIComponent("Bonjour Septim, je veux un site ou des vidéos qui retiennent.")}`
-  : `https://wa.me/?text=${encodeURIComponent("Bonjour Septim, je veux un site ou des vidéos qui retiennent.")}`;
+import { WHATSAPP_URL } from "./whatsapp";
 
 // Pas de footer de fin : les mentions légales restent à un clic, dans l'en-tête.
 export function SiteHeader() {

@@ -42,8 +42,9 @@ Sans aucune clé, tout tourne en FREE : rendu Remotion, lit lo-fi généré, pub
 ## Lancer le site
 
 ```bash
+echo "NEXT_PUBLIC_WHATSAPP_NUMBER=2376XXXXXXXX" >> .env.local   # sinon le bouton WhatsApp n'arrive pas chez toi
 npm run dev
-npm test            # 128 tests du moteur viral
+npm test            # moteur viral + site
 npm run typecheck && npm run lint && npm run build
 ```
 

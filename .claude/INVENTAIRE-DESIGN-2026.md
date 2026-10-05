@@ -111,7 +111,7 @@ Variable PRO vide = version FREE affichée. Le site ne dépend jamais d'un créd
 
 | Brique | Statut | Prix | À quoi ça sert | Commande |
 | --- | --- | --- | --- | --- |
-| Moteur `src/viral-engine` (128 tests) | ✅ | Gratuit | Tendances → hook H.E.A.T → voix → rendu 9:16 → WhatsApp → publication → apprentissage | `npm run viral -- "sujet"` |
+| Moteur `src/viral-engine` (165 tests avec le site) | ✅ | Gratuit | Tendances → hook H.E.A.T → voix → rendu 9:16 → WhatsApp → publication → apprentissage | `npm run viral -- "sujet"` |
 | 3 templates 9:16 (story, maths, film) | ✅ MP4 rendus et vérifiés | Gratuit | Sous-titres mot à mot, coup visuel à chaque beat, barre de progression, réponse à ≥ 80 %, CTA « garde ça » | `--template story\|maths\|film` |
 | Voix Piper (FR) / Kokoro (EN) | ✅ code vérifié avec une vraie voix Piper | Gratuit, local | Voix grave à 1,1× | voir `viral:doctor` |
 | Lit lo-fi généré par code | ✅ | Gratuit, sans droits | Fond sonore qui ne fatigue pas | automatique |
@@ -160,7 +160,7 @@ Refait selon la science de la rétention : clarté en 0,5 s, promesse ouverte pa
 - `npm audit --omit=dev` : 0 vulnérabilité dans les dépendances de prod.
 - Plugin : `claude plugin validate --strict` OK (plugin + marketplace). Installé depuis le marketplace local : statut « enabled », 4 skills et 8 MCP détectés, ~365 tokens ajoutés par session.
 - Bootstrap testé sur un projet Next.js vierge : installe tout, 2ᵉ passage = `ready: true`, typecheck + ESLint + build OK avec les templates branchés.
-- Usine : 128 tests vitest verts ; rendus réels des 3 templates ; pipeline de bout en bout avec une vraie voix Piper (MP4 h264 + aac) ; démon lancé, cycle hors ligne, réponse « oui » → publié en mode manuel ; branche PRO B-roll rendue avec des clips de test.
+- Usine et site : 165 tests vitest verts ; rendus réels des 3 templates ; pipeline de bout en bout avec une vraie voix Piper (MP4 h264 + aac) ; démon lancé, cycle hors ligne, réponse « oui » → publié en mode manuel ; branche PRO B-roll rendue avec des clips de test.
 - Site : navigateur 1440 / 390 / reduced-motion : 0 erreur, 0 débordement, HUD qui avance, aucun AudioContext avant un clic, fil infini qui grandit, secrets aléatoires.
 - Skills testées par sous-agents : 3 scénarios RED sans skill (ils ont révélé 5 vrais défauts, corrigés) puis GREEN avec skill (voir `docs/skill-tests.md`).
 - Limite : depuis le conteneur, seuls npm et le CDN des skills étaient joignables. Les endpoints MCP (21st, Higgsfield, Runway, Pika) et les registres de composants n'ont pas pu être appelés ici ; ils sont configurés, et la connexion se fait chez toi.

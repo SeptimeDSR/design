@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { WHATSAPP_URL } from "./site-header";
+import { WHATSAPP_URL } from "./whatsapp";
 
 const FACTS = [
   "Le pouce met 0,25 seconde à décider de scroller.",
