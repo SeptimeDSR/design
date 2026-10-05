@@ -11,10 +11,15 @@ const wav = (seconds) => {
   b.writeUInt32LE(rate * 2, 28); b.writeUInt16LE(2, 32); b.writeUInt16LE(16, 34); b.write("data", 36); b.writeUInt32LE(n * 2, 40);
   return b;
 };
-process.stdout.write(JSON.stringify({ ready: true, device: "cpu" }) + "\n");
+if (process.env.FAKE_CHATTERBOX_SILENT_START) setInterval(() => undefined, 1000);
+else process.stdout.write(JSON.stringify({ ready: true, device: "cpu" }) + "\n");
 createInterface({ input: process.stdin }).on("line", (line) => {
   const job = JSON.parse(line);
-  if (job.text.includes("PANNE")) return process.stdout.write(JSON.stringify({ ok: false, error: "modèle en panne" }) + "\n");
+  const reply = (r) => process.stdout.write(JSON.stringify({ id: job.id, ...r }) + "\n");
+  if (job.text.includes("PANNE")) return reply({ ok: false, error: "modèle en panne" });
+  // LENT : ne répond jamais (le délai de l'usine doit couper). PARASITE : une réponse d'une autre phrase arrive d'abord.
+  if (job.text.includes("LENT")) return;
+  if (job.text.includes("PARASITE")) process.stdout.write(JSON.stringify({ id: "autre", ok: false, error: "pas pour toi" }) + "\n");
   writeFileSync(job.out, wav(job.text.split(/\s+/).length * 0.3));
-  process.stdout.write(JSON.stringify({ ok: true, lang: job.lang, voice: job.voice ?? null }) + "\n");
+  reply({ ok: true, lang: job.lang, voice: job.voice ?? null });
 });

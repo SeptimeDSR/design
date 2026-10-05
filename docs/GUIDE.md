@@ -530,6 +530,8 @@ Tout est optionnel : sans rien, l'usine tourne en gratuit (rendu Remotion, voix 
 | `VIRAL_MUSIC_DIR` | vide | tes pistes ; vide = nappe lo-fi générée |
 | `VIRAL_CHATTERBOX_VOICE` | vide | WAV de ta voix à cloner (voix HD) |
 | `VIRAL_CHATTERBOX_SCRIPT` | script intégré | avancé : autre worker Chatterbox |
+| `VIRAL_CHATTERBOX_START_TIMEOUT_MS` | `900000` (15 min) | délai de démarrage du modèle ; dépassé, la vidéo passe à la voix Piper |
+| `VIRAL_CHATTERBOX_TIMEOUT_MS` | `120000` (2 min) | délai par phrase ; dépassé, cette phrase passe à Piper (sinon silence) |
 | `NEXT_PUBLIC_WHATSAPP_NUMBER` | vide | site : numéro du bouton WhatsApp |
 | `NEXT_PUBLIC_SPLINE_SCENE` | vide | site : scène 3D Spline (sinon orbe three.js) |
 | `NEXT_PUBLIC_HERO_VIDEO_URL` | vide | site : vidéo hero PRO (sinon Remotion) |

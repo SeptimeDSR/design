@@ -66,51 +66,100 @@ async function runKokoro(text: string, outPath: string, speed: number): Promise<
 }
 
 // Voix HD (D24) : un seul processus Python garde Chatterbox chargé pour toutes les phrases de la vidéo.
-type Worker = { child: ChildProcessWithoutNullStreams; next: () => Promise<Record<string, unknown>> };
+// Chaque demande porte un id, chaque attente a un délai : un modèle bloqué ne bloque jamais le rendu.
+type Reply = Record<string, unknown>;
+type Worker = { child: ChildProcessWithoutNullStreams; ask: (job: Reply, ms: number) => Promise<Reply> };
 let worker: Promise<Worker> | undefined;
+let current: ChildProcessWithoutNullStreams | undefined;
 let started = 0;
+let seq = 0;
 export const chatterboxWorkers = () => started;
+export const chatterboxAlive = () => !!current && current.exitCode === null && !current.killed;
+
+const msFromEnv = (name: string, fallback: number) => {
+  const v = Number(process.env[name]);
+  return Number.isFinite(v) && v > 0 ? v : fallback;
+};
+
+// Fin de vidéo (ou délai dépassé) : le processus et la mémoire du modèle sont rendus.
+export function closeChatterbox(): void {
+  const child = current;
+  worker = undefined;
+  current = undefined;
+  if (child && child.exitCode === null) child.kill();
+}
 
 function startChatterbox(): Promise<Worker> {
   const script = process.env.VIRAL_CHATTERBOX_SCRIPT ?? join(__dirname, "py", "chatterbox_tts.py");
   const child = spawn(pythonBin(), [script], { stdio: ["pipe", "pipe", "pipe"] });
+  current = child;
   started++;
   child.unref();
   const lines = createInterface({ input: child.stdout });
-  const queue: ((v: Record<string, unknown>) => void)[] = [];
-  const buffered: Record<string, unknown>[] = [];
+  const pending = new Map<string, (v: Reply) => void>();
+  let hello: ((v: Reply) => void) | undefined;
   let err = "";
   child.stderr.on("data", (d) => (err = (err + d).slice(-500)));
   const fail = (why: string) => {
-    worker = undefined;
-    for (const r of queue.splice(0)) r({ ok: false, error: why });
+    if (current === child) closeChatterbox();
+    hello?.({ ready: false, error: why });
+    for (const r of pending.values()) r({ ok: false, error: why });
+    pending.clear();
   };
   child.on("error", (e) => fail(e.message));
   child.on("exit", (code) => fail(`chatterbox s'est arrêté (${code}) : ${err}`));
   lines.on("line", (line) => {
-    let msg: Record<string, unknown>;
+    let msg: Reply;
     try {
       msg = JSON.parse(line);
     } catch {
       return; // une bibliothèque qui parle sur stdout : ignoré
     }
-    const waiting = queue.shift();
-    if (waiting) waiting(msg);
-    else buffered.push(msg);
+    if ("ready" in msg && hello) {
+      hello(msg);
+      hello = undefined;
+      return;
+    }
+    const id = typeof msg.id === "string" ? msg.id : undefined;
+    const waiting = id ? pending.get(id) : undefined;
+    if (!waiting) return; // réponse d'une phrase déjà abandonnée, ou étrangère
+    pending.delete(id!);
+    waiting(msg);
   });
-  const next = () => new Promise<Record<string, unknown>>((r) => (buffered.length ? r(buffered.shift()!) : queue.push(r)));
-  return next().then((hello) => {
-    if (!hello.ready) throw new Error(String(hello.error ?? `chatterbox n'a pas démarré : ${err}`));
-    return { child, next };
+  // Délai dépassé : on coupe ce worker, la phrase suivante en relance un neuf.
+  const timed = (p: Promise<Reply>, ms: number, what: string) =>
+    new Promise<Reply>((resolve) => {
+      const t = setTimeout(() => {
+        if (current === child) closeChatterbox();
+        resolve({ ok: false, ready: false, error: `${what} : pas de réponse en ${Math.round(ms / 1000)} s` });
+      }, ms);
+      t.unref();
+      void p.then((v) => {
+        clearTimeout(t);
+        resolve(v);
+      });
+    });
+  const ask = (job: Reply, ms: number) => {
+    const id = String(++seq);
+    const reply = new Promise<Reply>((r) => pending.set(id, r));
+    child.stdin.write(`${JSON.stringify({ ...job, id })}\n`);
+    return timed(reply, ms, "chatterbox").finally(() => pending.delete(id));
+  };
+  // Premier démarrage : le modèle (~ 2 Go) se télécharge, d'où un délai large.
+  const ready = timed(new Promise<Reply>((r) => (hello = r)), msFromEnv("VIRAL_CHATTERBOX_START_TIMEOUT_MS", 900_000), "chatterbox au démarrage");
+  return ready.then((h) => {
+    if (!h.ready) throw new Error(String(h.error ?? `chatterbox n'a pas démarré : ${err}`));
+    return { child, ask };
   });
 }
 
 async function runChatterbox(text: string, lang: Lang, outPath: string): Promise<void> {
   worker ??= startChatterbox();
-  const w = await worker;
-  const reply = w.next();
-  w.child.stdin.write(`${JSON.stringify({ text, lang, out: outPath })}\n`);
-  const r = await reply;
+  const w = await worker.catch((error) => {
+    worker = undefined;
+    throw error;
+  });
+  const r = await w.ask({ text, lang, out: outPath }, msFromEnv("VIRAL_CHATTERBOX_TIMEOUT_MS", 120_000));
   if (!r.ok) throw new Error(String(r.error ?? "chatterbox a échoué"));
 }
 
@@ -133,7 +182,10 @@ export async function synthesize(
       return { path: opts.outPath, durationMs: wavDurationMs(voice), engine };
     }
   } catch (error) {
-    console.warn(`[tts] ${engine} indisponible, piste silencieuse : ${(error as Error).message}`);
+    // La voix HD en panne : la voix gratuite suivante (Piper, Kokoro) plutôt que le silence.
+    const next = engine === "chatterbox" ? await detectEngine(opts.lang, "auto") : "silent";
+    console.warn(`[tts] ${engine} indisponible, ${next === "silent" ? "piste silencieuse" : `voix ${next}`} : ${(error as Error).message}`);
+    if (next !== "silent") return synthesize(text, { ...opts, engine: next });
   }
 
   const durationMs = estimateSpokenMs(text, opts.lang, speed);

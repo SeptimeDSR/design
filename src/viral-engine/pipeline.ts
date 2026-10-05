@@ -16,7 +16,7 @@ import { hasPostizCredentials } from "./publish";
 import { segmentTexts, buildTimeline, lintScript } from "./story";
 import { createStore, type Job } from "./store";
 import { fetchTrends, pickTrend } from "./trends";
-import { synthesize, detectEngine } from "./tts";
+import { closeChatterbox, synthesize, detectEngine } from "./tts";
 import { FORMULAS, type Lang, type TemplateId, type Timeline, type ViralScript } from "./types";
 import type { ViralProps } from "../remotion/viral/props";
 
@@ -96,8 +96,13 @@ export async function runJob(req: JobRequest, partial: Partial<PipelineDeps> = {
   // Une piste par segment : la timeline suit les vraies durées de la voix.
   const engine = await detectEngine(lang, env.VIRAL_TTS ?? cfg.tts);
   const voices = [];
-  for (const [i, seg] of segmentTexts(script).entries()) {
-    voices.push(await synthesize(seg.text, { lang, engine, outPath: join(jobDir, "voice", `${String(i).padStart(2, "0")}.wav`) }));
+  try {
+    for (const [i, seg] of segmentTexts(script).entries()) {
+      voices.push(await synthesize(seg.text, { lang, engine, outPath: join(jobDir, "voice", `${String(i).padStart(2, "0")}.wav`) }));
+    }
+  } finally {
+    // Voix HD : le modèle rend sa mémoire avant le rendu Remotion (et un démon qui tourne des jours ne garde rien).
+    closeChatterbox();
   }
   const timeline = buildTimeline(script, voices.map((v) => v.durationMs));
   await writeAmbient(join(jobDir, "ambient.wav"), Math.ceil(timeline.durationMs / 1000) + 2);

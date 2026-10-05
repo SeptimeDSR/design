@@ -140,3 +140,88 @@ describe("voix normalisée (niveau réseaux sociaux)", () => {
     expect(normalizeSpeech(odd)).toBe(odd);
   });
 });
+
+describe("revue finale : Chatterbox ne bloque jamais un rendu", () => {
+  const fake = join(__dirname, "fixtures", "fake-chatterbox.mjs");
+  const keys = ["VIRAL_PYTHON", "VIRAL_CHATTERBOX_SCRIPT", "VIRAL_CHATTERBOX_TIMEOUT_MS", "VIRAL_CHATTERBOX_START_TIMEOUT_MS", "FAKE_CHATTERBOX_SILENT_START", "VIRAL_PIPER_DIR"];
+  const withEnv = async (extra: Record<string, string>, fn: () => Promise<void>) => {
+    const { closeChatterbox } = await import("../tts");
+    closeChatterbox();
+    Object.assign(process.env, { VIRAL_PYTHON: process.execPath, VIRAL_CHATTERBOX_SCRIPT: fake, ...extra });
+    try {
+      await fn();
+    } finally {
+      closeChatterbox();
+      for (const k of keys) delete process.env[k];
+    }
+  };
+
+  it("une phrase sans réponse est coupée au délai, puis un nouveau worker repart", async () => {
+    await withEnv({ VIRAL_CHATTERBOX_TIMEOUT_MS: "300" }, async () => {
+      const { synthesize, chatterboxWorkers } = await import("../tts");
+      const before = chatterboxWorkers();
+      const t0 = Date.now();
+      const slow = await synthesize("LENT ici", { lang: "fr", outPath: join(tmp(), "a.wav"), engine: "chatterbox" });
+      expect(slow.engine).toBe("silent");
+      expect(Date.now() - t0).toBeLessThan(3000);
+      const ok = await synthesize("la tontine", { lang: "fr", outPath: join(tmp(), "b.wav"), engine: "chatterbox" });
+      expect(ok.engine).toBe("chatterbox");
+      expect(chatterboxWorkers()).toBe(before + 2);
+    });
+  });
+
+  it("un modèle qui ne démarre jamais est coupé au délai de démarrage", async () => {
+    await withEnv({ VIRAL_CHATTERBOX_START_TIMEOUT_MS: "300", FAKE_CHATTERBOX_SILENT_START: "1" }, async () => {
+      const { synthesize } = await import("../tts");
+      const t0 = Date.now();
+      const r = await synthesize("la tontine", { lang: "fr", outPath: join(tmp(), "c.wav"), engine: "chatterbox" });
+      expect(r.engine).toBe("silent");
+      expect(Date.now() - t0).toBeLessThan(3000);
+    });
+  });
+
+  it("chaque réponse est rattachée à sa phrase par un identifiant (une réponse étrangère est ignorée)", async () => {
+    await withEnv({}, async () => {
+      const { synthesize } = await import("../tts");
+      const r = await synthesize("PARASITE puis la vraie", { lang: "fr", outPath: join(tmp(), "d.wav"), engine: "chatterbox" });
+      expect(r.engine).toBe("chatterbox");
+    });
+  });
+
+  it("Chatterbox en panne → la voix gratuite suivante (Piper) avant le silence", async () => {
+    const voices = tmp();
+    const { writeFileSync } = await import("node:fs");
+    writeFileSync(join(voices, "fr_FR-tom-medium.onnx"), "");
+    await withEnv({ VIRAL_PYTHON: join(__dirname, "fixtures", "fake-python.sh"), VIRAL_PIPER_DIR: voices }, async () => {
+      const { synthesize } = await import("../tts");
+      const r = await synthesize("PANNE ici", { lang: "fr", outPath: join(tmp(), "e.wav"), engine: "chatterbox" });
+      expect(r.engine).toBe("piper");
+      expect(r.durationMs).toBeCloseTo(1000, -1);
+    });
+  });
+
+  it("closeChatterbox arrête le worker ; runJob l'appelle à la fin de chaque vidéo", async () => {
+    await withEnv({}, async () => {
+      const { synthesize, chatterboxAlive, closeChatterbox } = await import("../tts");
+      await synthesize("la tontine", { lang: "fr", outPath: join(tmp(), "f.wav"), engine: "chatterbox" });
+      expect(chatterboxAlive()).toBe(true);
+      closeChatterbox();
+      expect(chatterboxAlive()).toBe(false);
+      const { runJob } = await import("../pipeline");
+      const dir = tmp();
+      await runJob(
+        { topic: "la tontine" },
+        {
+          env: { VIRAL_HOME: dir, VIRAL_TTS: "chatterbox", VIRAL_BROLL: "off" },
+          render: async (_j, _p, d) => join(d, "video.mp4"),
+          notify: async () => undefined,
+          llm: async () => {
+            throw new Error("pas d'Ollama");
+          },
+          broll: async () => ({ files: [], source: "procedural", credits: [] }),
+        },
+      );
+      expect(chatterboxAlive()).toBe(false);
+    });
+  }, 20_000);
+});
