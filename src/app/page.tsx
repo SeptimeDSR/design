@@ -11,7 +11,7 @@ import { StretchDriver } from "@/components/retention/stretch-driver";
 import { ViralPhone } from "@/components/retention/viral-phone";
 
 function ChapterLabel({ n }: { n: number }) {
-  return <p className="mb-6 text-brume">Chapitre {n}</p>;
+  return <p className="mb-6 text-craie/75">Chapitre {n}</p>;
 }
 
 export default function Home() {
@@ -33,7 +33,7 @@ export default function Home() {
               Septim est un studio à Yaoundé. On conçoit pour les marques et les créateurs qui veulent être regardés jusqu&apos;au bout.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <a href={WHATSAPP_URL} className="rounded-full bg-camwood px-7 py-4 font-semibold text-craie hover:bg-[#d4553a]">
+              <a href={WHATSAPP_URL} className="rounded-full bg-camwood px-7 py-4 font-semibold text-craie hover:bg-[#9f3b26]">
                 Écrire sur WhatsApp
               </a>
               <a href="#trois-secondes" className="rounded-full px-7 py-4 font-semibold text-craie ring-1 ring-craie/30 hover:bg-ndop">
@@ -117,7 +117,7 @@ export default function Home() {
         <p className="mt-10 max-w-[52ch] text-xl text-craie/90">
           Les 3 premières secondes ne vendent rien. Elles posent une question que ton cerveau refuse de laisser ouverte. Tout le reste, le son, le rythme, les récompenses, sert à repousser la réponse juste assez longtemps.
         </p>
-        <a href={WHATSAPP_URL} className="mt-12 inline-block rounded-full bg-camwood px-8 py-5 text-lg font-semibold text-craie hover:bg-[#d4553a]">
+        <a href={WHATSAPP_URL} className="mt-12 inline-block rounded-full bg-camwood px-8 py-5 text-lg font-semibold text-craie hover:bg-[#9f3b26]">
           Écrire sur WhatsApp
         </a>
       </section>

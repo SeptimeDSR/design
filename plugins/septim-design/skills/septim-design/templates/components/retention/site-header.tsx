@@ -18,7 +18,7 @@ export function SiteHeader() {
         <button type="button" onClick={() => dialog.current?.showModal()} className="rounded-full px-4 py-2 text-sm text-brume hover:text-craie">
           Mentions
         </button>
-        <a href={WHATSAPP_URL} className="rounded-full bg-camwood px-5 py-2.5 text-sm font-semibold text-craie hover:bg-[#d4553a]">
+        <a href={WHATSAPP_URL} className="rounded-full bg-camwood px-5 py-2.5 text-sm font-semibold text-craie hover:bg-[#9f3b26]">
           Écrire sur WhatsApp
         </a>
       </nav>

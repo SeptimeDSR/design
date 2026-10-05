@@ -14,7 +14,7 @@
 
 ## Direction artistique
 - Polices : Anybody Variable (titres, axe de largeur animé par la vitesse de scroll), Instrument Sans Variable (texte)
-- Couleurs : nuit indigo #121640, indigo ndop #24307a, craie #e9ecf2, camwood #c2492f (actions), raphia #e8c15a (récompenses seulement), brume #8f97c8 (texte secondaire)
+- Couleurs : nuit indigo #121640, indigo ndop #24307a, craie #e9ecf2, camwood #b4432b (actions, AA 4,7:1 avec la craie), raphia #e8c15a (récompenses seulement), brume #8f97c8 (texte secondaire)
 - Mouvement : un seul geste fort (titres qui s'étirent avec le scroll), le reste discret ; reduced-motion respecté
 - Références visuelles : tissu Ndop des Grassfields (indigo / blanc), téléphones 9:16
 
