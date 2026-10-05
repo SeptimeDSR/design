@@ -1,0 +1,28 @@
+{
+  "hook_first_3_sec": "Question perso qui implique le viewer, ex: 'Et si ta clé ne rentrait plus chez toi?'",
+  "curiosity_gap": "Commencer au milieu, pas au début",
+  "pattern_interrupt_3sec": "Changement angle/son/texte toutes les 3 sec",
+  "sound_template": "Utiliser un son trending du jour scrappé sur TikTok Creative Center",
+  "voice": "Kokoro TTS voix grave/chuchotée, 1.1x speed",
+  "variable_reward": "Ne pas donner la réponse avant 80% de la vidéo",
+  "cta_save": "Phrase qui pousse à sauvegarder: 'Garde ça, tu vas en avoir besoin demain'",
+  "site_sticky_rules": "Lenis scroll, pas de footer visible, scrollytelling, dopamine loop",
+  "heat": {
+    "H": "Hit emotion : choc en 1 seconde",
+    "E": "Curiosity gap : un trou dans le cerveau, on commence au milieu",
+    "A": "Tension / risque : quelque chose à perdre",
+    "T": "Transition : on avance vite vers la réponse"
+  },
+  "rules": {
+    "hook_max_seconds": 3,
+    "words_per_second": { "fr": 2.5, "en": 2.8 },
+    "voice_speed": 1.1,
+    "beat_max_seconds": 3.5,
+    "payoff_min_ratio": 0.8,
+    "target_seconds": [20, 60],
+    "cta": {
+      "fr": "Garde ça, tu vas en avoir besoin demain.",
+      "en": "Save this, you'll need it tomorrow."
+    }
+  }
+}

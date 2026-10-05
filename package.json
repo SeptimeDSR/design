@@ -10,7 +10,11 @@
     "video:studio": "remotion studio src/remotion/index.ts",
     "video:render": "remotion render src/remotion/index.ts hero-shot public/videos/hero-shot.mp4",
     "video:dolly": "remotion render src/remotion/index.ts cinematic-dolly public/videos/cinematic-dolly.mp4",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "viral": "tsx src/viral-engine/cli.ts",
+    "viral:daemon": "tsx src/viral-engine/daemon.ts",
+    "viral:ambient": "tsx src/viral-engine/ambient.ts"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",
@@ -37,13 +41,15 @@
   "devDependencies": {
     "@remotion/cli": "^4.0.533",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^22.20.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/three": "^0.186.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "tsx": "^4.23.15",
+    "typescript": "^5",
+    "vitest": "^5.0.3"
   }
 }
