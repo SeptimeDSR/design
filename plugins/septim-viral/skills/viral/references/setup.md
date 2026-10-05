@@ -2,7 +2,7 @@
 
 ```bash
 git clone https://github.com/SeptimeDSR/design ~/septim && cd ~/septim
-npm install                     # Remotion, moteur, WhatsApp, Postiz…
+PUPPETEER_SKIP_DOWNLOAD=1 npm install   # Remotion, moteur, WhatsApp… (sans le Chromium de puppeteer : voir sécurité)
 cp .env.example .env            # tout est optionnel, l'usine tourne sans rien
 npm run viral:doctor            # dit ce qui manque, avec les commandes
 ```
@@ -33,3 +33,8 @@ Postiz couvre déjà la publication. Ces serveurs servent si tu veux piloter une
 | Meta (oliverames/meta-mcp-server) | Facebook / Instagram / Threads | bundle MCPB du dépôt |
 
 N'existent pas : `@modelcontextprotocol/server-facebook`, `@modelcontextprotocol/server-youtube` ; le TikTok MCP le plus étoilé lit seulement, il ne publie pas.
+
+## Sécurité
+
+- `npm audit` signale `extract-zip` (via whatsapp-web.js → puppeteer) : aucune version corrigée n'existe. Il ne sert qu'au téléchargement du Chromium de puppeteer ; avec `PUPPETEER_SKIP_DOWNLOAD=1` et `WHATSAPP_CHROME_PATH` (Google Chrome installé), ce code ne s'exécute jamais. `basic-ftp` est forcé en version corrigée (`overrides` du package.json).
+- WhatsApp passe par une bibliothèque non officielle : un seul destinataire (toi), faible volume. Pour un usage pro à grande échelle, l'API WhatsApp Cloud officielle de Meta est la voie sûre.
