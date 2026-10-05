@@ -1,9 +1,18 @@
 import type { CaptionWord } from "./types";
 
+// « 500 000 » ou « 1 250 000 » : les groupes de 3 chiffres restent collés au nombre.
+export function splitWords(text: string): string[] {
+  return text
+    .replace(/(\d)\s+(?=\d{3}(?!\d))/g, "$1\u00a0")
+    .split(/[^\S\u00a0]+/)
+    .filter(Boolean)
+    .map((w) => w.replace(/\u00a0/g, " "));
+}
+
 // « pourquoi ? » reste un seul mot à l'écran (typographie française).
 function tokens(text: string): string[] {
   const out: string[] = [];
-  for (const raw of text.split(/\s+/).filter(Boolean)) {
+  for (const raw of splitWords(text)) {
     if (/^[?!:;»…]+$/.test(raw) && out.length) out[out.length - 1] += ` ${raw}`;
     else out.push(raw);
   }

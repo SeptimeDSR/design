@@ -1,5 +1,5 @@
 import type { CaptionWord, Segment, Timeline, ViralScript } from "../../viral-engine/types";
-import { pageCaptions, wordTimings } from "../../viral-engine/captions";
+import { pageCaptions, splitWords, wordTimings } from "../../viral-engine/captions";
 
 export const VIRAL_FPS = 30;
 export const VIRAL_WIDTH = 1080;
@@ -43,10 +43,11 @@ export function segmentAt(timeline: Timeline, ms: number): { segment: Segment; i
   return { segment: timeline.segments[safe], index: safe };
 }
 
-// Le mot fort d'un segment : l'emphase fournie, sinon le plus long mot après « : » (la vraie réponse), sinon le plus long.
+// Le mot fort d'un segment : l'emphase fournie, sinon après « : » (la vraie réponse) le premier nombre, sinon le plus long mot.
 export function emphasisOf(text: string, emphasis?: string): string {
   if (emphasis && text.toLowerCase().includes(emphasis.toLowerCase())) return emphasis;
   const afterColon = text.includes(":") ? text.slice(text.indexOf(":") + 1) : text;
-  const words = afterColon.replace(/[.,;:!?…«»"]/g, "").split(/\s+/).filter(Boolean);
-  return words.reduce((a, b) => (b.length > a.length ? b : a), "");
+  const words = splitWords(afterColon.replace(/[.,;:!?…«»"]/g, " "));
+  const number = words.find((w) => /\d/.test(w));
+  return number ?? words.reduce((a, b) => (b.length > a.length ? b : a), "");
 }

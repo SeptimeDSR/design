@@ -31,3 +31,13 @@ describe("pageCaptions", () => {
     expect(pages[0].at(-1)?.text).toBe("pourquoi ?");
   });
 });
+
+describe("nombres à la française dans les sous-titres", () => {
+  it("garde « 500 000 » en un seul mot", () => {
+    expect(wordTimings("Il reçoit 500 000 F", 0, 1000).map((w) => w.text)).toEqual(["Il", "reçoit", "500 000", "F"]);
+  });
+
+  it("garde aussi « 1 250 000 »", () => {
+    expect(wordTimings("Total 1 250 000 francs", 0, 1000).map((w) => w.text)).toEqual(["Total", "1 250 000", "francs"]);
+  });
+});
