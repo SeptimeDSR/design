@@ -29,3 +29,9 @@ Task 4: Ruling: lists are wrapped ({videos:[…]}, {tasks:[…]}), video detail 
 Task 4: Ruling: startServer takes an optional root (repo dir; default SEPTIM_ROOT then cwd) for the Studio, the font and package.json — cwd-based like render.ts, P7's bin chdirs to the repo — cost if wrong: none
 Task 4: Ruling: shared test fixture __tests__/fixtures/fake-factory.ts (seedJob, fakeFactory, FAKE_PROBES) reused by P5/P6 tests — cost if wrong: none
 Task 4: complete (commits 89143e3..27b3479, tests: npx vitest run →              at least ~882ms faster with isolate: false — reuses workers across files instead of one per file)
+Task 5: Ruling: zod ^4.6.5 declared in dependencies — it is a required (non-optional) peer of @modelcontextprotocol/sdk 1.32.1; importing it undeclared would break if npm stopped hoisting it (allowed by the Global Constraint) — cost if wrong: none
+Task 5: Ruling: MCP HTTP runs stateless in JSON-response mode (enableJsonResponse), GET/DELETE /mcp → 405 — no SSE stream to keep open, works with n8n and plain curl — cost if wrong: no progress notifications over HTTP (none are emitted)
+Task 5: Ruling: septim_create_video returns {task, video?, next} instead of a bare task, and the server sends `instructions` restating « OUI #ref » and « aucun crédit » — the model always gets the next step and the rule — cost if wrong: none
+Task 5: Ruling: script schema is described but loose (all fields optional, extra keys kept) — an incomplete script reaches the linter and comes back with readable rules, not a protocol InvalidParams — cost if wrong: none
+Task 5: npm audit --omit=dev unchanged by the SDK (only the known extract-zip via whatsapp-web.js)
+Task 5: complete (commits 03091e8..43a6f35, tests: npx vitest run →              at least ~973ms faster with isolate: false — reuses workers across files instead of one per file)
