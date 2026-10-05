@@ -5,8 +5,8 @@ import { loadConfig, type Env } from "./config";
 import { publishWithLedger } from "./daemon";
 import { diagnose, probe as realProbe, type Probes } from "./doctor";
 import { FactoryError } from "./errors";
-import { writeJsonAtomic } from "./lock";
-import { jobRef } from "./message";
+import { tryLock, writeJsonAtomic } from "./lock";
+import { hostname } from "node:os";
 import { checkScript, cleanTopic, runJob as realRunJob, type JobRequest, type PipelineDeps } from "./pipeline";
 import { publishJob, type PublishResult } from "./publish";
 import { resolveModeFromEnv } from "./publish-mode";
@@ -23,6 +23,9 @@ export type Task = {
   jobId?: string;
   ref?: string;
   error?: string;
+  // Processus qui rend la tâche : une tâche dont le processus est mort est « interrompue », pas « en cours » pour toujours.
+  pid?: number;
+  host?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -85,6 +88,22 @@ export function createFactory(partial: Partial<FactoryDeps> = {}) {
   const handlers = new Map<FactoryEvent, Set<(p: EventPayload) => void>>();
   let chain: Promise<unknown> = Promise.resolve();
 
+  const ref = (job: Pick<Job, "id">) => store.ref(job.id);
+  const alive = (pid: number) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === "EPERM";
+    }
+  };
+  // Ctrl+C, fin de session MCP, redémarrage pm2 : la tâche du processus mort passe à « failed », on peut la relancer.
+  const settle = (task: Task): Task => {
+    const active = task.status === "queued" || task.status === "running";
+    if (!active || !task.pid || task.pid === process.pid || task.host !== hostname() || alive(task.pid)) return task;
+    return saveTask({ ...task, status: "failed", error: "Rendu interrompu (l'usine s'est arrêtée pendant le rendu) : relance-le." });
+  };
+
   const emit = (event: FactoryEvent, payload: EventPayload) => {
     for (const h of handlers.get(event) ?? []) {
       try {
@@ -101,9 +120,9 @@ export function createFactory(partial: Partial<FactoryDeps> = {}) {
     return next;
   };
 
-  const resolve = (ref: string): Job => {
+  const resolve = (input: string): Job => {
     try {
-      return store.resolveRef(ref);
+      return store.resolveRef(input);
     } catch (error) {
       if (error instanceof RefError) {
         throw new FactoryError(error.code, error.message, error.code === "ambiguous_ref" ? { matches: error.matches.map(summary) } : undefined);
@@ -114,7 +133,7 @@ export function createFactory(partial: Partial<FactoryDeps> = {}) {
 
   const summary = (job: Job): VideoSummary => ({
     id: job.id,
-    ref: jobRef(job),
+    ref: ref(job),
     status: job.status,
     hook: job.script.hook,
     topic: job.script.topic,
@@ -153,18 +172,35 @@ export function createFactory(partial: Partial<FactoryDeps> = {}) {
     return { ...req, topic: topic || undefined };
   };
 
+  // Jeter (ou refaire) sous le verrou de publication, job relu : jamais « jetée » pendant qu'elle part, jamais d'écrasement du registre.
+  const rejectUnderLock = (job: Job): Job => {
+    if (job.status === "publishing") throw new FactoryError("conflict", `Publication de #${ref(job)} en cours : attends la fin.`);
+    const release = tryLock(join(store.jobsDir, job.id, "publish.lock"), 15 * 60_000);
+    if (!release) throw new FactoryError("conflict", `Publication de #${ref(job)} en cours : attends la fin.`);
+    try {
+      const fresh = store.getJob(job.id) ?? job;
+      if (fresh.status === "published") throw new FactoryError("conflict", `#${ref(fresh)} est déjà publiée.`);
+      if (fresh.status === "publishing") throw new FactoryError("conflict", `Publication de #${ref(fresh)} en cours : attends la fin.`);
+      const next = { ...fresh, status: "rejected" as const };
+      store.saveJob(next);
+      return next;
+    } finally {
+      release();
+    }
+  };
+
   const enqueue = (kind: Task["kind"], request: VideoRequest): Task => {
     const now = new Date().toISOString();
-    let task = saveTask({ id: randomUUID().slice(0, 8), kind, status: "queued", request, createdAt: now, updatedAt: now });
+    let task = saveTask({ id: randomUUID().slice(0, 8), kind, status: "queued", request, pid: process.pid, host: hostname(), createdAt: now, updatedAt: now });
     const run = async () => {
       task = saveTask({ ...task, status: "running" });
       try {
         const job = await runJob(request, { env, notify });
         if (job.status === "failed") {
-          task = saveTask({ ...task, status: "failed", jobId: job.id, ref: jobRef(job), error: job.error });
+          task = saveTask({ ...task, status: "failed", jobId: job.id, ref: ref(job), error: job.error });
           emit("video.failed", { video: detail(job), task, error: job.error });
         } else {
-          task = saveTask({ ...task, status: "done", jobId: job.id, ref: jobRef(job) });
+          task = saveTask({ ...task, status: "done", jobId: job.id, ref: ref(job) });
           emit("video.ready", { video: detail(job), task });
         }
       } catch (error) {
@@ -190,21 +226,19 @@ export function createFactory(partial: Partial<FactoryDeps> = {}) {
   return {
     home: cfg.home,
     createVideo: (req: VideoRequest): Task => enqueue("create", validate(req)),
-    redo(ref: string): Task {
-      const job = resolve(ref);
-      if (job.status === "published") throw new FactoryError("conflict", `#${jobRef(job)} est déjà publiée.`);
-      store.saveJob({ ...job, status: "rejected" });
+    redo(input: string): Task {
+      const job = rejectUnderLock(resolve(input));
       return enqueue("redo", { topic: job.script.topic, template: job.script.template, lang: job.script.lang });
     },
     getTask(id: string): Task {
       const path = join(tasksDir, `${id.replace(/[^a-z0-9-]/gi, "")}.json`);
       if (!existsSync(path)) throw new FactoryError("not_found", `Aucune tâche ${id}.`);
-      return JSON.parse(readFileSync(path, "utf8"));
+      return settle(JSON.parse(readFileSync(path, "utf8")));
     },
     listTasks(): Task[] {
       return readdirSync(tasksDir)
         .filter((f) => f.endsWith(".json"))
-        .map((f) => JSON.parse(readFileSync(join(tasksDir, f), "utf8")) as Task)
+        .map((f) => settle(JSON.parse(readFileSync(join(tasksDir, f), "utf8")) as Task))
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     },
     idle: async (): Promise<void> => {
@@ -223,16 +257,16 @@ export function createFactory(partial: Partial<FactoryDeps> = {}) {
         .slice(0, limit)
         .map(summary);
     },
-    getVideo: (ref: string): VideoDetail => detail(resolve(ref)),
-    videoFile(ref: string): string {
-      const job = resolve(ref);
-      if (!job.videoPath || !existsSync(job.videoPath)) throw new FactoryError("not_found", `Le fichier vidéo de #${jobRef(job)} n'existe pas (ou plus).`);
+    getVideo: (input: string): VideoDetail => detail(resolve(input)),
+    videoFile(input: string): string {
+      const job = resolve(input);
+      if (!job.videoPath || !existsSync(job.videoPath)) throw new FactoryError("not_found", `Le fichier vidéo de #${ref(job)} n'existe pas (ou plus).`);
       return job.videoPath;
     },
     lintScript,
     // La même règle partout : la phrase « OUI #ref » de CETTE vidéo, tapée par un humain.
-    async publish(ref: string, confirm: string) {
-      const job = resolve(ref);
+    async publish(input: string, confirm: string) {
+      const job = resolve(input);
       const said = CONFIRM.exec(confirm ?? "")?.[1];
       let confirmed: Job | undefined;
       try {
@@ -241,11 +275,11 @@ export function createFactory(partial: Partial<FactoryDeps> = {}) {
         confirmed = undefined;
       }
       if (confirmed?.id !== job.id) {
-        throw new FactoryError("confirmation_required", `Pour publier, il faut la confirmation exacte « OUI #${jobRef(job)} ».`, { expected: `OUI #${jobRef(job)}` });
+        throw new FactoryError("confirmation_required", `Pour publier, il faut la confirmation exacte « OUI #${ref(job)} ».`, { expected: `OUI #${ref(job)}` });
       }
-      if (job.status === "published") throw new FactoryError("conflict", `#${jobRef(job)} est déjà publiée.`);
-      if (job.status === "rejected") throw new FactoryError("conflict", `#${jobRef(job)} a été jetée.`);
-      if (job.status === "failed" || !job.videoPath) throw new FactoryError("conflict", `#${jobRef(job)} n'a pas de vidéo à publier.`);
+      if (job.status === "published") throw new FactoryError("conflict", `#${ref(job)} est déjà publiée.`);
+      if (job.status === "rejected") throw new FactoryError("conflict", `#${ref(job)} a été jetée.`);
+      if (job.status === "failed" || !job.videoPath) throw new FactoryError("conflict", `#${ref(job)} n'a pas de vidéo à publier.`);
 
       const messages: string[] = [];
       let manualText: string | undefined;
@@ -265,15 +299,16 @@ export function createFactory(partial: Partial<FactoryDeps> = {}) {
         await notify(message).catch(() => undefined);
         emit("video.published", { video: detail(after) });
       }
-      return { ref: jobRef(after), status: after.status, posted: after.posted, manualText, message };
+      return { ref: ref(after), status: after.status, posted: after.posted, manualText, message };
     },
-    reject(ref: string): VideoSummary {
-      const job = resolve(ref);
-      if (job.status === "published") throw new FactoryError("conflict", `#${jobRef(job)} est déjà publiée.`);
-      const next = { ...job, status: "rejected" as const };
-      store.saveJob(next);
+    reject(input: string): VideoSummary {
+      const next = rejectUnderLock(resolve(input));
       emit("video.rejected", { video: detail(next) });
       return summary(next);
+    },
+    // Une porte qui agit hors de la fabrique (WhatsApp) prévient quand même les autres logiciels.
+    announce(event: FactoryEvent, input: string): void {
+      emit(event, { video: detail(resolve(input)) });
     },
     doctor: async () => diagnose(await (partial.probe ?? (() => realProbe(cfg, env)))(), { envFile: resolvePath(env.SEPTIM_ROOT ?? process.cwd(), ".env") }),
     lessons() {

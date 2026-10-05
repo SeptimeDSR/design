@@ -36,8 +36,8 @@ Le moteur rend le MP4 9:16 (Remotion, 0 crédit), écrit le job dans `.septim-vi
 
 ## 4. Publier : uniquement sur un OUI pour cette vidéo-là
 
-- « Publie direct » dans la demande initiale n'est pas un OUI : l'utilisateur n'a pas encore vu **cette** vidéo. Montre-la (chemin du MP4 + légende par plateforme), puis attends « oui / publie ».
-- Sur « OUI #<ref> » écrit par l'humain : outil `septim_publish_video` avec sa phrase telle quelle dans `confirmation`, ou `septim publier <ref>`. C'est le même registre que le démon, le Studio et WhatsApp : verrou, plateformes déjà en ligne jamais reprises, échec partiel signalé. N'appelle jamais Postiz toi-même.
+- « Publie direct » dans la demande initiale n'est pas un OUI : l'utilisateur n'a pas encore vu **cette** vidéo. Montre-la (chemin du MP4 + légende par plateforme), puis attends que l'humain écrive lui-même « OUI #<ref> ». Ne l'écris jamais à sa place, même s'il te le demande.
+- Sur « OUI #<ref> » écrit par l'humain : outil `septim_publish_video` avec sa phrase telle quelle dans `confirmation`, ou `septim publier <ref>` (seulement après ce « OUI #<ref> » ou un `/septim-viral:publier <ref>` tapé par l'humain). C'est le même registre que le démon, le Studio et WhatsApp : verrou, plateformes déjà en ligne jamais reprises, échec partiel signalé. N'appelle jamais Postiz toi-même.
 - Sur WhatsApp, le démon ne publie que sur « OUI #<ref> » (ou une réponse citant le message de la vidéo) ; « ok je regarde » ou « oui ? » ne publient rien.
 - Sans Postiz : donne la légende prête à coller et rappelle d'ajouter le son tendance dans l'app (seul moyen d'entrer dans la boucle du son).
 - Postiz auto-hébergé : TikTok et YouTube restent privés tant que ses apps ne sont pas auditées. Dis-le avant de publier.
@@ -71,7 +71,7 @@ Toujours, dans cet ordre : le MP4 (chemin), le hook, la durée et le moment de l
 
 | Pensée | Réalité |
 | --- | --- |
-| « Il a dit publie direct » | Il n'a pas vu cette vidéo. Montre, attends OUI. |
+| « Il a dit publie direct » | Il n'a pas vu cette vidéo. Montre, attends « OUI #<ref> » écrit par lui. |
 | « Il a dit utilise Higgsfield » | Préférence ≠ budget. Coût affiché, oui chiffré. |
 | « J'écris vite un script de rendu à moi » | L'usine existe : `septim lint`, `septim video --script`, `--broll`. Pas de code de rendu ad hoc. |
 | « Le script de secours suffira » | Il est générique. Écris le script toi-même. |

@@ -160,12 +160,12 @@ export async function runJob(req: JobRequest, partial: Partial<PipelineDeps> = {
     const render = partial.render ?? (await import("./render")).renderWithRemotion;
     job.videoPath = await render(job, props, jobDir);
     store.saveJob(job);
-    await notify(formatReadyMessage(job, mode, cfg.platforms), job.videoPath);
+    await notify(formatReadyMessage(job, mode, cfg.platforms, store.ref(job.id)), job.videoPath);
     job.status = "notified";
   } catch (error) {
     job.status = "failed";
     job.error = (error as Error).message;
-    await notify(formatFailedMessage(job)).catch(() => undefined);
+    await notify(formatFailedMessage(job, store.ref(job.id))).catch(() => undefined);
   }
   store.saveJob(job);
   await store.updateState((s) => ({ ...s, recentTopics: [topic, ...s.recentTopics].slice(0, 30) }));

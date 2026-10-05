@@ -211,3 +211,59 @@ describe("factory : retrouver une vidéo", () => {
     expect(s.factory.getTask(task.id)).toMatchObject({ status: "done", jobId: "1234abcd" });
   });
 });
+
+describe("revue finale : robustesse du cœur", () => {
+  it("une tâche dont le processus est mort passe à failed (« interrompue ») au lieu de rester running pour toujours", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const s = setup();
+    const dead = spawnSync(process.execPath, ["-e", "process.exit(0)"]).pid!;
+    const now = new Date().toISOString();
+    writeFileSync(join(s.home, "tasks", "orphan01.json"), JSON.stringify({ id: "orphan01", kind: "create", status: "running", request: { topic: "x" }, pid: dead, host: (await import("node:os")).hostname(), createdAt: now, updatedAt: now }));
+    expect(s.factory.getTask("orphan01")).toMatchObject({ status: "failed", error: expect.stringMatching(/interrompu/i) });
+    expect(s.factory.listTasks().find((t) => t.id === "orphan01")?.status).toBe("failed");
+    const live = s.factory.createVideo({ topic: "vivante" });
+    expect(s.factory.getTask(live.id).status).not.toBe("failed");
+    await s.factory.idle();
+  });
+
+  it("jeter ou refaire pendant une publication → conflict, et jamais d'écrasement sous le verrou de publication", async () => {
+    const s = setup();
+    s.factory.createVideo({ topic: "a" });
+    await s.factory.idle();
+    const job = s.store.getJob("5f8a4d25")!;
+    s.store.saveJob({ ...job, status: "publishing", publishingSince: new Date().toISOString() });
+    expect(() => s.factory.reject("5f8a")).toThrow(expect.objectContaining({ code: "conflict" }));
+    expect(() => s.factory.redo("5f8a")).toThrow(expect.objectContaining({ code: "conflict" }));
+    s.store.saveJob({ ...job, status: "notified" });
+    const { tryLock } = await import("../lock");
+    const release = tryLock(join(s.store.jobsDir, job.id, "publish.lock"))!;
+    try {
+      expect(() => s.factory.reject("5f8a")).toThrow(expect.objectContaining({ code: "conflict" }));
+    } finally {
+      release();
+    }
+    expect(s.factory.reject("5f8a").status).toBe("rejected");
+  });
+
+  it("la référence affichée est le plus court préfixe UNIQUE (≥ 4) : la phrase demandée est toujours acceptée", async () => {
+    const s = setup({}, ["5f8a1111", "5f8a2222"]);
+    s.factory.createVideo({ topic: "a" });
+    s.factory.createVideo({ topic: "b" });
+    await s.factory.idle();
+    const a = s.factory.getVideo("5f8a1");
+    expect(a.ref).toBe("5f8a1");
+    expect(s.factory.listVideos().map((v) => v.ref).sort()).toEqual(["5f8a1", "5f8a2"]);
+    const r = await s.factory.publish(a.ref, `OUI #${a.ref}`);
+    expect(r.status).toBe("published");
+    expect(s.published).toEqual(["5f8a1111"]);
+  });
+
+  it("announce : une porte qui publie ou jette hors de la fabrique (WhatsApp) émet quand même l'événement", async () => {
+    const s = setup();
+    const seen = events(s.factory);
+    s.factory.createVideo({ topic: "a" });
+    await s.factory.idle();
+    s.factory.announce("video.published", "5f8a4d25");
+    expect(seen).toEqual(["video.ready", "video.published"]);
+  });
+});

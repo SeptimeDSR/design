@@ -88,6 +88,10 @@ describe("MCP : outils", () => {
       expect(r.data.error.code).toBe("confirmation_required");
     }
     expect(s.published).toEqual([]);
+    // Pas de « expected » côté MCP : un modèle ne doit pas pouvoir recopier la phrase à la place de l'humain.
+    const refused = await s.call("septim_publish_video", { ref: "5f8a", confirmation: "oui" });
+    expect(refused.data.error.details).toBeUndefined();
+    expect(refused.data.error.message).toMatch(/ne l'écris jamais toi-même/);
     const ok = await s.call("septim_publish_video", { ref: "#5F8A", confirmation: "OUI #5f8a" });
     expect(ok.isError).toBe(false);
     expect(ok.data).toMatchObject({ ref: "5f8a", status: "published" });

@@ -205,3 +205,29 @@ describe("publishWithLedger : jamais deux fois, même entre processus", () => {
     expect(s.store.getJob("beef1234")?.status).toBe("published");
   }, 20_000);
 });
+
+describe("revue finale : WhatsApp prévient les autres logiciels et n'écrase rien", () => {
+  it("OUI publie puis appelle onPublished ; NON jette puis appelle onRejected", async () => {
+    const s = setup([makeJob("beef1234"), makeJob("cafe5678")]);
+    const events: string[] = [];
+    const deps = { ...s.deps, onPublished: (j: Job) => void events.push(`pub:${j.id}`), onRejected: (j: Job) => void events.push(`rej:${j.id}`) };
+    await handleReply("OUI #beef", deps);
+    await handleReply("NON #cafe", deps);
+    expect(events).toEqual(["pub:beef1234", "rej:cafe5678"]);
+  });
+
+  it("NON pendant une publication (verrou pris) : rien n'est écrasé, l'usine dit que c'est en cours", async () => {
+    const s = setup([makeJob("beef1234")]);
+    const { tryLock } = await import("../lock");
+    const { mkdirSync } = await import("node:fs");
+    mkdirSync(join(s.store.jobsDir, "beef1234"), { recursive: true });
+    const release = tryLock(join(s.store.jobsDir, "beef1234", "publish.lock"))!;
+    try {
+      await handleReply("NON #beef", s.deps);
+    } finally {
+      release();
+    }
+    expect(s.store.getJob("beef1234")?.status).toBe("notified");
+    expect(s.sent.at(-1)).toMatch(/en cours/);
+  });
+});

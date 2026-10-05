@@ -49,6 +49,15 @@ export class RefError extends Error {
 // « #5F8A », « 5f8a », « 5f8a » : même vidéo, quelle que soit la porte.
 export const normalizeRef = (input: string): string => input.replace(/[#\s]/g, "").toLowerCase();
 
+// Le plus court préfixe d'au moins 4 caractères qu'aucune autre vidéo ne partage : « OUI #ref » reste toujours acceptable.
+export function uniqueRef(id: string, ids: string[]): string {
+  for (let n = 4; n < id.length; n++) {
+    const prefix = id.slice(0, n);
+    if (!ids.some((other) => other !== id && other.startsWith(prefix))) return prefix;
+  }
+  return id;
+}
+
 export function createStore(home: string) {
   const jobsDir = join(home, "jobs");
   mkdirSync(jobsDir, { recursive: true });
@@ -97,6 +106,10 @@ export function createStore(home: string) {
       return existsSync(jobPath(id)) ? readJob(id) : undefined;
     },
     listJobs,
+    ids: (): string[] => readdirSync(jobsDir).filter((id) => existsSync(jobPath(id))),
+    ref(id: string): string {
+      return uniqueRef(id, readdirSync(jobsDir).filter((x) => existsSync(jobPath(x))));
+    },
     latestJob(status?: JobStatus): Job | undefined {
       return listJobs().find((j) => !status || j.status === status);
     },

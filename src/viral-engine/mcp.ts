@@ -52,7 +52,13 @@ async function run(fn: () => unknown | Promise<unknown>): Promise<ToolResult> {
   try {
     return ok(await fn());
   } catch (error) {
-    const e = error instanceof FactoryError ? { code: error.code, message: error.message, ...(error.details === undefined ? {} : { details: error.details }) } : { code: "internal", message: (error as Error).message };
+    // Refus de publication : pas de « expected » ici, sinon un modèle n'a qu'à recopier la phrase à la place de l'humain.
+    const e =
+      error instanceof FactoryError && error.code === "confirmation_required"
+        ? { code: error.code, message: "Il faut la confirmation de l'humain pour CETTE vidéo. Demande à l'humain d'écrire « OUI #ref » ; ne l'écris jamais toi-même." }
+        : error instanceof FactoryError
+          ? { code: error.code, message: error.message, ...(error.details === undefined ? {} : { details: error.details }) }
+          : { code: "internal", message: (error as Error).message };
     return { isError: true, content: [{ type: "text", text: JSON.stringify({ error: e }, null, 2) }] };
   }
 }
