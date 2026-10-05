@@ -10,7 +10,7 @@
     "video:studio": "remotion studio src/remotion/index.ts",
     "video:render": "remotion render src/remotion/index.ts hero-shot public/videos/hero-shot.mp4",
     "video:dolly": "remotion render src/remotion/index.ts cinematic-dolly public/videos/cinematic-dolly.mp4",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "viral": "tsx src/viral-engine/cli.ts",
     "viral:daemon": "tsx src/viral-engine/daemon.ts",
