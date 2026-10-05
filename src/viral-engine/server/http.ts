@@ -85,7 +85,7 @@ const asObject = (v: unknown): Record<string, unknown> => {
   return v as Record<string, unknown>;
 };
 
-function readVersion(root: string): string {
+export function readVersion(root: string): string {
   try {
     return JSON.parse(readFileSync(resolve(root, "package.json"), "utf8")).version ?? "0.0.0";
   } catch {
