@@ -9,7 +9,7 @@ import { CLIENT_NAMES, isMcpClient, MCP_CLIENTS, mcpConfig, writeMcpConfig } fro
 import { formatDiagnosis } from "./doctor";
 import { FactoryError } from "./errors";
 import { createFactory, type VideoDetail, type VideoSummary } from "./factory";
-import { connectClaudeCode, installVoice, setup } from "./setup";
+import { connectClaudeCode, installVoice, installVoiceHd, setup } from "./setup";
 import type { JobStatus } from "./store";
 import { attachWebhooks, flushWebhooks } from "./webhooks";
 
@@ -34,7 +34,7 @@ Ouvrir les portes
   septim connect <client> [--write]   brancher un assistant : ${MCP_CLIENTS.join(", ")}
 
 Installer et réparer
-  septim setup [--sans-claude] [--voix]   .env, plugins et MCP de Claude Code, voix gratuite, diagnostic
+  septim setup [--sans-claude] [--voix] [--voix-hd]   .env, Claude Code, voix gratuite (HD : Chatterbox), diagnostic
   septim doctor                       ce qui tourne, et les commandes pour le reste
   septim design init [dossier]        installer septim-design dans un autre projet
   septim version
@@ -232,9 +232,10 @@ async function dispatch(command: string, args: string[], io: CliIO): Promise<num
     case "connect":
       return connect(args, io);
     case "setup": {
-      const { values } = parseArgs({ args, options: { "sans-claude": { type: "boolean", default: false }, voix: { type: "boolean", default: false } } });
+      const { values } = parseArgs({ args, options: { "sans-claude": { type: "boolean", default: false }, voix: { type: "boolean", default: false }, "voix-hd": { type: "boolean", default: false } } });
       let ok = setup(repoRoot(), io, { withClaude: !values["sans-claude"] });
       if (values.voix) ok = installVoice(createFactory().home, io) && ok;
+      if (values["voix-hd"]) ok = installVoiceHd(createFactory().home, io) && ok;
       out("");
       out(formatDiagnosis(await createFactory().doctor()));
       out("");

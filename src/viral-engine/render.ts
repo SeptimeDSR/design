@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { ViralProps } from "../remotion/viral/props";
 import type { Job } from "./store";
@@ -19,7 +19,8 @@ export async function renderWithRemotion(job: Job, props: ViralProps, jobDir: st
   const serveUrl = await getBundle();
   const publicJob = join(serveUrl, "public", "viral", job.id);
   mkdirSync(publicJob, { recursive: true });
-  for (const sub of ["voice", "ambient.wav", "broll"]) {
+  const music = readdirSync(jobDir).filter((f) => f.startsWith("music."));
+  for (const sub of ["voice", "ambient.wav", "broll", ...music]) {
     if (existsSync(join(jobDir, sub))) cpSync(join(jobDir, sub), join(publicJob, sub), { recursive: true });
   }
 

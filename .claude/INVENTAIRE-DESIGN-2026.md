@@ -2,6 +2,28 @@
 
 Audit réalisé le 5 octobre 2026. Les prix viennent de recherches web faites ce jour-là et changent souvent : vérifie sur le site de chaque outil avant d'acheter des crédits.
 
+## Gratuit d'abord : chaque outil payant et son remplaçant gratuit
+
+Mis à jour le 5 octobre 2026 (recherche web du jour). Règle : la voie gratuite tourne par défaut ; le payant ne vient qu'en second, coût affiché, après un oui chiffré.
+
+| Payant | Remplaçant gratuit | Licence / limite | Dans le repo |
+| --- | --- | --- | --- |
+| Higgsfield, Runway, Pika (plans vidéo IA) | **ComfyUI + Wan 2.2 TI2V-5B** en local ; LTX-2.3 (son synchronisé) ; HunyuanVideo 1.5 | Wan 2.2 : Apache 2.0, ~8 Go de VRAM en natif ComfyUI. LTX-2 : licence communautaire gratuite sous 10 M$ de revenus annuels. HunyuanVideo 1.5 : ~14 Go | ✅ `COMFYUI_URL` → `src/viral-engine/broll.ts` (workflow Wan 2.2 intégré, ou le tien via `COMFYUI_WORKFLOW`) |
+| Plans vidéo en rapport avec le sujet | **Pexels**, puis **Pixabay** | clé gratuite, usage commercial sans attribution obligatoire (crédits gardés dans le job) | ✅ `PEXELS_API_KEY`, `PIXABAY_API_KEY` |
+| Motion design, templates vidéo | **Remotion** (3 templates 9:16), GSAP, Motion | Remotion gratuit jusqu'à 3 personnes | ✅ |
+| ElevenLabs, voix Pika | **Piper** (CPU) ; **Chatterbox Multilingual** (Resemble AI, 23 langues dont le français, clonage de voix) | Piper : MIT ; Chatterbox : MIT, filigrane audio intégré ; GPU conseillé | ✅ `septim setup --voix`, `--voix-hd` |
+| Suno, musique Pika | **ACE-Step 1.5** en local ; bibliothèques libres de droits | open source, < 4 Go de VRAM, usage commercial | ✅ `VIRAL_MUSIC_DIR` (le lit lo-fi généré reste le défaut) |
+| Images IA (Midjourney…) | **FLUX.2 [klein] 4B**, **Qwen-Image** via ComfyUI | Apache 2.0 | 🔌 via ComfyUI (pas encore branché dans l'usine) |
+| Script (ChatGPT payant) | **Claude dans ta session**, **Ollama + qwen2.5** pour le démon | local, gratuit | ✅ |
+| Postiz cloud (29 $/mois) | **Postiz auto-hébergé**, ou mode manuel | gratuit ; TikTok/YouTube privés tant que tes apps ne sont pas auditées | ✅ |
+| 21st.dev génération IA | **shadcn**, Magic UI, Aceternity, React Bits | gratuits (versions Pro payantes en option) | ✅ |
+| Spline Starter / Pro | **three.js / R3F** ; Spline gratuit pour éditer | gratuit | ✅ |
+| GPU cloud payant | Hugging Face ZeroGPU (compte gratuit : ~5 min de GPU par jour) | trop peu pour une usine ; bon pour un essai | 📄 documenté seulement |
+
+Sources : [Thunder Compute, modèles vidéo open source 2026](https://www.thundercompute.com/blog/best-open-source-ai-video-generation-models) · [Wan 2.2 (GitHub)](https://github.com/Wan-Video/Wan2.2) · [VRAM Wan 2.2](https://willitrunai.com/blog/wan-2-2-vram-requirements) · [Licence LTX-2](https://huggingface.co/Lightricks/LTX-2/blob/main/LICENSE) · [Workflow ComfyUI Wan 2.2 5B](https://comfy.org/workflows/video_wan2_2_5B_ti2v-f83ee3caa04e/) · [API ComfyUI](https://docs.comfy.org/development/comfyui-server/comms_routes) · [API Pexels](https://www.pexels.com/api/documentation/) · [API Pixabay](https://pixabay.com/api/docs/) · [Chatterbox Multilingual](https://www.resemble.ai/learn/models/chatterbox-multilingual) · [ACE-Step](https://github.com/ace-step/ACE-Step) · [ACE-Step 1.5](https://dev.to/czmilo/ace-step-15-the-complete-2026-guide-to-open-source-ai-music-generation-522e) · [Modèles d'images open source 2026](https://www.siliconflow.com/articles/best-open-source-image-generation-models-2025) · [ZeroGPU](https://huggingface.co/docs/hub/en/spaces-zerogpu)
+
+Non vérifié dans le conteneur (pas de GPU, Hugging Face et les API Pexels/Pixabay bloqués par le réseau) : la génération réelle par ComfyUI, les vrais appels Pexels/Pixabay, Chatterbox avec le vrai modèle. Le code est couvert par des tests sur faux serveurs qui suivent les formats documentés.
+
 ## Les 2 plugins Septim (tout est dedans)
 
 Installation unique, valable pour tous tes projets :

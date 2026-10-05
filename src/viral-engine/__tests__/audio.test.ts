@@ -70,3 +70,45 @@ describe("python de Piper", () => {
     expect(pythonBin({ VIRAL_HOME: home, VIRAL_PYTHON: "/opt/py/bin/python3" })).toBe("/opt/py/bin/python3");
   });
 });
+
+describe("voix HD Chatterbox (gratuite, MIT, français)", () => {
+  const fake = join(__dirname, "fixtures", "fake-chatterbox.mjs");
+  const env = (extra: Record<string, string> = {}) => ({ VIRAL_PYTHON: process.execPath, VIRAL_CHATTERBOX_SCRIPT: fake, ...extra });
+
+  it("un seul processus pour toutes les phrases ; la durée vient du vrai fichier", async () => {
+    const { synthesize, chatterboxWorkers } = await import("../tts");
+    const dir = mkdtempSync(join(tmpdir(), "septim-cb-"));
+    Object.assign(process.env, env());
+    try {
+      const a = await synthesize("Tu es le dernier à bouffer", { lang: "fr", outPath: join(dir, "a.wav"), engine: "chatterbox" });
+      const b = await synthesize("la tontine", { lang: "fr", outPath: join(dir, "b.wav"), engine: "chatterbox" });
+      expect(a.engine).toBe("chatterbox");
+      expect(a.durationMs).toBeCloseTo(1800, -1);
+      expect(b.durationMs).toBeCloseTo(600, -1);
+      expect(chatterboxWorkers()).toBe(1);
+    } finally {
+      delete process.env.VIRAL_PYTHON;
+      delete process.env.VIRAL_CHATTERBOX_SCRIPT;
+    }
+  });
+
+  it("une phrase ratée → piste silencieuse pour celle-là, le rendu continue", async () => {
+    const { synthesize } = await import("../tts");
+    const dir = mkdtempSync(join(tmpdir(), "septim-cb-"));
+    Object.assign(process.env, env());
+    try {
+      const r = await synthesize("PANNE ici", { lang: "fr", outPath: join(dir, "c.wav"), engine: "chatterbox" });
+      expect(r.engine).toBe("silent");
+      expect(existsSync(join(dir, "c.wav"))).toBe(true);
+    } finally {
+      delete process.env.VIRAL_PYTHON;
+      delete process.env.VIRAL_CHATTERBOX_SCRIPT;
+    }
+  });
+
+  it("VIRAL_TTS=chatterbox est choisi tel quel ; auto ne le choisit pas (lent sans GPU)", async () => {
+    const { detectEngine } = await import("../tts");
+    expect(await detectEngine("fr", "chatterbox")).toBe("chatterbox");
+    expect(await detectEngine("fr", "auto")).not.toBe("chatterbox");
+  });
+});

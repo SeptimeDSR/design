@@ -1,16 +1,15 @@
 @AGENTS.md
 
-**Travail en cours (reprise) :** lire `docs/REPRISE.md` avant toute action. Plan en cours : `docs/superpowers/plans/2026-10-05-septim-portes.md` (tâches P1 à P3 faites, reprendre à P4), registre `docs/handoff/ledger-septim-portes.md`.
+**Travail en cours (reprise) :** lire `docs/REPRISE.md` avant toute action. Plan en cours : `docs/superpowers/plans/2026-10-05-septim-portes.md` (l'état de chaque tâche est dans le registre `docs/handoff/ledger-septim-portes.md`).
 
-# Règle d'or : PRO avec crédits / FREE tout de suite
+# Règle d'or : FREE d'abord, PRO en second
 
-Chaque effet visuel ou vidéo existe en deux versions :
+Chaque effet visuel, vidéo, voix ou musique a une voie gratuite qui tourne par défaut, sans compte ni crédit :
 
-- **PRO** (Higgsfield, Runway, Pika — payant en crédits) : commenter dans le code
+- **FREE** (Remotion, three.js/R3F, GSAP, Lenis, Motion ; IA locale ComfyUI + Wan 2.2 / LTX-2 ; banques libres Pexels/Pixabay ; Piper, Chatterbox ; ACE-Step) : toujours codée et fonctionnelle, c'est la branche par défaut quand la variable PRO est vide.
+- **PRO** (Higgsfield, Runway, Pika — payant en crédits) : seulement en second, quand le gratuit ne suffit pas, coût affiché et oui explicite. Commenter dans le code
   `// BESOIN CREDIT: <outil> pour <usage>. Alternative gratuite: <outil free> installé ici`
   et ne jamais lancer une génération payante sans confirmation explicite.
-- **FREE** (Remotion, three.js/R3F, GSAP, Lenis, Motion) : toujours codée et fonctionnelle,
-  c'est la branche par défaut quand la variable d'environnement PRO est vide.
 
 Inventaire complet des outils, prix et commandes : `.claude/INVENTAIRE-DESIGN-2026.md`.
 

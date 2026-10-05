@@ -8,7 +8,7 @@ const STATUS = { rendered: "Rendue", notified: "À valider", publishing: "Public
 const TASK_STATUS = { queued: "En file d'attente", running: "En fabrication", done: "Prête", failed: "Ratée" };
 const TEMPLATES = { story: "Histoire", maths: "Maths", film: "Film" };
 const SOURCES = { claude: "écrit par Claude", ollama: "écrit par Ollama", fallback: "script de secours" };
-const VOICES = { piper: "Piper", kokoro: "Kokoro", silent: "silencieuse" };
+const VOICES = { piper: "Piper", kokoro: "Kokoro", chatterbox: "Chatterbox HD", silent: "silencieuse" };
 const CLIENTS = [
   ["claude-code", "Claude Code"],
   ["claude-desktop", "Claude Desktop"],
@@ -170,6 +170,7 @@ async function loadDoctor() {
       llm: d.llm === "ollama" ? "Ollama, en local" : "de secours",
       publishMode: d.publishMode === "postiz" ? "Postiz" : "manuelle, légende à coller",
       notify: d.notify === "whatsapp" ? "WhatsApp" : "console",
+      broll: { comfyui: "IA locale (gratuit)", pexels: "Pexels (gratuit)", pixabay: "Pixabay (gratuit)" }[d.broll] ?? "fonds animés",
     };
     for (const [key, text] of Object.entries(values)) box.querySelector(`[data-state="${key}"]`).textContent = text;
     const fixes = $("fixes");

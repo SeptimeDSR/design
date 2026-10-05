@@ -99,6 +99,20 @@ describe("septim setup --voix", () => {
     ]);
   });
 
+  it("--voix-hd installe Chatterbox (MIT) dans le même venv, et dit comment l'activer", async () => {
+    const { installVoiceHd } = await import("../setup");
+    const home = mkdtempSync(join(tmpdir(), "septim-voix-"));
+    const calls: string[][] = [];
+    const out = capture();
+    expect(installVoiceHd(home, { out: out.stream, err: capture().stream }, { run: (cmd, args) => (calls.push([cmd, ...args]), 0) })).toBe(true);
+    const py = join(home, "venv", "bin", "python");
+    expect(calls).toEqual([
+      ["python3", "-m", "venv", join(home, "venv")],
+      [py, "-m", "pip", "install", "--upgrade", "chatterbox-tts"],
+    ]);
+    expect(out.text).toMatch(/VIRAL_TTS=chatterbox/);
+  });
+
   it("venv impossible (python3-venv absent) → échec expliqué, rien d'autre lancé", async () => {
     const { installVoice } = await import("../setup");
     const err = capture();

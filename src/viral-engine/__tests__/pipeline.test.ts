@@ -140,3 +140,65 @@ describe("runJob PRO avec plans B-roll", () => {
     expect(existsSync(join(dir, "jobs", job.id, "broll", "a.mp4"))).toBe(true);
   });
 });
+
+describe("runJob gratuit d'abord : B-roll et musique sans crédit", () => {
+  it("sans --broll, les plans gratuits (banque libre ou IA locale) sont écrits dans le job et passés au rendu, source et crédits notés", async () => {
+    const { writeFileSync, mkdirSync } = await import("node:fs");
+    const dir = home();
+    let props: { broll?: string[] } = {};
+    const job = await runJob(
+      { topic: "la tontine" },
+      {
+        ...fakeDeps([]),
+        env: { VIRAL_HOME: dir, VIRAL_TTS: "silent" },
+        broll: async (_script, _timeline, out) => {
+          mkdirSync(out, { recursive: true });
+          writeFileSync(join(out, "00.mp4"), "x");
+          writeFileSync(join(out, "01.mp4"), "x");
+          return { source: "pexels", files: ["00.mp4", "01.mp4"], credits: [{ provider: "pexels", author: "Ama", url: "https://www.pexels.com/video/1/" }] };
+        },
+        render: async (_j: unknown, p: { broll?: string[] }, d: string) => ((props = p), join(d, "video.mp4")),
+      },
+    );
+    expect(props.broll).toEqual([`viral/${job.id}/broll/00.mp4`, `viral/${job.id}/broll/01.mp4`]);
+    expect(job.broll).toEqual({ source: "pexels", credits: [{ provider: "pexels", author: "Ama", url: "https://www.pexels.com/video/1/" }] });
+  });
+
+  it("un B-roll qui lève ne bloque jamais le rendu : fonds procéduraux", async () => {
+    const dir = home();
+    let props: { broll?: string[] } = { broll: ["x"] };
+    const job = await runJob(
+      { topic: "la tontine" },
+      {
+        ...fakeDeps([]),
+        env: { VIRAL_HOME: dir, VIRAL_TTS: "silent" },
+        broll: async () => {
+          throw new Error("réseau coupé");
+        },
+        render: async (_j: unknown, p: { broll?: string[] }, d: string) => ((props = p), join(d, "video.mp4")),
+      },
+    );
+    expect(job.status).toBe("notified");
+    expect(props.broll).toBeUndefined();
+    expect(job.broll?.source).toBe("procedural");
+  });
+
+  it("VIRAL_MUSIC_DIR : une de tes pistes remplace le lit procédural, toujours la même pour un même job", async () => {
+    const { mkdirSync, writeFileSync } = await import("node:fs");
+    const dir = home();
+    const music = join(dir, "musique");
+    mkdirSync(music);
+    for (const f of ["a.mp3", "b.wav", "c.ogg", "notes.txt"]) writeFileSync(join(music, f), "x");
+    let props: { audio?: { ambient?: string; ambientVolume?: number } } = {};
+    const job = await runJob(
+      { topic: "la tontine" },
+      { ...fakeDeps([]), env: { VIRAL_HOME: dir, VIRAL_TTS: "silent", VIRAL_MUSIC_DIR: music }, render: async (_j: unknown, p: typeof props, d: string) => ((props = p), join(d, "video.mp4")) },
+    );
+    expect(props.audio?.ambient).toMatch(new RegExp(`^viral/${job.id}/music\\.(mp3|wav|ogg)$`));
+    expect(props.audio?.ambientVolume).toBeGreaterThan(0.08);
+    expect(existsSync(join(dir, "jobs", job.id, props.audio!.ambient!.split("/").pop()!))).toBe(true);
+    const { pickTrack } = await import("../music");
+    expect(pickTrack(music, job.id)).toBe(pickTrack(music, job.id));
+    expect(pickTrack(join(dir, "absent"), job.id)).toBeUndefined();
+  });
+});

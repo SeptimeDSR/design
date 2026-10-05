@@ -9,8 +9,8 @@ export const TAIL_FRAMES = 15;
 export type ViralProps = {
   script: ViralScript;
   timeline: Timeline;
-  audio: { segments: { src: string; startMs: number }[]; ambient?: string };
-  // PRO : plans générés (Higgsfield Soul / Seedance). Vide = fonds procéduraux gratuits.
+  audio: { segments: { src: string; startMs: number }[]; ambient?: string; ambientVolume?: number };
+  // Plans de fond : tes clips, le B-roll gratuit (ComfyUI, Pexels, Pixabay) ou PRO (Higgsfield). Vide = fonds procéduraux.
   broll?: string[];
 };
 

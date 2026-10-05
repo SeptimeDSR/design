@@ -27,6 +27,8 @@ export type Job = {
   posted?: Partial<Record<Platform, string[]>>;
   publishingSince?: string;
   publishedAt?: string;
+  // D'où viennent les plans de fond, et à qui les créditer (Pexels, Pixabay).
+  broll?: { source: string; credits: { provider: string; author: string; url: string }[] };
   views?: number;
   rewarded?: boolean;
   error?: string;

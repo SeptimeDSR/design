@@ -354,6 +354,20 @@
 - [ ] **Step 4 : lancer** `npm test`, puis `claude plugin validate --strict plugins/septim-viral` et `claude plugin validate --strict .`, puis `bash -n scripts/install.sh`. Attendu : vert.
 - [ ] **Step 5 : commit** `docs: mode d'emploi complet, installation en une commande, commandes /septim-viral:*`.
 
+### Task 10 : Gratuit d'abord (D21–D27)
+
+**Files :** Create `src/viral-engine/broll.ts`, `src/viral-engine/music.ts`, `src/viral-engine/py/chatterbox_tts.py` ; Modify `pipeline.ts`, `types.ts` (`Beat.visual?`), `tts.ts` (moteur chatterbox), `doctor.ts`, `setup.ts` (`--voix-hd`), `septim.ts`, `.env.example`, `docs/GUIDE.md`, `.claude/INVENTAIRE-DESIGN-2026.md`, `CLAUDE.md`, skills `hero-shot`, `cinematic-dolly`, `viral`, `references/heat.md` ; Test `broll.test.ts`, `music.test.ts`, `pipeline.test.ts`, `doctor.test.ts`, `audio.test.ts`.
+
+- [ ] Tests en échec : chaîne ComfyUI → Pexels → Pixabay → procédural (faux serveurs) ; requête construite depuis `visual`, sinon mot fort + sujet ; Pexels choisit un fichier vertical ≥ 1080 de haut ; ComfyUI : POST /prompt, /history, /view ; un étage qui lève passe au suivant ; `--broll` prioritaire ; musique choisie de façon stable par job ; diagnostic des étages ; commande Chatterbox.
+- [ ] Implémenter, `npm test`, commit `feat(viral): gratuit d'abord — B-roll IA locale ou banques libres, musique, voix HD`.
+
+### Task 11 : Templates imbattables (D28)
+
+**Files :** Modify `src/remotion/viral/{shared,ViralStory,ViralMaths,ViralFilm,props}.tsx`, `src/viral-engine/render.ts` (CRF 18), `src/viral-engine/sfx.ts` (nouveau, bruitages générés) ; Test `src/viral-engine/__tests__/layout.test.ts`, `sfx.test.ts`.
+
+- [ ] Tests en échec : zones sûres, hook complet dès 0 ms, un changement de scène par segment, taille des sous-titres, temps des bruitages.
+- [ ] Implémenter ; rendre les 3 templates ; planches d'images relues ; corriger jusqu'à ce que chaque planche soit irréprochable ; commit `feat(viral): templates imbattables — hook dès la 1re image, zones sûres, bruitages, compteurs`.
+
 ### Task 9 : Vérification de bout en bout et tests par sous-agents
 
 - [ ] **Step 1 : vrai rendu par l'API.** `septim studio`, puis `curl POST /api/v1/videos` avec le script tontine. La tâche passe à `done` et `GET …/video` renvoie 206 sur une Range.

@@ -1,4 +1,5 @@
-import { spawn, spawnSync } from "node:child_process";
+import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { createInterface } from "node:readline";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -7,7 +8,7 @@ import { estimateSpokenMs } from "./heat";
 import type { Lang } from "./types";
 import { encodeWav, wavDurationMs } from "./wav";
 
-export type TtsEngine = "piper" | "kokoro" | "silent";
+export type TtsEngine = "piper" | "kokoro" | "chatterbox" | "silent";
 
 const PIPER_VOICE: Record<Lang, string> = {
   fr: process.env.VIRAL_PIPER_VOICE ?? "fr_FR-tom-medium",
@@ -39,7 +40,7 @@ async function kokoroReady(): Promise<boolean> {
 }
 
 export async function detectEngine(lang: Lang, pref = process.env.VIRAL_TTS ?? "auto"): Promise<TtsEngine> {
-  if (pref === "piper" || pref === "kokoro" || pref === "silent") return pref;
+  if (pref === "piper" || pref === "kokoro" || pref === "chatterbox" || pref === "silent") return pref;
   if (lang === "en" && (await kokoroReady())) return "kokoro";
   if (piperReady(lang)) return "piper";
   return "silent";
@@ -64,6 +65,55 @@ async function runKokoro(text: string, outPath: string, speed: number): Promise<
   await audio.save(outPath);
 }
 
+// Voix HD (D24) : un seul processus Python garde Chatterbox chargé pour toutes les phrases de la vidéo.
+type Worker = { child: ChildProcessWithoutNullStreams; next: () => Promise<Record<string, unknown>> };
+let worker: Promise<Worker> | undefined;
+let started = 0;
+export const chatterboxWorkers = () => started;
+
+function startChatterbox(): Promise<Worker> {
+  const script = process.env.VIRAL_CHATTERBOX_SCRIPT ?? join(__dirname, "py", "chatterbox_tts.py");
+  const child = spawn(pythonBin(), [script], { stdio: ["pipe", "pipe", "pipe"] });
+  started++;
+  child.unref();
+  const lines = createInterface({ input: child.stdout });
+  const queue: ((v: Record<string, unknown>) => void)[] = [];
+  const buffered: Record<string, unknown>[] = [];
+  let err = "";
+  child.stderr.on("data", (d) => (err = (err + d).slice(-500)));
+  const fail = (why: string) => {
+    worker = undefined;
+    for (const r of queue.splice(0)) r({ ok: false, error: why });
+  };
+  child.on("error", (e) => fail(e.message));
+  child.on("exit", (code) => fail(`chatterbox s'est arrêté (${code}) : ${err}`));
+  lines.on("line", (line) => {
+    let msg: Record<string, unknown>;
+    try {
+      msg = JSON.parse(line);
+    } catch {
+      return; // une bibliothèque qui parle sur stdout : ignoré
+    }
+    const waiting = queue.shift();
+    if (waiting) waiting(msg);
+    else buffered.push(msg);
+  });
+  const next = () => new Promise<Record<string, unknown>>((r) => (buffered.length ? r(buffered.shift()!) : queue.push(r)));
+  return next().then((hello) => {
+    if (!hello.ready) throw new Error(String(hello.error ?? `chatterbox n'a pas démarré : ${err}`));
+    return { child, next };
+  });
+}
+
+async function runChatterbox(text: string, lang: Lang, outPath: string): Promise<void> {
+  worker ??= startChatterbox();
+  const w = await worker;
+  const reply = w.next();
+  w.child.stdin.write(`${JSON.stringify({ text, lang, out: outPath })}\n`);
+  const r = await reply;
+  if (!r.ok) throw new Error(String(r.error ?? "chatterbox a échoué"));
+}
+
 export async function synthesize(
   text: string,
   opts: { lang: Lang; outPath: string; speed?: number; engine?: TtsEngine },
@@ -75,6 +125,7 @@ export async function synthesize(
   try {
     if (engine === "piper") await runPiper(text, opts.lang, opts.outPath, speed);
     else if (engine === "kokoro") await runKokoro(text, opts.outPath, speed);
+    else if (engine === "chatterbox") await runChatterbox(text, opts.lang, opts.outPath);
     if (engine !== "silent") {
       return { path: opts.outPath, durationMs: wavDurationMs(await readFile(opts.outPath)), engine };
     }

@@ -20,6 +20,12 @@ export const FAKE_PROBES: Probes = {
   whatsappSession: false,
   youtubeKey: false,
   apify: false,
+  comfyui: false,
+  pexels: false,
+  pixabay: false,
+  musicTracks: 0,
+  chatterbox: false,
+  ttsPref: "auto",
 };
 
 // Un job rendu « pour de faux » : vrai job.json, vrai fichier video.mp4 de 1000 octets.

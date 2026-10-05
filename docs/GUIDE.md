@@ -53,10 +53,71 @@ Il affiche ce qui tourne (rendu, voix, script automatique, publication, messages
 
 ---
 
+## Gratuit d'abord
+
+Tout ce que font les outils à crédits a une voie gratuite, et c'est celle-ci que l'usine prend par défaut. La version payante ne vient qu'en second, coût affiché, après ton oui chiffré.
+
+| Ce que vendent les outils payants | Voie gratuite dans l'usine | Ce qu'il faut |
+| --- | --- | --- |
+| Plans vidéo générés (Higgsfield, Runway, Pika) | **IA vidéo locale** : ComfyUI + Wan 2.2 5B (Apache 2.0), ou LTX-2 / HunyuanVideo 1.5 avec ton workflow | une carte NVIDIA 8 Go+ (`COMFYUI_URL`) |
+| Plans vidéo en rapport avec le sujet | **Banques libres** Pexels puis Pixabay (usage commercial, sans attribution obligatoire ; l'usine garde les crédits) | une clé gratuite (`PEXELS_API_KEY`) |
+| Fonds animés, motion design | **Remotion** : fonds procéduraux, texte cinétique, compteurs, bruitages générés | rien |
+| Voix off (ElevenLabs, Pika) | **Piper** (rapide, CPU) ; **Chatterbox Multilingual** (MIT, expressif, clone ta voix) | `septim setup --voix` / `--voix-hd` |
+| Musique (Pika, Suno) | **Tes pistes** : ACE-Step 1.5 en local (open source, < 4 Go de VRAM) ou bibliothèques libres de droits ; sinon lit lo-fi généré | `VIRAL_MUSIC_DIR` |
+| Script (ChatGPT, Claude payant) | **Claude dans ta session**, ou **Ollama + qwen2.5** en local pour le démon | `ollama pull qwen2.5:7b` |
+| Publication programmée (Postiz cloud 29 $/mois) | **Postiz auto-hébergé** ou mode manuel (légende prête à coller) | rien |
+| Composants IA (21st.dev payant) | **shadcn**, Magic UI, Aceternity, React Bits (gratuits) | rien |
+| Scène 3D (Spline payant) | **three.js / React Three Fiber** ; Spline gratuit pour éditer | rien |
+
+`septim doctor` affiche l'étage de chaque brique (« Plans : Pexels (gratuit) », « Musique : lit lo-fi généré »…) et la commande gratuite pour monter d'un cran.
+
+### Plans vidéo : trois étages, jamais bloquants
+
+`VIRAL_BROLL=auto` (défaut) essaie, dans l'ordre : ComfyUI si `COMFYUI_URL` répond, Pexels si `PEXELS_API_KEY` est posée, Pixabay si `PIXABAY_API_KEY` est posée, puis les fonds procéduraux. Un étage qui échoue passe au suivant : le rendu n'échoue jamais à cause des plans. `--broll dossier` (tes clips) passe toujours avant. Le Studio et `septim voir` indiquent la source ; les crédits Pexels/Pixabay sont gardés dans le job.
+
+Pour des plans précis, Claude écrit `visual` dans chaque beat du script (en anglais, concret : « african women counting cash at a market stall ») ; sans `visual`, la recherche se fait sur le sujet.
+
+**Pexels (2 minutes, sans GPU)** : crée un compte sur https://www.pexels.com/api/, copie la clé, puis `echo PEXELS_API_KEY=ta_cle >> ~/septim/.env`.
+
+**IA vidéo locale (ComfyUI + Wan 2.2 5B)**, Linux/WSL avec carte NVIDIA :
+
+```bash
+git clone https://github.com/comfyanonymous/ComfyUI ~/ComfyUI && cd ~/ComfyUI
+python3 -m venv venv && . venv/bin/activate
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+pip install -r requirements.txt
+wget -P models/diffusion_models https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors
+wget -P models/text_encoders https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors
+wget -P models/vae https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan2.2_vae.safetensors
+python main.py --listen 127.0.0.1 --port 8188
+echo COMFYUI_URL=http://127.0.0.1:8188 >> ~/septim/.env
+```
+
+Sous Windows, le plus simple est **ComfyUI Desktop** : ouvre le modèle « Wan 2.2 5B », il télécharge les fichiers tout seul ; son serveur écoute sur le port 8000 (`COMFYUI_URL=http://127.0.0.1:8000`, joignable depuis WSL). Un plan de 5 s prend plusieurs minutes de GPU : l'usine en fait 4 par vidéo (`VIRAL_BROLL_CLIPS`) et les répète sur les segments. Pour LTX-2 ou HunyuanVideo, exporte ton workflow au format API avec `{{prompt}}`, `{{seed}}`, `{{frames}}`, `{{width}}`, `{{height}}` et pointe `COMFYUI_WORKFLOW` dessus. Les liens de modèles peuvent changer : la page « Wan 2.2 » de la doc ComfyUI fait foi.
+
+Sans carte graphique : Pexels suffit. Les quotas GPU gratuits (Hugging Face ZeroGPU : environ 5 minutes par jour) dépannent pour un essai, pas pour une usine.
+
+### Musique
+
+Mets tes pistes (MP3, WAV, OGG, M4A, FLAC) dans un dossier et pointe `VIRAL_MUSIC_DIR` dessus : l'usine en choisit une par vidéo (toujours la même si tu refais le rendu), sous la voix. Pour générer les tiennes gratuitement : ACE-Step 1.5 (open source, interface locale, < 4 Go de VRAM), suis son README et exporte en MP3. Les droits des pistes restent ta responsabilité ; le son tendance de TikTok s'ajoute toujours dans l'app au moment de poster.
+
+### Voix HD
+
+```bash
+septim setup --voix-hd                 # Chatterbox Multilingual (MIT) dans .septim-viral/venv ; plusieurs Go avec torch
+echo VIRAL_TTS=chatterbox >> ~/septim/.env
+echo VIRAL_CHATTERBOX_VOICE=$HOME/ma-voix.wav >> ~/septim/.env   # optionnel : 10 s de TA voix, propres
+```
+
+Plus expressive que Piper, plus lente sans GPU. Ne clone que ta voix, ou celle d'une personne qui t'a donné son accord.
+
+---
+
 ## Les portes
 
 | Porte | Pour qui | Démarrer |
 | --- | --- | --- |
+| [Gratuit d'abord](#gratuit-dabord) | tout avoir sans crédit | `septim doctor` |
 | [Navigateur](#navigateur--le-studio) | toi, sur l'ordinateur ou le téléphone | `septim studio` |
 | [Terminal](#terminal--la-commande-septim) | toi, en une ligne | `septim video "sujet"` |
 | [Claude Code](#claude-code) | Claude écrit le script, l'usine rend | `/septim-viral:viral "sujet"` |
@@ -384,7 +445,7 @@ Tout est optionnel : sans rien, l'usine tourne en gratuit (rendu Remotion, voix 
 | `VIRAL_NOTIFIER` | `whatsapp` | `whatsapp` ou `console` |
 | `VIRAL_WHATSAPP_TO` | vide (toi) | numéro qui reçoit les messages |
 | `WHATSAPP_CHROME_PATH` | vide | Google Chrome pour envoyer de vraies vidéos (sinon en document) |
-| `VIRAL_TTS` | `auto` | `auto`, `piper`, `kokoro`, `silent` |
+| `VIRAL_TTS` | `auto` | `auto`, `piper`, `kokoro`, `chatterbox`, `silent` |
 | `VIRAL_PIPER_VOICE` | `fr_FR-tom-medium` | voix Piper française |
 | `VIRAL_PIPER_VOICE_EN` | `en_US-ryan-high` | voix Piper anglaise |
 | `VIRAL_PIPER_DIR` | `.septim-viral/voices` | dossier des voix |
@@ -407,6 +468,17 @@ Tout est optionnel : sans rien, l'usine tourne en gratuit (rendu Remotion, voix 
 | `VIRAL_RENDER_CONCURRENCY` | `2` | onglets Chrome pour le rendu |
 | `REMOTION_BROWSER_EXECUTABLE` | vide | Chrome headless déjà installé (sinon Remotion le télécharge) |
 | `PUPPETEER_SKIP_DOWNLOAD` | `1` | ne pas télécharger le Chromium de puppeteer |
+| `VIRAL_BROLL` | `auto` | plans de fond : `auto`, `comfyui`, `stock`, `pexels`, `pixabay`, `none` |
+| `PEXELS_API_KEY` | vide | banque libre Pexels (clé gratuite) |
+| `PIXABAY_API_KEY` | vide | banque libre Pixabay (clé gratuite) |
+| `COMFYUI_URL` | vide | IA vidéo locale (ComfyUI) |
+| `COMFYUI_WORKFLOW` | vide | ton workflow ComfyUI au format API |
+| `COMFYUI_WAN_MODEL` | `wan2.2_ti2v_5B_fp16.safetensors` | modèle Wan du workflow intégré |
+| `VIRAL_COMFYUI_TIMEOUT_MS` | `1200000` | délai par plan IA |
+| `VIRAL_BROLL_CLIPS` | `12` (`4` avec ComfyUI) | plans par vidéo |
+| `VIRAL_MUSIC_DIR` | vide | tes pistes ; vide = lit lo-fi généré |
+| `VIRAL_CHATTERBOX_VOICE` | vide | WAV de ta voix à cloner (voix HD) |
+| `VIRAL_CHATTERBOX_SCRIPT` | script intégré | avancé : autre worker Chatterbox |
 | `NEXT_PUBLIC_WHATSAPP_NUMBER` | vide | site : numéro du bouton WhatsApp |
 | `NEXT_PUBLIC_SPLINE_SCENE` | vide | site : scène 3D Spline (sinon orbe three.js) |
 | `NEXT_PUBLIC_HERO_VIDEO_URL` | vide | site : vidéo hero PRO (sinon Remotion) |

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { diagnose, formatDiagnosis } from "../doctor";
 
-const allMissing = { ollama: false, piperVoice: false, kokoro: false, chrome: false, postiz: false, whatsappSession: false, youtubeKey: false, apify: false };
+const allMissing = { ollama: false, piperVoice: false, kokoro: false, chrome: false, postiz: false, whatsappSession: false, youtubeKey: false, apify: false, comfyui: false, pexels: false, pixabay: false, musicTracks: 0, chatterbox: false, ttsPref: "auto" };
 
 describe("doctor", () => {
   it("sans rien d'installé, l'usine tourne quand même en FREE minimal", () => {
@@ -14,7 +14,7 @@ describe("doctor", () => {
   });
 
   it("tout installé : voix Piper, Postiz, aucune correction requise", () => {
-    const d = diagnose({ ...allMissing, ollama: true, piperVoice: true, chrome: true, postiz: true, whatsappSession: true, youtubeKey: true });
+    const d = diagnose({ ...allMissing, ollama: true, piperVoice: true, chrome: true, postiz: true, whatsappSession: true, youtubeKey: true, pexels: true, musicTracks: 3, chatterbox: true });
     expect(d.voice).toBe("piper");
     expect(d.publishMode).toBe("postiz");
     expect(d.fixes.filter((f) => f.id !== "apify")).toEqual([]);
@@ -22,5 +22,22 @@ describe("doctor", () => {
 
   it("le rapport est lisible et signale clairement la voix silencieuse", () => {
     expect(formatDiagnosis(diagnose(allMissing))).toMatch(/Voix\s*:\s*silencieuse/);
+  });
+
+  it("gratuit d'abord : l'étage de B-roll, la musique et la voix HD, avec la commande gratuite pour monter d'un cran", () => {
+    const none = diagnose(allMissing);
+    expect(none.broll).toBe("procedural");
+    expect(none.music).toBe("procedural");
+    expect(none.fixes.find((f) => f.id === "broll")?.commands.join(" ")).toMatch(/PEXELS_API_KEY/);
+    expect(none.fixes.find((f) => f.id === "music")?.commands.join(" ")).toMatch(/VIRAL_MUSIC_DIR/);
+    expect(none.fixes.find((f) => f.id === "voice-hd")?.commands.join(" ")).toMatch(/septim setup --voix-hd/);
+    expect(diagnose({ ...allMissing, pexels: true }).broll).toBe("pexels");
+    expect(diagnose({ ...allMissing, pexels: true, comfyui: true }).broll).toBe("comfyui");
+    expect(diagnose({ ...allMissing, pixabay: true }).broll).toBe("pixabay");
+    expect(diagnose({ ...allMissing, musicTracks: 2 }).music).toBe("pistes");
+    expect(diagnose({ ...allMissing, chatterbox: true, ttsPref: "chatterbox" }).voice).toBe("chatterbox");
+    const text = formatDiagnosis(diagnose({ ...allMissing, pexels: true }));
+    expect(text).toMatch(/Plans\s*:\s*Pexels/);
+    expect(text).toMatch(/Musique\s*:\s*lit lo-fi/);
   });
 });

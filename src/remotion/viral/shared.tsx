@@ -32,7 +32,7 @@ export function AudioTracks({ audio }: { audio: ViralProps["audio"] }) {
   const { fps } = useVideoConfig();
   return (
     <>
-      {audio.ambient ? <Audio name="Lit ambiant" src={resolveSrc(audio.ambient)} loop volume={0.08} premountFor={fps} /> : null}
+      {audio.ambient ? <Audio name="Lit ambiant" src={resolveSrc(audio.ambient)} loop volume={audio.ambientVolume ?? 0.08} premountFor={fps} /> : null}
       {audio.segments.map((s, i) => (
         <Audio key={i} name={`Voix ${i}`} src={resolveSrc(s.src)} from={msToFrame(s.startMs, fps)} premountFor={fps} />
       ))}

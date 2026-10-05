@@ -41,13 +41,20 @@ Le moteur rend le MP4 9:16 (Remotion, 0 crédit), écrit le job dans `.septim-vi
 - Sans Postiz : donne la légende prête à coller et rappelle d'ajouter le son tendance dans l'app (seul moyen d'entrer dans la boucle du son).
 - Postiz auto-hébergé : TikTok et YouTube restent privés tant que ses apps ne sont pas auditées. Dis-le avant de publier.
 
-## 5. PRO (Higgsfield, Runway, Pika) : coût affiché, OUI chiffré
+## 5. Plans vidéo : gratuit d'abord, PRO en dernier
+
+- Écris `visual` dans chaque beat (en anglais, concret : « african women counting cash at a market stall ») : l'usine s'en sert pour chercher ou générer les plans.
+- Gratuit, automatique : IA locale ComfyUI si `COMFYUI_URL` est posée, sinon banques libres Pexels / Pixabay si une clé gratuite est posée, sinon fonds animés. `septim doctor` dit l'étage actif et la commande pour monter d'un cran (une clé Pexels gratuite suffit, sans GPU).
+
+## 6. PRO (Higgsfield, Runway, Pika) : en dernier, coût affiché, OUI chiffré
+
+- Ne le propose que si l'étage gratuit ne suffit pas pour ce que l'utilisateur demande, et dis quel étage gratuit tourne déjà.
 
 - « Utilise Higgsfield » est une préférence, pas un accord sur un montant.
 - Annonce : `BESOIN CREDIT: Higgsfield Soul + Seedance pour <n> plans (≈ <durée>/10 × 3 $). Alternative gratuite : la version Remotion déjà rendue.` Attends un oui qui mentionne le budget.
 - Sur ce oui, et seulement si le MCP `higgsfield` est connecté (`/mcp`) : génère un plan par beat, dépose-les dans un dossier, puis `septim video "<sujet>" --template <t> --script <fichier> --broll <dossier>`.
 
-## 6. Autonomie (démon)
+## 7. Autonomie (démon)
 
 `septim start` (ou `pm2 start ecosystem.config.cjs` pour qu'il redémarre seul) : Studio, API et MCP HTTP, un cycle toutes les 6 h, réponses WhatsApp OUI / NON / REFAIS / PRO, analytics à 48 h qui entraînent le choix des prochains templates et hooks (`.septim-viral/LESSONS.md`). Le démon ne dépense jamais de crédits. Installation complète : `references/setup.md`.
 

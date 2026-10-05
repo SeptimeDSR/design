@@ -87,3 +87,21 @@ export function installVoice(home: string, io: IO, opts: { voice?: string; run?:
   say(io, `✓ Voix ${voice} installée (Piper, gratuite) : les prochaines vidéos parlent.`);
   return true;
 }
+
+// septim setup --voix-hd : Chatterbox Multilingual (licence MIT, français, clonage de ta voix) dans le même venv.
+export function installVoiceHd(home: string, io: IO, opts: { run?: Run } = {}): boolean {
+  const run = opts.run ?? inherit;
+  const venv = join(home, "venv");
+  const py = join(venv, process.platform === "win32" ? "Scripts/python.exe" : "bin/python");
+  if (run("python3", ["-m", "venv", venv]) !== 0) {
+    io.err.write("✗ Impossible de créer le venv Python. Sur Ubuntu/WSL : sudo apt install python3-venv, puis relance septim setup --voix-hd.\n");
+    return false;
+  }
+  if (run(py, ["-m", "pip", "install", "--upgrade", "chatterbox-tts"]) !== 0) {
+    io.err.write("✗ pip n'a pas pu installer chatterbox-tts (plusieurs Go avec torch : réseau, ou place disque ?). Relance septim setup --voix-hd.\n");
+    return false;
+  }
+  say(io, "✓ Voix HD installée (Chatterbox Multilingual, gratuite). Active-la : echo VIRAL_TTS=chatterbox >> .env");
+  say(io, "  Ta propre voix : enregistre 10 s propres en WAV, puis echo VIRAL_CHATTERBOX_VOICE=/chemin/voix.wav >> .env");
+  return true;
+}
