@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { parseReply } from "./approval";
 import { rewardFromViews, updateArm } from "./bandit";
 import { loadConfig, loadDotEnv } from "./config";
+import { tryLock } from "./lock";
 import { BOT_PREFIX, jobRef } from "./message";
 import type { Platform, PublishMode } from "./publish-plan";
 import type { JobRequest } from "./pipeline";
@@ -100,35 +101,49 @@ export async function handleReply(text: string, deps: DaemonDeps, ctx: ReplyCont
   );
 }
 
-// Même chemin pour le démon (WhatsApp) et le CLI (--publish) : verrou, statut persistant, registre par plateforme.
-export async function publishWithLedger(job: Job, deps: Pick<DaemonDeps, "store" | "notify" | "publish">): Promise<void> {
-  if (inFlight.has(job.id)) return;
-  inFlight.add(job.id);
-  deps.store.saveJob({ ...job, status: "publishing", publishingSince: new Date().toISOString() });
+// Même chemin pour toutes les portes (WhatsApp, CLI, Studio, API, MCP) : verrou de fichier entre processus,
+// job relu sous verrou, statut persistant, registre par plateforme.
+export async function publishWithLedger(stale: Job, deps: Pick<DaemonDeps, "store" | "notify" | "publish">): Promise<void> {
+  if (inFlight.has(stale.id)) return;
+  const release = tryLock(join(deps.store.jobsDir, stale.id, "publish.lock"), STALE_PUBLISHING_MS);
+  if (!release) {
+    await deps.notify(`${BOT_PREFIX} · Publication de #${jobRef(stale)} déjà en cours.`);
+    return;
+  }
+  inFlight.add(stale.id);
   try {
-    const r = await deps.publish(job);
-    const posted = { ...job.posted, ...r.posted };
-    const done = Object.keys(posted);
-    if (r.manualText) {
-      deps.store.saveJob({ ...job, status: "published", posted, publishedAt: new Date().toISOString() });
-      await deps.notify(`${BOT_PREFIX} · Légende prête #${jobRef(job)}, colle-la et ajoute le son tendance :\n\n${r.manualText}`);
-    } else if (r.failed.length) {
-      deps.store.saveJob({ ...job, status: "notified", posted });
-      const failed = r.failed.map((f) => `${f.platform} (${f.error})`).join(", ");
-      await deps.notify(
-        `${BOT_PREFIX} · Publication partielle #${jobRef(job)}. Déjà en ligne : ${done.join(", ") || "rien"}. Échec : ${failed}. ` +
-          `Réponds OUI #${jobRef(job)} pour réessayer seulement ce qui a échoué.`,
-      );
-    } else {
-      deps.store.saveJob({ ...job, status: "published", posted, publishedAt: new Date().toISOString() });
-      const missing = r.missing.length ? `\nPas connecté dans Postiz : ${r.missing.join(", ")}.` : "";
-      await deps.notify(`${BOT_PREFIX} · Publié ✅ #${jobRef(job)} sur ${done.join(", ")}.${missing}`);
+    const job = deps.store.getJob(stale.id) ?? stale;
+    if (job.status === "published") {
+      await deps.notify(`${BOT_PREFIX} · #${jobRef(job)} est déjà publiée.`);
+      return;
     }
-  } catch (error) {
-    deps.store.saveJob({ ...job, status: "notified" });
-    await deps.notify(`${BOT_PREFIX} · Publication ratée #${jobRef(job)} : ${(error as Error).message}. Réponds OUI #${jobRef(job)} pour réessayer.`);
+    deps.store.saveJob({ ...job, status: "publishing", publishingSince: new Date().toISOString() });
+    try {
+      const r = await deps.publish(job);
+      const posted = { ...job.posted, ...r.posted };
+      const done = Object.keys(posted);
+      if (r.manualText) {
+        deps.store.saveJob({ ...job, status: "published", posted, publishedAt: new Date().toISOString() });
+        await deps.notify(`${BOT_PREFIX} · Légende prête #${jobRef(job)}, colle-la et ajoute le son tendance :\n\n${r.manualText}`);
+      } else if (r.failed.length) {
+        deps.store.saveJob({ ...job, status: "notified", posted });
+        const failed = r.failed.map((f) => `${f.platform} (${f.error})`).join(", ");
+        await deps.notify(
+          `${BOT_PREFIX} · Publication partielle #${jobRef(job)}. Déjà en ligne : ${done.join(", ") || "rien"}. Échec : ${failed}. ` +
+            `Réponds OUI #${jobRef(job)} pour réessayer seulement ce qui a échoué.`,
+        );
+      } else {
+        deps.store.saveJob({ ...job, status: "published", posted, publishedAt: new Date().toISOString() });
+        const missing = r.missing.length ? `\nPas connecté dans Postiz : ${r.missing.join(", ")}.` : "";
+        await deps.notify(`${BOT_PREFIX} · Publié ✅ #${jobRef(job)} sur ${done.join(", ")}.${missing}`);
+      }
+    } catch (error) {
+      deps.store.saveJob({ ...job, status: "notified" });
+      await deps.notify(`${BOT_PREFIX} · Publication ratée #${jobRef(job)} : ${(error as Error).message}. Réponds OUI #${jobRef(job)} pour réessayer.`);
+    }
   } finally {
-    inFlight.delete(job.id);
+    inFlight.delete(stale.id);
+    release();
   }
 }
 
@@ -150,22 +165,27 @@ export function createCycleRunner(run: (req: JobRequest) => Promise<Job>, notify
 
 // Auto-amélioration : 48 h après la publication, les vues récompensent (ou pas) le couple template × formule.
 export async function collectRewards(deps: DaemonDeps, now = Date.now()): Promise<void> {
-  const state = deps.store.loadState();
+  const rewards: { job: Job; views: number }[] = [];
   for (const job of deps.store.listJobs()) {
     const since = Date.parse(job.publishedAt ?? job.createdAt);
     if (job.status !== "published" || job.rewarded || now - since < REWARD_DELAY_MS) continue;
     const views = await deps.views(job);
-    if (views === null) continue;
-    const reward = rewardFromViews(views, state.viewsHistory);
-    state.bandit = updateArm(state.bandit, job.arm, reward);
-    state.viewsHistory = [...state.viewsHistory, views].slice(-100);
-    deps.store.saveJob({ ...job, views, rewarded: true });
-    appendFileSync(
-      join(deps.store.home, "LESSONS.md"),
-      `- ${new Date(now).toISOString().slice(0, 10)} · ${job.arm} · « ${job.script.hook} » → ${views} vues (${reward ? "au-dessus" : "en dessous"} de la médiane)\n`,
-    );
+    if (views !== null) rewards.push({ job, views });
   }
-  deps.store.saveState(state);
+  if (!rewards.length) return;
+  // Mise à jour sous verrou : un rendu qui se termine en même temps n'efface pas ces récompenses.
+  await deps.store.updateState((state) => {
+    for (const { job, views } of rewards) {
+      const reward = rewardFromViews(views, state.viewsHistory);
+      state = { ...state, bandit: updateArm(state.bandit, job.arm, reward), viewsHistory: [...state.viewsHistory, views].slice(-100) };
+      deps.store.saveJob({ ...job, views, rewarded: true });
+      appendFileSync(
+        join(deps.store.home, "LESSONS.md"),
+        `- ${new Date(now).toISOString().slice(0, 10)} · ${job.arm} · « ${job.script.hook} » → ${views} vues (${reward ? "au-dessus" : "en dessous"} de la médiane)\n`,
+      );
+    }
+    return state;
+  });
 }
 
 async function main() {

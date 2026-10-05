@@ -1,5 +1,5 @@
 import { PassThrough } from "node:stream";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createConsoleNotifier } from "../notify";
 import { formatReadyMessage, jobRef } from "../message";
 import { fallbackScript } from "../heat";
@@ -77,5 +77,49 @@ describe("formatReadyMessage : ce qu'on accepte = ce qui se passera", () => {
 
   it("Postiz auto-hébergé : prévient que TikTok et YouTube restent privés", () => {
     expect(formatReadyMessage(job(), "postiz-self", ["tiktok", "youtube"])).toMatch(/privé/);
+  });
+});
+
+describe("WhatsApp : jamais sourd", () => {
+  async function started(event: string) {
+    const { EventEmitter } = await import("node:events");
+    const { createWhatsAppNotifier } = await import("../notify");
+    class Client extends EventEmitter {
+      info = { wid: { _serialized: "me@c.us" } };
+      async initialize() {
+        setTimeout(() => this.emit("ready"), 0);
+      }
+    }
+    const client: { current?: Client } = {};
+    const lib = {
+      Client: class extends Client {
+        constructor() {
+          super();
+          client.current = this;
+        }
+      },
+      LocalAuth: class {},
+      MessageMedia: {},
+    };
+    const exits: number[] = [];
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const n = createWhatsAppNotifier({ home: "/tmp/septim-wa-test" } as never, {
+      load: async () => ({ lib, qrcode: { generate: () => undefined } }),
+      exit: (code) => void exits.push(code),
+    });
+    await n.start();
+    client.current!.emit(event, "LOGOUT");
+    errors.mockRestore();
+    log.mockRestore();
+    return exits;
+  }
+
+  it("déconnecté → le processus quitte (pm2 relance)", async () => {
+    expect(await started("disconnected")).toEqual([1]);
+  });
+
+  it("échec d'authentification → le processus quitte", async () => {
+    expect(await started("auth_failure")).toEqual([1]);
   });
 });

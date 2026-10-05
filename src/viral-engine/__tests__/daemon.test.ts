@@ -1,8 +1,9 @@
-import { mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { collectRewards, createCycleRunner, handleReply, type DaemonDeps, type PublishResult } from "../daemon";
+import { collectRewards, createCycleRunner, handleReply, publishWithLedger, type DaemonDeps, type PublishResult } from "../daemon";
 import { createStore, type Job } from "../store";
 import { fallbackScript } from "../heat";
 import { buildTimeline } from "../story";
@@ -169,4 +170,28 @@ describe("collectRewards", () => {
     await collectRewards(s.deps);
     expect(s.store.loadState().bandit).toEqual({});
   });
+});
+
+describe("publishWithLedger : jamais deux fois, même entre processus", () => {
+  it("relit le job sous verrou : déjà publié par un autre processus → aucun appel à publish", async () => {
+    const s = setup([makeJob("beef1234", "published")]);
+    const stale = makeJob("beef1234", "notified");
+    await publishWithLedger(stale, s.deps);
+    expect(s.published).toHaveLength(0);
+    expect(s.sent.at(-1)).toContain("déjà publiée");
+  });
+
+  it("deux processus qui publient en même temps : une seule publication", async () => {
+    const s = setup();
+    const child = () =>
+      new Promise<number>((resolve) => {
+        const p = spawn(process.execPath, ["--import", "tsx", join(__dirname, "fixtures", "publish-child.ts"), s.home, "beef1234"], { stdio: "inherit" });
+        p.on("exit", (code) => resolve(code ?? 1));
+      });
+    const codes = await Promise.all([child(), child()]);
+    expect(codes).toEqual([0, 0]);
+    const log = join(s.home, "calls.log");
+    expect(existsSync(log) ? readFileSync(log, "utf8").trim().split("\n") : []).toHaveLength(1);
+    expect(s.store.getJob("beef1234")?.status).toBe("published");
+  }, 20_000);
 });

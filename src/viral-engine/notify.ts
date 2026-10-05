@@ -33,8 +33,18 @@ export function createConsoleNotifier(io: { input?: Readable; output?: Writable 
   };
 }
 
+type WhatsAppLib = { lib: unknown; qrcode: { generate: (qr: string, opts: { small: boolean }) => void } };
+export type WhatsAppDeps = { load?: () => Promise<WhatsAppLib>; exit?: (code: number) => void };
+
+const loadWhatsApp = async (): Promise<WhatsAppLib> => {
+  const wa = await import("whatsapp-web.js");
+  const qrcode = (await import("qrcode-terminal")).default;
+  return { lib: wa.default ?? wa, qrcode };
+};
+
 // WhatsApp perso via whatsapp-web.js (non officiel : un seul destinataire, faible volume).
-export function createWhatsAppNotifier(cfg: ViralConfig): Notifier {
+// Déconnecté = processus arrêté : pm2 le relance, au lieu d'un démon vivant mais sourd.
+export function createWhatsAppNotifier(cfg: ViralConfig, deps: WhatsAppDeps = {}): Notifier {
   const handlers: ((t: string, meta?: { quoted?: string }) => void)[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let client: any;
@@ -45,9 +55,10 @@ export function createWhatsAppNotifier(cfg: ViralConfig): Notifier {
 
   return {
     async start() {
-      const wa = await import("whatsapp-web.js");
-      const qrcode = (await import("qrcode-terminal")).default;
-      const lib = (wa.default ?? wa) as typeof wa;
+      const loaded = await (deps.load ?? loadWhatsApp)();
+      const qrcode = loaded.qrcode;
+      const lib = loaded.lib as typeof import("whatsapp-web.js");
+      const exit = deps.exit ?? ((code: number) => process.exit(code));
       MessageMedia = lib.MessageMedia;
       client = new lib.Client({
         authStrategy: new lib.LocalAuth({ dataPath: join(cfg.home, "wa") }),
@@ -57,6 +68,12 @@ export function createWhatsAppNotifier(cfg: ViralConfig): Notifier {
         console.log("Scanne ce QR avec WhatsApp (Appareils connectés) :");
         qrcode.generate(qr, { small: true });
       });
+      for (const event of ["disconnected", "auth_failure"]) {
+        client.on(event, (reason: unknown) => {
+          console.error(`[whatsapp] ${event} (${String(reason)}) : arrêt, pm2 relance l'usine.`);
+          exit(1);
+        });
+      }
       const ready = new Promise<void>((resolve) => client.once("ready", resolve));
       await client.initialize();
       await ready;

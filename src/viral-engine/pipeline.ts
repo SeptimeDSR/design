@@ -135,6 +135,6 @@ export async function runJob(req: JobRequest, partial: Partial<PipelineDeps> = {
     await notify(formatFailedMessage(job)).catch(() => undefined);
   }
   store.saveJob(job);
-  store.saveState({ ...state, recentTopics: [topic, ...state.recentTopics].slice(0, 30) });
+  await store.updateState((s) => ({ ...s, recentTopics: [topic, ...s.recentTopics].slice(0, 30) }));
   return job;
 }
