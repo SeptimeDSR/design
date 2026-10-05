@@ -23,7 +23,7 @@ describe("viral checklist", () => {
     expect(RULES.payoffMinRatio).toBe(0.8);
     expect(RULES.beatMaxSeconds).toBe(3.5);
     expect(RULES.voiceSpeed).toBe(1.1);
-    expect(RULES.wordsPerSecond).toEqual({ fr: 2.5, en: 2.8 });
+    expect(RULES.wordsPerSecond).toEqual({ fr: 3.0, en: 3.2 });
     expect(RULES.targetSeconds).toEqual([20, 60]);
     expect(RULES.cta.fr).toBe("Garde ça, tu vas en avoir besoin demain.");
   });

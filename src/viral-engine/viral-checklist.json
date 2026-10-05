@@ -15,7 +15,7 @@
   },
   "rules": {
     "hook_max_seconds": 3,
-    "words_per_second": { "fr": 2.5, "en": 2.8 },
+    "words_per_second": { "fr": 3.0, "en": 3.2 },
     "voice_speed": 1.1,
     "beat_max_seconds": 3.5,
     "payoff_min_ratio": 0.8,
