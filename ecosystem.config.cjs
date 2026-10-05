@@ -5,7 +5,7 @@ module.exports = {
       name: "septim-viral",
       script: "node_modules/.bin/tsx",
       args: "src/viral-engine/daemon.ts",
-      env_file: ".env",
+      cwd: __dirname, // le démon charge lui-même .env (pm2 n'a pas d'option env_file)
       autorestart: true,
       max_restarts: 20,
       restart_delay: 10000,

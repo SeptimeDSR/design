@@ -1,4 +1,4 @@
-import { existsSync, statSync } from "node:fs";
+import { statSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
@@ -8,7 +8,7 @@ import { BOT_PREFIX } from "./message";
 export type Notifier = {
   start(): Promise<void>;
   send(text: string, mediaPath?: string): Promise<void>;
-  onMessage(handler: (text: string) => void): void;
+  onMessage(handler: (text: string, meta?: { quoted?: string }) => void): void;
   stop(): Promise<void>;
 };
 
@@ -35,7 +35,7 @@ export function createConsoleNotifier(io: { input?: Readable; output?: Writable 
 
 // WhatsApp perso via whatsapp-web.js (non officiel : un seul destinataire, faible volume).
 export function createWhatsAppNotifier(cfg: ViralConfig): Notifier {
-  const handlers: ((t: string) => void)[] = [];
+  const handlers: ((t: string, meta?: { quoted?: string }) => void)[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let client: any;
   let target = "";
@@ -63,10 +63,14 @@ export function createWhatsAppNotifier(cfg: ViralConfig): Notifier {
       const self = client.info.wid._serialized as string;
       target = cfg.whatsappTo ? `${cfg.whatsappTo.replace(/\D/g, "")}@c.us` : self;
 
-      client.on("message_create", (msg: { body: string; from: string; to: string; fromMe: boolean }) => {
+      type WaMessage = { body: string; from: string; to: string; fromMe: boolean; hasQuotedMsg?: boolean; getQuotedMessage?: () => Promise<{ body?: string } | undefined> };
+      client.on("message_create", async (msg: WaMessage) => {
         if (!msg.body || msg.body.startsWith(BOT_PREFIX)) return;
         const fromTarget = target === self ? msg.fromMe && msg.to === self : msg.from === target;
-        if (fromTarget) handlers.forEach((h) => h(msg.body));
+        if (!fromTarget) return;
+        // Une réponse « citée » sur le message d'une vidéo désigne cette vidéo-là.
+        const quoted = msg.hasQuotedMsg ? (await msg.getQuotedMessage?.().catch(() => undefined))?.body : undefined;
+        handlers.forEach((h) => h(msg.body, { quoted }));
       });
       console.log(`WhatsApp connecté, messages vers ${target === self ? "toi-même" : target}.`);
     },
@@ -86,18 +90,6 @@ export function createWhatsAppNotifier(cfg: ViralConfig): Notifier {
     },
   };
 }
-
-// Le CLI ne doit jamais rester bloqué sur un QR : seul le démon (interactif) lie WhatsApp.
-export function chooseNotifier(opts: { requested: "whatsapp" | "console"; sessionExists: boolean; interactive: boolean }): {
-  kind: "whatsapp" | "console";
-  warning?: string;
-} {
-  if (opts.requested === "console") return { kind: "console" };
-  if (opts.sessionExists || opts.interactive) return { kind: "whatsapp" };
-  return { kind: "console", warning: "WhatsApp pas encore lié : lance une fois `npm run viral:daemon` et scanne le QR. Message affiché ici en attendant." };
-}
-
-export const whatsappSessionExists = (cfg: ViralConfig) => existsSync(join(cfg.home, "wa"));
 
 export function createNotifier(kind: "whatsapp" | "console", cfg: ViralConfig): Notifier {
   return kind === "whatsapp" ? createWhatsAppNotifier(cfg) : createConsoleNotifier();

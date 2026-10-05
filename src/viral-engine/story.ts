@@ -10,8 +10,9 @@ const SAVE_CTA: Record<Lang, RegExp> = {
 };
 
 function splitText(text: string, lang: Lang, speed: number): string[] {
-  if (estimateSpokenMs(text, lang, speed) <= BEAT_MAX_MS) return [text];
   const words = text.split(/\s+/).filter(Boolean);
+  // Un seul mot ne se coupe pas : on le garde tel quel (le linter le signalera s'il est trop long).
+  if (words.length < 2 || estimateSpokenMs(text, lang, speed) <= BEAT_MAX_MS) return [text];
   const middle = words.length / 2;
   // Coupe à la ponctuation la plus proche du milieu, sinon au milieu exact.
   let cut = Math.ceil(middle);

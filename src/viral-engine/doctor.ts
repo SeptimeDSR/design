@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
-import { loadConfig, type ViralConfig } from "./config";
+import { loadConfig, loadDotEnv, type ViralConfig } from "./config";
 
 export type Probes = {
   ollama: boolean;
@@ -85,6 +85,7 @@ export async function probe(cfg: ViralConfig, env = process.env): Promise<Probes
 }
 
 if (process.argv[1]?.endsWith("doctor.ts")) {
+  loadDotEnv();
   const cfg = loadConfig();
   probe(cfg).then((p) => console.log(formatDiagnosis(diagnose(p))));
 }

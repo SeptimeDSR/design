@@ -2,52 +2,107 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { collectRewards, handleReply, type DaemonDeps } from "../daemon";
+import { collectRewards, createCycleRunner, handleReply, type DaemonDeps, type PublishResult } from "../daemon";
 import { createStore, type Job } from "../store";
 import { fallbackScript } from "../heat";
 import { buildTimeline } from "../story";
 
-function setup(status: Job["status"] = "notified", createdAt = new Date().toISOString()) {
+function makeJob(id: string, status: Job["status"] = "notified", createdAt = new Date().toISOString()): Job {
+  const script = fallbackScript({ topic: "la tontine", lang: "fr", formula: "secret", template: "maths" });
+  return { id, createdAt, status, request: {}, script, timeline: buildTimeline(script), arm: "maths:secret", source: "ollama", ttsEngine: "piper", jobDir: "/tmp", videoPath: "/tmp/v.mp4" };
+}
+
+function setup(jobs: Job[] = [makeJob("beef1234")], publishImpl?: (job: Job) => Promise<PublishResult>) {
   const home = mkdtempSync(join(tmpdir(), "septim-daemon-"));
   const store = createStore(home);
-  const script = fallbackScript({ topic: "la tontine", lang: "fr", formula: "secret", template: "maths" });
-  const job: Job = { id: "beef1234", createdAt, status, request: {}, script, timeline: buildTimeline(script), arm: "maths:secret", source: "ollama", ttsEngine: "piper", jobDir: home, videoPath: join(home, "v.mp4") };
-  store.saveJob(job);
+  jobs.forEach((j) => store.saveJob(j));
   const sent: string[] = [];
   const published: string[] = [];
   const redone: string[] = [];
   const deps: DaemonDeps = {
     store,
     mode: "postiz-cloud",
+    platforms: ["tiktok", "youtube"],
     notify: async (t) => void sent.push(t),
-    publish: async (j) => (published.push(j.id), { postIds: ["p1"], missing: [] }),
-    runJob: async (req) => (redone.push(req.topic ?? ""), job),
+    publish:
+      publishImpl ??
+      (async (j) => {
+        published.push(j.id);
+        await new Promise((r) => setTimeout(r, 30));
+        return { posted: { tiktok: ["p1"], youtube: ["p2"] }, missing: [], failed: [] };
+      }),
+    runJob: async (req) => (redone.push(req.topic ?? ""), jobs[0]),
     views: async () => 500,
   };
-  return { store, job, deps, sent, published, redone, home };
+  return { store, deps, sent, published, redone, home };
 }
 
-describe("handleReply", () => {
-  it("OUI publie le dernier job notifié et confirme", async () => {
+describe("handleReply : jamais sans accord net, jamais deux fois", () => {
+  it("OUI publie la seule vidéo en attente et confirme", async () => {
     const s = setup();
     await handleReply("OUI", s.deps);
     expect(s.published).toEqual(["beef1234"]);
     expect(s.store.getJob("beef1234")?.status).toBe("published");
+    expect(s.store.getJob("beef1234")?.posted).toEqual({ tiktok: ["p1"], youtube: ["p2"] });
     expect(s.sent.at(-1)).toContain("Publié");
   });
 
-  it("un deuxième OUI ne republie jamais", async () => {
+  it("deux OUI simultanés ne publient qu'une fois", async () => {
+    const s = setup();
+    await Promise.all([handleReply("oui", s.deps), handleReply("OUI", s.deps)]);
+    expect(s.published).toHaveLength(1);
+  });
+
+  it("un deuxième OUI plus tard ne republie pas", async () => {
     const s = setup();
     await handleReply("oui", s.deps);
-    await handleReply("oui", s.deps);
+    await handleReply("oui #beef", s.deps);
     expect(s.published).toHaveLength(1);
+    expect(s.sent.at(-1)).toContain("déjà publiée");
+  });
+
+  it("plusieurs vidéos en attente : un OUI nu ne publie rien et demande laquelle", async () => {
+    const s = setup([makeJob("aaaa1111", "notified", "2026-10-05T06:00:00Z"), makeJob("bbbb2222", "notified", "2026-10-05T12:00:00Z")]);
+    await handleReply("oui", s.deps);
+    expect(s.published).toEqual([]);
+    expect(s.sent.at(-1)).toContain("#aaaa");
+    expect(s.sent.at(-1)).toContain("#bbbb");
+  });
+
+  it("une réponse citant le message d'une vidéo publie cette vidéo-là", async () => {
+    const s = setup([makeJob("aaaa1111", "notified", "2026-10-05T06:00:00Z"), makeJob("bbbb2222", "notified", "2026-10-05T12:00:00Z")]);
+    await handleReply("oui", s.deps, { quoted: "🎬 Septim · Vidéo prête boss #aaaa\n« … »" });
+    expect(s.published).toEqual(["aaaa1111"]);
+  });
+
+  it("un accord ambigu ne publie pas et demande un OUI net", async () => {
+    const s = setup();
+    await handleReply("ok je regarde ce soir", s.deps);
+    expect(s.published).toEqual([]);
+    expect(s.sent.at(-1)).toContain("OUI #beef");
+  });
+
+  it("échec partiel : garde le registre, reste en attente, nomme ce qui est passé", async () => {
+    let call = 0;
+    const s = setup([makeJob("beef1234")], async (j) => {
+      call++;
+      return call === 1
+        ? { posted: { tiktok: ["p1"] }, missing: [], failed: [{ platform: "youtube", error: "quota" }] }
+        : { posted: { ...j.posted, youtube: ["p2"] }, missing: [], failed: [] };
+    });
+    await handleReply("oui", s.deps);
+    expect(s.store.getJob("beef1234")?.status).toBe("notified");
+    expect(s.store.getJob("beef1234")?.posted).toEqual({ tiktok: ["p1"] });
+    expect(s.sent.at(-1)).toMatch(/tiktok/i);
+    expect(s.sent.at(-1)).toMatch(/youtube/i);
+    await handleReply("oui", s.deps);
+    expect(s.store.getJob("beef1234")?.status).toBe("published");
   });
 
   it("NON jette la vidéo", async () => {
     const s = setup();
     await handleReply("non", s.deps);
     expect(s.store.getJob("beef1234")?.status).toBe("rejected");
-    expect(s.published).toEqual([]);
   });
 
   it("REFAIS relance une version sur le même sujet", async () => {
@@ -63,25 +118,43 @@ describe("handleReply", () => {
     expect(s.published).toEqual([]);
   });
 
-  it("un message inconnu ou du bot ne déclenche rien", async () => {
+  it("un message sans rapport ou du bot ne déclenche rien", async () => {
     const s = setup();
     await handleReply("🎬 Septim · Vidéo prête", s.deps);
     await handleReply("salut", s.deps);
     expect(s.published).toEqual([]);
     expect(s.sent).toEqual([]);
   });
+});
 
-  it("vise le job référencé par #ref", async () => {
-    const s = setup();
-    await handleReply("oui #beef", s.deps);
-    expect(s.published).toEqual(["beef1234"]);
+describe("createCycleRunner : rien n'est perdu pendant un cycle", () => {
+  it("une demande pendant un cycle est mise en file, annoncée, puis exécutée", async () => {
+    const runs: string[] = [];
+    const told: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const runner = createCycleRunner(
+      async (req) => {
+        runs.push(req.topic ?? "cycle");
+        if (runs.length === 1) await gate;
+        return makeJob("x");
+      },
+      async (t) => void told.push(t),
+    );
+    const first = runner({});
+    const second = runner({ topic: "la tontine" });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(told.at(-1)).toContain("juste après");
+    release();
+    await Promise.all([first, second]);
+    expect(runs).toEqual(["cycle", "la tontine"]);
   });
 });
 
 describe("collectRewards", () => {
-  it("après 48 h, récompense le bras et écrit une leçon", async () => {
-    const old = new Date(Date.now() - 49 * 3600_000).toISOString();
-    const s = setup("published", old);
+  it("48 h après la publication, récompense le bras et écrit une leçon", async () => {
+    const job = { ...makeJob("beef1234", "published"), publishedAt: new Date(Date.now() - 49 * 3600_000).toISOString() };
+    const s = setup([job]);
     await collectRewards(s.deps);
     const state = s.store.loadState();
     expect(state.bandit["maths:secret"]).toEqual({ alpha: 2, beta: 1 });
@@ -90,8 +163,9 @@ describe("collectRewards", () => {
     expect(readFileSync(join(s.home, "LESSONS.md"), "utf8")).toContain("maths:secret");
   });
 
-  it("ne récompense pas deux fois ni trop tôt", async () => {
-    const s = setup("published");
+  it("compte depuis la publication, pas depuis la création", async () => {
+    const job = { ...makeJob("beef1234", "published", new Date(Date.now() - 72 * 3600_000).toISOString()), publishedAt: new Date().toISOString() };
+    const s = setup([job]);
     await collectRewards(s.deps);
     expect(s.store.loadState().bandit).toEqual({});
   });

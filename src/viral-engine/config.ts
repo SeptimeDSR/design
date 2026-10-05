@@ -17,9 +17,20 @@ export type ViralConfig = {
   whatsappTo?: string;
   tiktokMethod: "DIRECT_POST" | "UPLOAD";
   cron: string;
+  // Les acteurs Apify scrapent un navigateur : plusieurs minutes, pas 10 s.
+  timeouts: { default: number; apify: number };
 };
 
 const list = (v: string | undefined, fallback: string[]) => (v ? v.split(",").map((s) => s.trim()).filter(Boolean) : fallback);
+
+// npm, tsx et pm2 ne lisent pas .env tout seuls : chaque point d'entrée l'appelle (sans écraser l'environnement).
+export function loadDotEnv(path = resolve(".env")): void {
+  try {
+    process.loadEnvFile(path);
+  } catch {
+    // pas de .env : l'usine tourne en FREE avec les valeurs par défaut
+  }
+}
 
 export function loadConfig(env: Env = process.env): ViralConfig {
   return {
@@ -46,5 +57,6 @@ export function loadConfig(env: Env = process.env): ViralConfig {
     whatsappTo: env.VIRAL_WHATSAPP_TO,
     tiktokMethod: env.VIRAL_TIKTOK_METHOD === "UPLOAD" ? "UPLOAD" : "DIRECT_POST",
     cron: env.VIRAL_CRON ?? "0 */6 * * *",
+    timeouts: { default: 10_000, apify: Number(env.VIRAL_APIFY_TIMEOUT_MS ?? 180_000) },
   };
 }

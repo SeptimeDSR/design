@@ -1,11 +1,11 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { BanditState } from "./bandit";
-import type { PublishMode } from "./publish-plan";
+import type { Platform, PublishMode } from "./publish-plan";
 import type { Trend } from "./trends";
 import type { TemplateId, Timeline, ViralScript, Lang } from "./types";
 
-export type JobStatus = "rendered" | "notified" | "published" | "rejected" | "failed";
+export type JobStatus = "rendered" | "notified" | "publishing" | "published" | "rejected" | "failed";
 
 export type Job = {
   id: string;
@@ -22,6 +22,10 @@ export type Job = {
   videoPath?: string;
   publishMode?: PublishMode;
   postIds?: string[];
+  // Registre de publication : ce qui est déjà parti, par plateforme. Une relance ne reposte jamais ces plateformes.
+  posted?: Partial<Record<Platform, string[]>>;
+  publishingSince?: string;
+  publishedAt?: string;
   views?: number;
   rewarded?: boolean;
   error?: string;

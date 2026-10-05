@@ -24,9 +24,14 @@ export function ollamaClient(cfg: ViralConfig): LlmClient {
 
 export function assembleScript(input: ScriptInput, raw: Partial<ViralScript>): ViralScript | null {
   if (typeof raw.hook !== "string" || !Array.isArray(raw.beats) || typeof raw.payoff !== "string") return null;
-  const beats: Beat[] = raw.beats
+  const beats: Beat[] = (raw.beats as unknown[])
     .map((b) => (typeof b === "string" ? { text: b } : b))
-    .filter((b): b is Beat => !!b && typeof b.text === "string" && b.text.trim().length > 0);
+    .filter((b): b is { text: string; emphasis?: unknown } => !!b && typeof (b as Beat).text === "string" && (b as Beat).text.trim().length > 0)
+    .map((b) => {
+      // Un LLM renvoie parfois une emphase numérique : le rendu attend du texte.
+      const emphasis = typeof b.emphasis === "string" ? b.emphasis : typeof b.emphasis === "number" ? String(b.emphasis) : undefined;
+      return emphasis ? { text: b.text, emphasis } : { text: b.text };
+    });
   return {
     topic: input.topic,
     lang: input.lang,

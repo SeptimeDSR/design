@@ -61,3 +61,28 @@ describe("pickTrend", () => {
     expect(pickTrend([], []).title).toBe(EVERGREEN_TOPICS[0]);
   });
 });
+
+describe("délais par source", () => {
+  it("chaque source a son délai : Apify n'utilise pas celui des flux", async () => {
+    const cfg = {
+      ...loadConfig({ APIFY_TOKEN: "t", YOUTUBE_API_KEY: "k", VIRAL_REGIONS: "CM" }),
+      timeouts: { default: 1000, apify: 50 },
+    };
+    const slow = (async (url: string, init?: RequestInit) => {
+      const isApify = url.includes("apify");
+      await new Promise((resolve, reject) => {
+        const t = setTimeout(resolve, isApify ? 200 : 100);
+        init?.signal?.addEventListener("abort", () => (clearTimeout(t), reject(new Error("aborted"))));
+      });
+      const body = isApify ? [{ songName: "Coup du marteau", rank: 1 }] : { items: [{ snippet: { title: "Clip" }, statistics: { viewCount: "10" } }] };
+      return new Response(JSON.stringify(body), { status: 200 });
+    }) as typeof fetch;
+    const t = await fetchTrends(cfg, slow);
+    expect(t.some((x) => x.source === "youtube")).toBe(true);
+    expect(t.some((x) => x.source === "tiktok")).toBe(false);
+  });
+
+  it("par défaut, Apify attend au moins 2 minutes", () => {
+    expect(loadConfig({}).timeouts.apify).toBeGreaterThanOrEqual(120_000);
+  });
+});

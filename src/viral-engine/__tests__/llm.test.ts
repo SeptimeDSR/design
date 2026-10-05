@@ -53,3 +53,12 @@ describe("generateScript", () => {
     expect(prompts[1]).toContain("hook.no_viewer");
   });
 });
+
+describe("robustesse des réponses du LLM", () => {
+  it("une emphase non textuelle (nombre) est convertie ou ignorée, jamais transmise brute au rendu", async () => {
+    const { assembleScript } = await import("../llm");
+    const s = assembleScript(input, { hook: "Tu sais ?", beats: [{ text: "Dix mille francs.", emphasis: 10000 as unknown as string }, { text: "Rien.", emphasis: { x: 1 } as unknown as string }], payoff: "Fin." });
+    expect(s?.beats[0].emphasis).toBe("10000");
+    expect(s?.beats[1].emphasis).toBeUndefined();
+  });
+});

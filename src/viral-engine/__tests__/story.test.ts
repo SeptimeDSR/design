@@ -75,3 +75,10 @@ describe("scripts de secours, tous cas", () => {
     }
   }
 });
+
+describe("normalizeBeats ne boucle jamais", () => {
+  it("un seul « mot » trop long (16 pauses) ne fait pas exploser la pile", () => {
+    const beats = normalizeBeats([{ text: "a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p" }], "fr");
+    expect(beats).toEqual([{ text: "a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p" }]);
+  });
+});

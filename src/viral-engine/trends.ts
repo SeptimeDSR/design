@@ -65,9 +65,9 @@ export function parseApifyTikTok(items: unknown[]): Trend[] {
   return out;
 }
 
-async function withTimeout<T>(fetchImpl: typeof fetch, url: string, init: RequestInit, read: (r: Response) => Promise<T>): Promise<T> {
+async function withTimeout<T>(fetchImpl: typeof fetch, url: string, init: RequestInit, read: (r: Response) => Promise<T>, timeoutMs: number): Promise<T> {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 10_000);
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetchImpl(url, { ...init, signal: ctrl.signal });
     if (!res.ok) throw new Error(`${res.status} ${url}`);
@@ -81,18 +81,21 @@ export async function fetchTrends(cfg: ViralConfig, fetchImpl: typeof fetch = fe
   const jobs: Promise<Trend[]>[] = [];
   for (const region of cfg.regions) {
     if (region !== "CM") {
-      jobs.push(withTimeout(fetchImpl, `https://trends.google.com/trending/rss?geo=${region}`, {}, async (r) => parseGoogleTrendsRss(await r.text(), region)));
+      jobs.push(withTimeout(fetchImpl, `https://trends.google.com/trending/rss?geo=${region}`, {}, async (r) => parseGoogleTrendsRss(await r.text(), region), cfg.timeouts.default));
     }
     if (cfg.youtubeApiKey) {
       const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&maxResults=15&regionCode=${region}&key=${cfg.youtubeApiKey}`;
-      jobs.push(withTimeout(fetchImpl, url, {}, async (r) => parseYouTubePopular(await r.json(), region)));
+      jobs.push(withTimeout(fetchImpl, url, {}, async (r) => parseYouTubePopular(await r.json(), region), cfg.timeouts.default));
     }
   }
   if (cfg.apify) {
-    const url = `https://api.apify.com/v2/acts/${cfg.apify.actor.replace("/", "~")}/run-sync-get-dataset-items?token=${cfg.apify.token}`;
+    // timeout côté Apify aligné sur le nôtre : la course ne continue pas (ni ne facture) après notre abandon.
+    const seconds = Math.max(1, Math.floor(cfg.timeouts.apify / 1000) - 5);
+    const url = `https://api.apify.com/v2/acts/${cfg.apify.actor.replace("/", "~")}/run-sync-get-dataset-items?token=${cfg.apify.token}&timeout=${seconds}`;
     jobs.push(
       withTimeout(fetchImpl, url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cfg.apify.input) }, async (r) =>
         parseApifyTikTok((await r.json()) as unknown[]),
+        cfg.timeouts.apify,
       ),
     );
   }

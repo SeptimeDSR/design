@@ -7,6 +7,7 @@ import { writeAmbient } from "./ambient";
 import { assembleScript, generateScript, type LlmClient, type ScriptInput } from "./llm";
 import { formatFailedMessage, formatReadyMessage } from "./message";
 import { resolvePublishMode } from "./publish-plan";
+import { hasPostizCredentials } from "./publish";
 import { segmentTexts, buildTimeline, lintScript } from "./story";
 import { createStore, type Job } from "./store";
 import { fetchTrends, pickTrend } from "./trends";
@@ -121,12 +122,12 @@ export async function runJob(req: JobRequest, partial: Partial<PipelineDeps> = {
   };
 
   const notify = partial.notify ?? (async (text: string) => console.log(text));
-  const mode = resolvePublishMode(env, partial.hasPostizCredentials ?? false);
+  const mode = resolvePublishMode(env, partial.hasPostizCredentials ?? hasPostizCredentials());
   try {
     const render = partial.render ?? (await import("./render")).renderWithRemotion;
     job.videoPath = await render(job, props, jobDir);
     store.saveJob(job);
-    await notify(formatReadyMessage(job, mode), job.videoPath);
+    await notify(formatReadyMessage(job, mode, cfg.platforms), job.videoPath);
     job.status = "notified";
   } catch (error) {
     job.status = "failed";

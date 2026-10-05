@@ -24,26 +24,27 @@ function job(over: Partial<Job> = {}): Job {
 }
 
 describe("formatReadyMessage", () => {
-  it("contient la référence, le hook, la légende et la consigne OUI", () => {
-    const text = formatReadyMessage(job(), "postiz-cloud");
+  it("contient la référence, le hook, la légende et la consigne OUI #ref", () => {
+    const text = formatReadyMessage(job(), "postiz-cloud", ["tiktok", "youtube", "instagram", "facebook"]);
     expect(text).toContain(`#${jobRef(job())}`);
     expect(text).toContain(job().script.hook);
     expect(text).toContain(job().script.caption);
-    expect(text).toMatch(/OUI pour publier sur TikTok, YouTube, Facebook, Instagram/);
+    expect(text).toContain(`OUI #${jobRef(job())}`);
+    expect(text).toMatch(/TikTok, YouTube, Instagram, Facebook/);
     expect(text.startsWith("🎬 Septim")).toBe(true);
   });
 
   it("en mode manuel, promet la légende à coller", () => {
-    expect(formatReadyMessage(job(), "manual")).toContain("légende prête à coller");
+    expect(formatReadyMessage(job(), "manual", ["tiktok"])).toContain("légende prête à coller");
   });
 
   it("signale le son tendance à ajouter dans l'app", () => {
-    const text = formatReadyMessage(job({ trend: { title: "x", source: "tiktok", sound: "Coup du marteau", score: 1 } }), "manual");
+    const text = formatReadyMessage(job({ trend: { title: "x", source: "tiktok", sound: "Coup du marteau", score: 1 } }), "manual", ["tiktok"]);
     expect(text).toContain("Coup du marteau");
   });
 
   it("avoue le script de secours", () => {
-    expect(formatReadyMessage(job({ source: "fallback" }), "manual")).toContain("script de secours");
+    expect(formatReadyMessage(job({ source: "fallback" }), "manual", ["tiktok"])).toContain("script de secours");
   });
 });
 
@@ -67,27 +68,14 @@ describe("notificateur console", () => {
   });
 });
 
-describe("chooseNotifier", () => {
-  it("WhatsApp pas encore lié : la console, avec la marche à suivre (jamais bloquer sur un QR)", async () => {
-    const { chooseNotifier } = await import("../notify");
-    expect(chooseNotifier({ requested: "whatsapp", sessionExists: false, interactive: false })).toEqual({
-      kind: "console",
-      warning: expect.stringContaining("npm run viral:daemon"),
-    });
+describe("formatReadyMessage : ce qu'on accepte = ce qui se passera", () => {
+  it("ne liste que les plateformes configurées", () => {
+    const text = formatReadyMessage(job(), "postiz-cloud", ["tiktok", "instagram"]);
+    expect(text).toMatch(/TikTok, Instagram/);
+    expect(text).not.toMatch(/YouTube/);
   });
 
-  it("WhatsApp lié : WhatsApp", async () => {
-    const { chooseNotifier } = await import("../notify");
-    expect(chooseNotifier({ requested: "whatsapp", sessionExists: true, interactive: false })).toEqual({ kind: "whatsapp" });
-  });
-
-  it("le démon (interactif) peut afficher le QR pour lier WhatsApp", async () => {
-    const { chooseNotifier } = await import("../notify");
-    expect(chooseNotifier({ requested: "whatsapp", sessionExists: false, interactive: true })).toEqual({ kind: "whatsapp" });
-  });
-
-  it("console demandée : console", async () => {
-    const { chooseNotifier } = await import("../notify");
-    expect(chooseNotifier({ requested: "console", sessionExists: true, interactive: false })).toEqual({ kind: "console" });
+  it("Postiz auto-hébergé : prévient que TikTok et YouTube restent privés", () => {
+    expect(formatReadyMessage(job(), "postiz-self", ["tiktok", "youtube"])).toMatch(/privé/);
   });
 });
