@@ -282,6 +282,7 @@ export function createFactory(partial: Partial<FactoryDeps> = {}) {
       if (job.status === "published") throw new FactoryError("conflict", `#${ref(job)} est déjà publiée.`);
       if (job.status === "rejected") throw new FactoryError("conflict", `#${ref(job)} a été jetée.`);
       if (job.status === "failed" || !job.videoPath) throw new FactoryError("conflict", `#${ref(job)} n'a pas de vidéo à publier.`);
+      if (!existsSync(job.videoPath)) throw new FactoryError("conflict", `Le fichier vidéo de #${ref(job)} n'existe plus (${job.videoPath}) : refais-la (Refaire) avant de publier.`);
 
       const messages: string[] = [];
       let manualText: string | undefined;

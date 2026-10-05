@@ -38,7 +38,7 @@ Sans Ollama ni Claude, le script vient du script de secours (générique) et, sa
 
 ```bash
 git clone https://github.com/SeptimeDSR/design ~/septim
-bash ~/septim/scripts/install.sh            # ou --voix pour la voix française, --sans-claude pour ne pas toucher Claude Code
+bash ~/septim/scripts/install.sh            # ou --voix pour la voix française, --voix-hd pour la voix HD (Chatterbox), --sans-claude pour ne pas toucher Claude Code
 ```
 
 `install.sh` vérifie Node, installe les dépendances (`PUPPETEER_SKIP_DOWNLOAD=1 npm install`), rend la commande `septim` disponible partout (`npm link`), crée `.env` depuis `.env.example`, puis lance `septim setup`. `septim setup` branche Claude Code s'il est présent (marketplace `septim`, plugins `septim-design` et `septim-viral`, serveur MCP `septim`), puis affiche le diagnostic. Le script est idempotent : relance-le quand tu veux.

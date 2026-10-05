@@ -2,6 +2,7 @@
 # Installe l'usine SEPTIM en une commande (Linux, WSL, macOS). Idempotent : relance-le quand tu veux.
 #   bash scripts/install.sh                  npm, commande septim, .env, Claude Code (s'il est là), diagnostic
 #   bash scripts/install.sh --voix           + voix française gratuite (Piper)
+#   bash scripts/install.sh --voix-hd        + voix HD gratuite (Chatterbox, MIT ; GPU conseillé)
 #   bash scripts/install.sh --sans-claude    sans toucher à la configuration de Claude Code
 set -euo pipefail
 
@@ -10,13 +11,14 @@ SETUP_ARGS=()
 for arg in "$@"; do
   case "$arg" in
     --voix) SETUP_ARGS+=(--voix) ;;
+    --voix-hd) SETUP_ARGS+=(--voix-hd) ;;
     --sans-claude) SETUP_ARGS+=(--sans-claude) ;;
     -h | --help)
       sed -n '2,5p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *)
-      echo "Option inconnue : $arg (options : --voix, --sans-claude)" >&2
+      echo "Option inconnue : $arg (options : --voix, --voix-hd, --sans-claude)" >&2
       exit 1
       ;;
   esac

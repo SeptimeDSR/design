@@ -8,6 +8,7 @@ import { fallbackScript } from "../heat";
 import { buildTimeline } from "../story";
 import type { PublishResult } from "../publish";
 import type { JobRequest } from "../pipeline";
+import { fakeFactory as sharedFakeFactory, seedJob as sharedSeedJob } from "./fixtures/fake-factory";
 
 const TONTINE = JSON.parse(readFileSync(join(__dirname, "fixtures", "tontine.json"), "utf8"));
 
@@ -265,5 +266,15 @@ describe("revue finale : robustesse du cœur", () => {
     await s.factory.idle();
     s.factory.announce("video.published", "5f8a4d25");
     expect(seen).toEqual(["video.ready", "video.published"]);
+  });
+});
+
+describe("revue finale : mineurs corrigés", () => {
+  it("publier une vidéo dont le MP4 a disparu → conflict, rien n'est envoyé", async () => {
+    const f = sharedFakeFactory();
+    const job = sharedSeedJob(f.store, "5f8a4d25");
+    rmSync(job.videoPath!);
+    await expect(f.factory.publish("5f8a", "OUI #5f8a")).rejects.toMatchObject({ code: "conflict" });
+    expect(f.published).toEqual([]);
   });
 });

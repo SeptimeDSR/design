@@ -93,6 +93,7 @@ describe("documentation : elle ne dérive pas du code", () => {
     expect(sh).toContain("PUPPETEER_SKIP_DOWNLOAD=1");
     expect(sh).toContain("npm link");
     expect(sh).toContain("--voix");
+    expect(sh).toContain("--voix-hd) SETUP_ARGS+=(--voix-hd)");
     expect(sh).not.toMatch(/\bread\s+-/);
   });
 });
