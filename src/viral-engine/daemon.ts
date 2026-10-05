@@ -7,7 +7,7 @@ import { tryLock } from "./lock";
 import { BOT_PREFIX, jobRef } from "./message";
 import type { Platform, PublishMode } from "./publish-plan";
 import type { JobRequest } from "./pipeline";
-import type { Job, Store } from "./store";
+import { RefError, type Job, type Store } from "./store";
 import type { PublishResult } from "./publish";
 
 export type { PublishResult };
@@ -51,7 +51,16 @@ export async function handleReply(text: string, deps: DaemonDeps, ctx: ReplyCont
   const ref = reply.jobRef ?? ctx.quoted?.match(/#([0-9a-f]{4,})/i)?.[1]?.toLowerCase();
   let job: Job | undefined;
   if (ref) {
-    job = deps.store.findJob(ref);
+    // Deux vidéos qui commencent par les mêmes caractères : on demande, on ne devine jamais.
+    try {
+      job = deps.store.resolveRef(ref);
+    } catch (error) {
+      if (error instanceof RefError && error.code === "ambiguous_ref") {
+        await deps.notify(`${BOT_PREFIX} · Je n'ai rien publié. ${error.message}`);
+        return;
+      }
+      job = undefined;
+    }
   } else if (pending.length > 1) {
     await deps.notify(`${BOT_PREFIX} · Plusieurs vidéos attendent, dis-moi laquelle (réponds par exemple OUI #${jobRef(pending[0])}) :\n${describe(pending)}`);
     return;
@@ -188,22 +197,35 @@ export async function collectRewards(deps: DaemonDeps, now = Date.now()): Promis
   });
 }
 
-async function main() {
+// septim start : un seul processus possède WhatsApp et la file de rendu ; le Studio, l'API et le MCP HTTP tournent avec lui.
+export async function runDaemon(): Promise<void> {
   loadDotEnv();
   const cron = (await import("node-cron")).default;
   const { createStore } = await import("./store");
   const { createNotifier } = await import("./notify");
-  const { runJob } = await import("./pipeline");
   const { publishJob, fetchJobViews } = await import("./publish");
   const { resolveModeFromEnv } = await import("./publish-mode");
   const { flushOutbox } = await import("./outbox");
+  const { createFactory } = await import("./factory");
+  const { attachWebhooks } = await import("./webhooks");
 
   const cfg = loadConfig();
   const store = createStore(cfg.home);
   const notifier = createNotifier(cfg.notifier, cfg);
   const mode = resolveModeFromEnv();
   const notify = (t: string, m?: string) => notifier.send(t, m);
-  const runner = createCycleRunner((req) => runJob(req, { notify }), notify);
+  // Toutes les portes (cycle, REFAIS, Studio, API, MCP) passent par la même file de la fabrique : un rendu à la fois.
+  const factory = createFactory({ notify });
+  attachWebhooks(factory);
+  const render = async (req: JobRequest): Promise<Job> => {
+    const task = factory.createVideo({ topic: req.topic, template: req.template, lang: req.lang, script: req.script });
+    await factory.idle();
+    const done = factory.getTask(task.id);
+    const job = done.jobId ? store.getJob(done.jobId) : undefined;
+    if (!job) throw new Error(done.error ?? "rendu raté");
+    return job;
+  };
+  const runner = createCycleRunner(render, notify);
   const deps: DaemonDeps = {
     store,
     mode,
@@ -225,7 +247,21 @@ async function main() {
   });
   cron.schedule("0 9 * * *", () => void collectRewards(deps).catch((e) => console.error("[analytics]", e)));
   console.log(`SEPTIM-VIRAL-OS en marche · cycle « ${cfg.cron} » · publication ${mode} · notifications ${cfg.notifier}`);
+
+  const port = Number(process.env.SEPTIM_PORT ?? 4321);
+  if (port !== 0) {
+    const { startServer } = await import("./server/http");
+    const { mcpHttpHandler } = await import("./mcp");
+    const corsOrigins = (process.env.SEPTIM_CORS_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+    try {
+      const srv = await startServer({ factory, port, host: process.env.SEPTIM_HOST, token: process.env.SEPTIM_TOKEN, corsOrigins, mcp: mcpHttpHandler(factory) });
+      console.log(`Studio, API et MCP HTTP : ${srv.url}${process.env.SEPTIM_TOKEN ? "/?token=…" : ""}`);
+    } catch (error) {
+      // WhatsApp et le cycle continuent : seul le serveur manque.
+      console.error(`[serveur] ${(error as Error).message}`);
+    }
+  }
   if (process.argv.includes("--now")) await runner({});
 }
 
-if (process.argv[1]?.endsWith("daemon.ts")) main();
+if (process.argv[1]?.endsWith("daemon.ts")) void runDaemon();

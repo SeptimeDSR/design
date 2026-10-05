@@ -1,0 +1,255 @@
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { Writable } from "node:stream";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { afterEach, describe, expect, it } from "vitest";
+import { HELP, MCP_CLIENTS, main, mcpConfig, parseCommand, writeMcpConfig } from "../septim";
+import { createStore } from "../store";
+import { seedJob } from "./fixtures/fake-factory";
+
+const ROOT = resolve(__dirname, "..", "..", "..");
+const BIN = join(ROOT, "bin", "septim.mjs");
+const NODE = "/usr/bin/node-test";
+
+function capture() {
+  let text = "";
+  const stream = new Writable({
+    write(chunk, _enc, done) {
+      text += chunk.toString();
+      done();
+    },
+  });
+  return { stream, get text() {
+    return text;
+  } };
+}
+
+async function run(argv: string[]) {
+  const out = capture();
+  const err = capture();
+  const code = await main(argv, { out: out.stream, err: err.stream });
+  return { code, out: out.text, err: err.text };
+}
+
+const savedEnv = { ...process.env };
+afterEach(() => {
+  for (const k of Object.keys(process.env)) if (!(k in savedEnv)) delete process.env[k];
+  Object.assign(process.env, savedEnv);
+});
+
+function tempHome() {
+  const home = mkdtempSync(join(tmpdir(), "septim-cli-"));
+  process.env.VIRAL_HOME = home;
+  process.env.VIRAL_PUBLISH_MODE = "manual";
+  process.env.VIRAL_WEBHOOK_URL = "";
+  return { home, store: createStore(home) };
+}
+
+describe("septim : aide et répartition", () => {
+  it("septim sans argument → aide en français qui liste video, studio, start, mcp, connect, publier", async () => {
+    const r = await run([]);
+    expect(r.code).toBe(0);
+    expect(r.out).toBe(`${HELP}\n`);
+    for (const word of ["septim video", "septim studio", "septim start", "septim mcp", "septim connect", "septim publier", "septim setup", "septim doctor"]) expect(HELP).toContain(word);
+    expect(HELP).toMatch(/Fabriquer une vidéo/);
+    expect((await run(["aide"])).out).toBe(`${HELP}\n`);
+    expect((await run(["--help"])).out).toBe(`${HELP}\n`);
+  });
+
+  it("alias anglais : publish 5f8a → publier ; create → video ; list, show, reject", () => {
+    expect(parseCommand(["publish", "5f8a"])).toEqual({ command: "publier", args: ["5f8a"] });
+    expect(parseCommand(["create", "la tontine"])).toEqual({ command: "video", args: ["la tontine"] });
+    expect(parseCommand(["list"]).command).toBe("videos");
+    expect(parseCommand(["show", "5f8a"]).command).toBe("voir");
+    expect(parseCommand(["reject", "5f8a"]).command).toBe("jeter");
+    expect(parseCommand(["help"]).command).toBe("aide");
+  });
+
+  it("commande inconnue → sortie 1 avec suggestion", async () => {
+    const r = await run(["vidoe", "x"]);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("« vidoe »");
+    expect(r.err).toContain("septim video");
+  });
+
+  it("publier sans référence → sortie 1 et marche à suivre", async () => {
+    tempHome();
+    const r = await run(["publier"]);
+    expect(r.code).toBe(1);
+    expect(r.err).toMatch(/septim publier <ref>/);
+    expect(r.err).toMatch(/septim videos/);
+  });
+});
+
+describe("septim : vidéos depuis le terminal", () => {
+  it("videos, voir, jeter et publier passent par la fabrique (références « #5F8A », ambiguïté refusée)", async () => {
+    const { store } = tempHome();
+    seedJob(store, "5f8a4d25", { topic: "la tontine" });
+    seedJob(store, "ab12cdef");
+    seedJob(store, "ab34cdef");
+    const list = await run(["videos"]);
+    expect(list.code).toBe(0);
+    expect(list.out).toContain("#5f8a");
+    expect(list.out).toContain("À valider");
+    const show = await run(["voir", "#5F8A"]);
+    expect(show.code).toBe(0);
+    expect(show.out).toContain("la tontine");
+    expect(show.out).toContain("septim publier 5f8a");
+    const amb = await run(["voir", "ab"]);
+    expect(amb.code).toBe(1);
+    expect(amb.err).toMatch(/plusieurs vidéos/);
+    const pub = await run(["publier", "5F8A"]);
+    expect(pub.code).toBe(0);
+    expect(pub.out).toMatch(/Légende prête/);
+    expect(store.getJob("5f8a4d25")!.status).toBe("published");
+    const again = await run(["publish", "5f8a"]);
+    expect(again.code).toBe(1);
+    expect(again.err).toMatch(/déjà publiée/);
+    const reject = await run(["jeter", "ab12"]);
+    expect(reject.code).toBe(0);
+    expect(store.getJob("ab12cdef")!.status).toBe("rejected");
+  });
+
+  it("lint <fichier> relatif au dossier où l'on tape la commande", async () => {
+    tempHome();
+    process.env.SEPTIM_CWD = join(__dirname, "fixtures");
+    const r = await run(["lint", "tontine.json", "--template", "maths"]);
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/conforme/);
+  });
+});
+
+describe("septim connect : configuration MCP de chaque client", () => {
+  const opts = { root: "/opt/septim", node: NODE, home: "/home/ana", platform: "linux" as NodeJS.Platform };
+  const server = { command: NODE, args: ["/opt/septim/bin/septim.mjs", "mcp"] };
+
+  it("MCP_CLIENTS couvre les 7 clients", () => {
+    expect([...MCP_CLIENTS]).toEqual(["claude-code", "claude-desktop", "cursor", "vscode", "windsurf", "codex", "gemini"]);
+  });
+
+  it("claude-code → commande claude mcp add en portée utilisateur", () => {
+    expect(mcpConfig("claude-code", opts).command).toEqual(["claude", "mcp", "add", "--scope", "user", "septim", "--", NODE, "/opt/septim/bin/septim.mjs", "mcp"]);
+  });
+
+  it("claude-desktop → claude_desktop_config.json (Linux, macOS, Windows) avec mcpServers.septim absolu", () => {
+    const linux = mcpConfig("claude-desktop", opts);
+    expect(linux.path).toBe("/home/ana/.config/Claude/claude_desktop_config.json");
+    expect(JSON.parse(linux.content)).toEqual({ mcpServers: { septim: server } });
+    expect(mcpConfig("claude-desktop", { ...opts, platform: "darwin" }).path).toBe("/home/ana/Library/Application Support/Claude/claude_desktop_config.json");
+    expect(mcpConfig("claude-desktop", { ...opts, platform: "win32", appData: "C:\\Users\\ana\\AppData\\Roaming" }).path).toMatch(/Claude[\\/]claude_desktop_config\.json$/);
+  });
+
+  it("cursor → ~/.cursor/mcp.json ; windsurf → ~/.codeium/windsurf/mcp_config.json ; gemini → ~/.gemini/settings.json", () => {
+    expect(mcpConfig("cursor", opts).path).toBe("/home/ana/.cursor/mcp.json");
+    expect(JSON.parse(mcpConfig("cursor", opts).content)).toEqual({ mcpServers: { septim: server } });
+    expect(mcpConfig("windsurf", opts).path).toBe("/home/ana/.codeium/windsurf/mcp_config.json");
+    expect(mcpConfig("gemini", opts).path).toBe("/home/ana/.gemini/settings.json");
+    expect(JSON.parse(mcpConfig("gemini", opts).content)).toEqual({ mcpServers: { septim: server } });
+  });
+
+  it("vscode → mcp.json du profil utilisateur, clé servers et type stdio", () => {
+    const c = mcpConfig("vscode", opts);
+    expect(c.path).toBe("/home/ana/.config/Code/User/mcp.json");
+    expect(JSON.parse(c.content)).toEqual({ servers: { septim: { type: "stdio", ...server } } });
+    expect(mcpConfig("vscode", { ...opts, platform: "darwin" }).path).toBe("/home/ana/Library/Application Support/Code/User/mcp.json");
+  });
+
+  it("codex → ~/.codex/config.toml avec [mcp_servers.septim]", () => {
+    const c = mcpConfig("codex", opts);
+    expect(c.path).toBe("/home/ana/.codex/config.toml");
+    expect(c.content).toContain("[mcp_servers.septim]");
+    expect(c.content).toContain(`command = "${NODE}"`);
+    expect(c.content).toContain('args = ["/opt/septim/bin/septim.mjs", "mcp"]');
+  });
+
+  it("--write fusionne : les autres serveurs restent, septim est remplacé ; JSON illisible → refus sans écraser", () => {
+    const home = mkdtempSync(join(tmpdir(), "septim-connect-"));
+    const o = { ...opts, home };
+    const file = join(home, ".cursor", "mcp.json");
+    mkdirSync(join(home, ".cursor"), { recursive: true });
+    writeFileSync(file, JSON.stringify({ mcpServers: { github: { command: "gh" }, septim: { command: "vieux" } }, autre: 1 }));
+    writeMcpConfig("cursor", o);
+    expect(JSON.parse(readFileSync(file, "utf8"))).toEqual({ mcpServers: { github: { command: "gh" }, septim: server }, autre: 1 });
+
+    const toml = join(home, ".codex", "config.toml");
+    mkdirSync(join(home, ".codex"), { recursive: true });
+    writeFileSync(toml, 'model = "o4"\n\n[mcp_servers.septim]\ncommand = "vieux"\n\n[mcp_servers.autre]\ncommand = "x"\n');
+    writeMcpConfig("codex", o);
+    const t = readFileSync(toml, "utf8");
+    expect(t).toContain('model = "o4"');
+    expect(t).toContain("[mcp_servers.autre]");
+    expect(t).not.toContain("vieux");
+    expect(t.match(/\[mcp_servers\.septim\]/g)).toHaveLength(1);
+
+    const broken = join(home, ".gemini", "settings.json");
+    mkdirSync(join(home, ".gemini"), { recursive: true });
+    writeFileSync(broken, "{ pas du json");
+    expect(() => writeMcpConfig("gemini", o)).toThrow(/illisible/);
+    expect(readFileSync(broken, "utf8")).toBe("{ pas du json");
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it("septim connect <client> affiche le fichier et la configuration ; client inconnu → 1", async () => {
+    const r = await run(["connect", "cursor"]);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain(".cursor/mcp.json");
+    expect(r.out).toContain("bin/septim.mjs");
+    expect(r.out).toContain("--write");
+    const bad = await run(["connect", "notepad"]);
+    expect(bad.code).toBe(1);
+    expect(bad.err).toContain("claude-desktop");
+  });
+});
+
+describe("septim : vrais processus, lancés depuis un autre dossier", () => {
+  it("bin/septim.mjs doctor (cwd = dossier temporaire) sort en 0 et affiche « état de l'usine »", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "septim-ailleurs-"));
+    const r = spawnSync(process.execPath, [BIN, "doctor"], { cwd, env: { ...process.env, VIRAL_NOTIFIER: "console" }, encoding: "utf8", timeout: 60_000 });
+    expect(r.stderr).toBe("");
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain("état de l'usine");
+  }, 70_000);
+
+  it("septim videos lancé ailleurs lit le VIRAL_HOME du repo (chemin relatif résolu depuis le repo)", () => {
+    const rel = `.septim-test-${process.pid}`;
+    const home = join(ROOT, rel);
+    try {
+      seedJob(createStore(home), "c0ffee12", { topic: "le marché Mokolo" });
+      const cwd = mkdtempSync(join(tmpdir(), "septim-ailleurs-"));
+      const r = spawnSync(process.execPath, [BIN, "videos"], { cwd, env: { ...process.env, VIRAL_HOME: rel }, encoding: "utf8", timeout: 60_000 });
+      expect(r.status, r.stderr).toBe(0);
+      expect(r.stdout).toContain("#c0ff");
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  }, 70_000);
+
+  it("septim mcp (vrai processus) répond à initialize puis tools/list sur stdio, sans rien d'autre sur stdout", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "septim-ailleurs-"));
+    const home = mkdtempSync(join(tmpdir(), "septim-mcp-home-"));
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: [BIN, "mcp"],
+      cwd,
+      env: { ...(process.env as Record<string, string>), VIRAL_HOME: home },
+      stderr: "pipe",
+    });
+    const client = new Client({ name: "test", version: "1.0.0" });
+    const errors: unknown[] = [];
+    client.onerror = (e) => void errors.push(e);
+    await client.connect(transport);
+    try {
+      const tools = await client.listTools();
+      expect(tools.tools).toHaveLength(9);
+      const doctor = (await client.callTool({ name: "septim_doctor", arguments: {} })) as { content: { text: string }[] };
+      expect(JSON.parse(doctor.content[0].text).canRender).toBe(true);
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+    }
+    expect(existsSync(join(home, "tasks"))).toBe(true);
+  }, 70_000);
+});

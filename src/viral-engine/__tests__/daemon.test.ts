@@ -76,6 +76,16 @@ describe("handleReply : jamais sans accord net, jamais deux fois", () => {
     expect(s.published).toEqual(["aaaa1111"]);
   });
 
+  it("OUI #ref ambigu (deux vidéos qui commencent pareil) : rien n'est publié, l'usine demande quelques caractères de plus", async () => {
+    const s = setup([makeJob("5f8a1111", "notified", "2026-10-05T10:00:00Z"), makeJob("5f8a2222", "notified", "2026-10-05T11:00:00Z")]);
+    await handleReply("OUI #5f8a", s.deps);
+    expect(s.published).toEqual([]);
+    expect(s.sent.at(-1)).toMatch(/plusieurs vidéos/);
+    expect(s.sent.at(-1)).toContain("#5f8a11");
+    await handleReply("OUI #5f8a22", s.deps);
+    expect(s.published).toEqual(["5f8a2222"]);
+  });
+
   it("un accord ambigu ne publie pas et demande un OUI net", async () => {
     const s = setup();
     await handleReply("ok je regarde ce soir", s.deps);

@@ -505,7 +505,7 @@ async function act(card, action) {
   for (const b of card.parts.actions.querySelectorAll("button")) b.disabled = true;
   try {
     if (action === "publish") {
-      const r = await api("POST /api/v1/videos/:ref/publish", { params: { ref: detail.id }, body: { confirm: `OUI #${detail.ref}` } });
+      const r = await api("POST /api/v1/videos/:ref/publish", { params: { ref: detail.id }, body: { confirm: `OUI #${detail.id}` } });
       card.parts.outcome.hidden = false;
       card.parts.outcome.replaceChildren(
         h("p", { text: r.manualText ? `Publiée #${r.ref}. Colle la légende ci-dessus dans l'app, avec le son tendance.` : r.message }),
@@ -577,7 +577,8 @@ function renderConnect() {
   $("mcp-url").textContent = `${location.origin}/mcp`;
   $("commands").replaceChildren(
     ...CLIENTS.map(([id, name]) => {
-      const command = `septim connect ${id}`;
+      // claude-code lance « claude mcp add » ; les autres écrivent leur fichier de config (sans toucher aux autres serveurs).
+      const command = id === "claude-code" ? "septim connect claude-code" : `septim connect ${id} --write`;
       return h(
         "li",
         { class: "command" },

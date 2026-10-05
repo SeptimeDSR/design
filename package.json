@@ -2,6 +2,9 @@
   "name": "design",
   "version": "0.1.0",
   "private": true,
+  "bin": {
+    "septim": "bin/septim.mjs"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -12,6 +15,7 @@
     "video:dolly": "remotion render src/remotion/index.ts cinematic-dolly public/videos/cinematic-dolly.mp4",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
+    "septim": "tsx src/viral-engine/septim.ts",
     "viral": "tsx src/viral-engine/cli.ts",
     "viral:daemon": "tsx src/viral-engine/daemon.ts",
     "viral:ambient": "tsx src/viral-engine/ambient.ts",
