@@ -3,6 +3,8 @@ import { useMemo } from "react";
 import { AbsoluteFill, Easing, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { captionPages, msToFrame, segmentAt, type ViralProps } from "./props";
 
+export { emphasisOf } from "./props";
+
 const resolveSrc = (src: string) => (/^(https?:|data:|blob:)/.test(src) ? src : staticFile(src));
 
 export function useTimelineMs() {
@@ -133,10 +135,4 @@ export function SaveBadge({ accent, fontFamily, label }: { accent: string; fontF
       </div>
     </div>
   );
-}
-
-export function emphasisOf(text: string, emphasis?: string): string {
-  if (emphasis && text.toLowerCase().includes(emphasis.toLowerCase())) return emphasis;
-  const words = text.replace(/[.,;:!?…«»"]/g, "").split(/\s+/).filter(Boolean);
-  return words.reduce((a, b) => (b.length > a.length ? b : a), "");
 }

@@ -42,3 +42,11 @@ export function segmentAt(timeline: Timeline, ms: number): { segment: Segment; i
   const safe = ms >= timeline.durationMs ? timeline.segments.length - 1 : index;
   return { segment: timeline.segments[safe], index: safe };
 }
+
+// Le mot fort d'un segment : l'emphase fournie, sinon le plus long mot après « : » (la vraie réponse), sinon le plus long.
+export function emphasisOf(text: string, emphasis?: string): string {
+  if (emphasis && text.toLowerCase().includes(emphasis.toLowerCase())) return emphasis;
+  const afterColon = text.includes(":") ? text.slice(text.indexOf(":") + 1) : text;
+  const words = afterColon.replace(/[.,;:!?…«»"]/g, "").split(/\s+/).filter(Boolean);
+  return words.reduce((a, b) => (b.length > a.length ? b : a), "");
+}

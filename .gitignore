@@ -43,3 +43,6 @@ next-env.d.ts
 
 # Remotion renders (regenerate with npm run video:render / video:dolly)
 /public/videos/*.mp4
+
+# SEPTIM-VIRAL-OS : état local, sessions WhatsApp, vidéos rendues
+/.septim-viral/
