@@ -46,3 +46,6 @@ next-env.d.ts
 
 # SEPTIM-VIRAL-OS : état local, sessions WhatsApp, vidéos rendues
 /.septim-viral/
+
+# Livrables envoyés en fichiers (vidéos de démo, bundles)
+/deliverables/
