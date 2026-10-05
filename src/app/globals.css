@@ -2,25 +2,59 @@
 @import "lenis/dist/lenis.css";
 
 @theme {
-  --color-ink: #0d0d0b;
-  --color-bone: #ece7dc;
-  --color-signal: #ff4d1a;
-  --font-display: "Bricolage Grotesque Variable", system-ui, sans-serif;
-  --font-sans: "Bricolage Grotesque Variable", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+  --color-nuit: #121640;
+  --color-ndop: #24307a;
+  --color-craie: #e9ecf2;
+  --color-camwood: #c2492f;
+  --color-raphia: #e8c15a;
+  --color-brume: #8f97c8;
+  --font-display: "Anybody Variable", system-ui, sans-serif;
+  --font-sans: "Instrument Sans Variable", system-ui, sans-serif;
 }
 
 html {
-  background: var(--color-ink);
-  color: var(--color-bone);
+  background: var(--color-nuit);
+  color: var(--color-craie);
 }
 
 body {
   font-family: var(--font-sans);
-  font-variation-settings: "opsz" 14;
+  font-size: 1.125rem;
+  line-height: 1.6;
 }
 
 ::selection {
-  background: var(--color-signal);
-  color: var(--color-ink);
+  background: var(--color-raphia);
+  color: var(--color-nuit);
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-raphia);
+  outline-offset: 3px;
+}
+
+/* Tissu Ndop : losanges blancs réservés sur indigo, en motif SVG répété. */
+.ndop {
+  background-color: var(--color-ndop);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' viewBox='0 0 56 56'%3E%3Cpath d='M28 6 L50 28 L28 50 L6 28 Z' fill='none' stroke='%23e9ecf2' stroke-opacity='.22' stroke-width='3'/%3E%3Cpath d='M28 20 L36 28 L28 36 L20 28 Z' fill='%23e9ecf2' fill-opacity='.18'/%3E%3C/svg%3E");
+}
+
+.stretch {
+  font-family: var(--font-display);
+  font-stretch: var(--stretch, 100%);
+  will-change: font-stretch;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stretch {
+    will-change: auto;
+  }
+}
+
+@keyframes drop {
+  from {
+    opacity: 0;
+    translate: 0 2rem;
+    rotate: 4deg;
+  }
 }

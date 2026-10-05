@@ -1,19 +1,22 @@
 import type { Metadata } from "next";
-import "@fontsource-variable/bricolage-grotesque";
-import "@fontsource-variable/jetbrains-mono";
+import "@fontsource-variable/anybody/wdth.css";
+import "@fontsource-variable/instrument-sans";
 import "./globals.css";
 import { SmoothScroll } from "@/components/providers/smooth-scroll";
+import { SoundProvider } from "@/components/retention/sound";
 
 export const metadata: Metadata = {
-  title: "Septim — Design Stack 2026",
-  description: "Lenis, GSAP, Motion, Spline, Remotion : la stack qui retient, en version FREE et PRO.",
+  title: "Septim — sites et vidéos qu'on n'arrive pas à quitter",
+  description: "Studio à Yaoundé. Sites immersifs et vidéos courtes conçus pour être regardés jusqu'au bout.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="fr" className="antialiased">
-      <body className="min-h-screen bg-ink text-bone">
-        <SmoothScroll>{children}</SmoothScroll>
+      <body className="min-h-screen bg-nuit text-craie">
+        <SoundProvider>
+          <SmoothScroll>{children}</SmoothScroll>
+        </SoundProvider>
       </body>
     </html>
   );

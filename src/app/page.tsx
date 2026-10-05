@@ -1,68 +1,129 @@
-import { HeroScene } from "@/components/hero/hero-scene";
-import { HeroVideo } from "@/components/video/hero-video";
 import { Reveal } from "@/components/motion/reveal";
-import { ScrubText } from "@/components/sections/scrub-text";
-import { StackRail } from "@/components/sections/stack-rail";
+import { ChapterHud } from "@/components/retention/chapter-hud";
+import { Countdown } from "@/components/retention/countdown";
+import { EndlessFeed } from "@/components/retention/endless-feed";
+import { Factory } from "@/components/retention/factory";
+import { InterruptRail } from "@/components/retention/interrupt-rail";
+import { SecretDrop } from "@/components/retention/secret-drop";
+import { SiteHeader, WHATSAPP_URL } from "@/components/retention/site-header";
+import { SoundToggle } from "@/components/retention/sound";
+import { StretchDriver } from "@/components/retention/stretch-driver";
+import { ViralPhone } from "@/components/retention/viral-phone";
 
-const tools = [
-  { name: "Lenis", role: "Le scroll beurre : inertie douce, synchronisée avec GSAP.", tier: "FREE" },
-  { name: "GSAP", role: "ScrollTrigger, pin, scrub : la mise en scène pilotée par le scroll.", tier: "FREE" },
-  { name: "Motion", role: "Apparitions, gestes et layout animations côté React.", tier: "FREE" },
-  { name: "Three / R3F", role: "La 3D codée qui remplace Spline quand il n'y a pas de scène.", tier: "FREE" },
-  { name: "Remotion", role: "Des vidéos écrites en React, rendues en MP4 sans crédit.", tier: "FREE" },
-  { name: "Higgsfield", role: "Soul + Seedance pour les plans hero cinématiques.", tier: "PRO" },
-  { name: "Runway · Pika", role: "Gen-4.5, Seedance 2.0, Pika Agents : options vidéo payantes.", tier: "PRO" },
-] as const;
+function ChapterLabel({ n }: { n: number }) {
+  return <p className="mb-6 text-brume">Chapitre {n}</p>;
+}
 
 export default function Home() {
   return (
-    <main>
-      <section className="relative flex min-h-screen flex-col justify-between overflow-hidden px-4 pt-6 pb-10 md:px-[8vw]">
-        <HeroScene className="absolute inset-0 md:left-[35%]" />
-        <header className="relative flex items-center justify-between font-mono text-sm">
-          <span>Septim</span>
-          <span className="text-bone/60">Design stack · 2026</span>
-        </header>
-        <div className="relative">
+    <main id="top">
+      <StretchDriver />
+      <SiteHeader />
+      <ChapterHud />
+
+      <section className="grid min-h-screen items-center gap-12 px-4 pt-28 pb-28 md:px-[8vw] lg:grid-cols-[minmax(0,1.35fr)_minmax(0,0.65fr)]">
+        <div>
           <Reveal onMount>
-            <h1 className="max-w-[9ch] font-display text-[clamp(3.2rem,11vw,10rem)] leading-[0.88] font-bold tracking-[-0.05em]">
-              Le scroll qui retient.
+            <h1 className="stretch max-w-[17ch] text-[clamp(2.8rem,6vw,6.2rem)] leading-[0.9] font-black">
+              Des sites et des vidéos qu&apos;on n&apos;arrive pas à quitter.
             </h1>
           </Reveal>
-          <Reveal onMount delay={0.15}>
-            <p className="mt-8 max-w-[42ch] text-lg text-bone/70">
-              Chaque effet existe en deux versions : une version gratuite qui tourne tout de suite, une version
-              à crédits quand le client paie le plan cinéma.
+          <Reveal onMount delay={0.12}>
+            <p className="mt-7 max-w-[46ch] text-xl text-craie/85">
+              Septim est un studio à Yaoundé. On conçoit pour les marques et les créateurs qui veulent être regardés jusqu&apos;au bout.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <a href={WHATSAPP_URL} className="rounded-full bg-camwood px-7 py-4 font-semibold text-craie hover:bg-[#d4553a]">
+                Écrire sur WhatsApp
+              </a>
+              <a href="#trois-secondes" className="rounded-full px-7 py-4 font-semibold text-craie ring-1 ring-craie/30 hover:bg-ndop">
+                Voir la méthode
+              </a>
+            </div>
+            <p className="mt-8 max-w-[50ch] text-brume">
+              71 % des gens décident en 3 secondes s&apos;ils restent. À la fin de cette page, tu sauras ce qu&apos;on met dans ces 3 secondes.
             </p>
           </Reveal>
         </div>
+        <ViralPhone template="story" topic="ton attention" className="mx-auto w-full max-w-[19rem] rotate-[2deg]" />
       </section>
 
-      <section className="px-4 py-32 md:px-[8vw] md:py-48">
-        <ScrubText text="Un visiteur décide en trois secondes s'il reste. Le mouvement, la matière et le rythme du scroll font ce travail avant le premier mot lu." />
+      <section id="trois-secondes">
+        <Countdown />
       </section>
 
-      <StackRail tools={[...tools]} />
+      <SecretDrop slot={1} />
 
-      <section className="px-4 py-32 md:px-[8vw]">
-        <Reveal>
-          <h2 className="mb-10 max-w-[20ch] font-display text-[clamp(2.2rem,5vw,4rem)] leading-none font-semibold tracking-[-0.03em]">
-            Le plan hero, rendu par du code.
-          </h2>
-        </Reveal>
-        <Reveal delay={0.1}>
-          <HeroVideo className="w-full overflow-hidden rounded-3xl border border-bone/10" />
-        </Reveal>
-        <p className="mt-6 max-w-[60ch] font-mono text-sm text-bone/55">
-          Remotion par défaut. Renseignez NEXT_PUBLIC_HERO_VIDEO_URL avec un rendu Higgsfield, Runway ou Pika
-          pour passer en version PRO.
+      <section id="le-mot" className="ndop px-4 py-32 md:px-[8vw]">
+        <ChapterLabel n={2} />
+        <p className="stretch max-w-[18ch] text-[clamp(2.4rem,6.5vw,6rem)] leading-[0.95] font-black">
+          Pendant ces 3 secondes, on ne vend rien. On ouvre une <span className="inline-block w-[4.5ch] border-b-[0.12em] border-raphia align-baseline" aria-label="mot caché" />.
+        </p>
+        <p className="mt-10 max-w-[48ch] text-xl text-craie/85">
+          Ton cerveau veut déjà connaître le mot. Garde cette envie : c&apos;est exactement elle qui te fait rester. Le mot arrive au chapitre 7.
         </p>
       </section>
 
-      <footer className="flex flex-col gap-4 border-t border-bone/10 px-4 py-16 md:flex-row md:items-end md:justify-between md:px-[8vw]">
-        <p className="font-display text-[clamp(2.5rem,8vw,7rem)] leading-none font-bold tracking-[-0.05em]">On lance ?</p>
-        <p className="font-mono text-sm text-bone/55">.claude/INVENTAIRE-DESIGN-2026.md</p>
-      </footer>
+      <section id="le-son" className="px-4 py-32 md:px-[8vw]">
+        <ChapterLabel n={3} />
+        <h2 className="stretch max-w-[16ch] text-[clamp(2.4rem,6vw,5.5rem)] leading-[0.95] font-black">La moitié d&apos;une vidéo virale s&apos;écoute.</h2>
+        <div className="mt-10 grid gap-10 md:grid-cols-2">
+          <p className="max-w-[46ch] text-xl text-craie/85">
+            Sur TikTok, un son qui monte entraîne les vidéos qui l&apos;utilisent. Une voix claire bat une musique forte : les plateformes transcrivent ce que tu dis.
+          </p>
+          <div>
+            <SoundToggle className="flex items-center gap-3 rounded-full bg-craie px-7 py-4 font-semibold text-nuit hover:bg-white" />
+            <p className="mt-4 text-brume">Une nappe douce, générée en direct. Rien ne joue sans ton clic.</p>
+          </div>
+        </div>
+      </section>
+
+      <SecretDrop slot={2} />
+
+      <section id="interruptions">
+        <div className="px-4 pt-24 md:px-[8vw]">
+          <ChapterLabel n={4} />
+          <h2 className="stretch max-w-[18ch] text-[clamp(2.4rem,6vw,5.5rem)] leading-[0.95] font-black">Toutes les 3 secondes, quelque chose change.</h2>
+        </div>
+        <InterruptRail />
+      </section>
+
+      <section id="recompense" className="px-4 py-32 md:px-[8vw]">
+        <ChapterLabel n={5} />
+        <h2 className="stretch max-w-[18ch] text-[clamp(2.4rem,6vw,5.5rem)] leading-[0.95] font-black">
+          Tu ne sais pas quand elle arrive. C&apos;est pour ça que tu restes.
+        </h2>
+        <p className="mt-10 max-w-[50ch] text-xl text-craie/85">
+          Une récompense prévisible ennuie. Une récompense qui peut tomber à tout moment fait continuer. Des secrets sont cachés dans cette page, jamais au même endroit.
+        </p>
+      </section>
+
+      <SecretDrop slot={3} />
+
+      <section id="usine">
+        <div className="px-4 pt-16 md:px-[8vw]">
+          <ChapterLabel n={6} />
+        </div>
+        <Factory />
+      </section>
+
+      <SecretDrop slot={4} />
+
+      <section id="reponse" className="ndop px-4 py-36 md:px-[8vw]">
+        <ChapterLabel n={7} />
+        <p className="stretch text-[clamp(3rem,10vw,10rem)] leading-[0.88] font-black">
+          On ouvre une <span className="text-raphia">question</span>.
+        </p>
+        <p className="mt-10 max-w-[52ch] text-xl text-craie/90">
+          Les 3 premières secondes ne vendent rien. Elles posent une question que ton cerveau refuse de laisser ouverte. Tout le reste, le son, le rythme, les récompenses, sert à repousser la réponse juste assez longtemps.
+        </p>
+        <a href={WHATSAPP_URL} className="mt-12 inline-block rounded-full bg-camwood px-8 py-5 text-lg font-semibold text-craie hover:bg-[#d4553a]">
+          Écrire sur WhatsApp
+        </a>
+      </section>
+
+      <SecretDrop slot={5} />
+      <EndlessFeed />
     </main>
   );
 }
