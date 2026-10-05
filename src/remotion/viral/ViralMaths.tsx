@@ -1,6 +1,6 @@
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { AudioTracks, BigWord, BrollBackground, Captions, HookCard, PayoffFlash, ProgressBar, SaveBadge, outline, usePunch } from "./shared";
-import { LAYOUT, sceneFor } from "./layout";
+import { CHIP, LAYOUT, chipFontSize, sceneFor } from "./layout";
 import { msToFrame, type ViralProps } from "./props";
 
 const PAPER = "#0f1a14";
@@ -27,6 +27,7 @@ export function ViralMaths({ script, timeline, audio, broll }: ViralProps) {
     .slice(-3);
   const isNumber = /\d/.test(scene.word);
   const chips = LAYOUT.chips;
+  const chipSize = chipFontSize(numbers, EM);
   const box = LAYOUT.answerBox;
 
   return (
@@ -73,9 +74,9 @@ export function ViralMaths({ script, timeline, audio, broll }: ViralProps) {
       ) : null}
 
       {segment.kind === "beat" && numbers.length ? (
-        <div style={{ position: "absolute", top: chips.top, left: chips.left, width: chips.width, height: chips.height, display: "flex", gap: 18, justifyContent: "center", alignItems: "center" }}>
+        <div style={{ position: "absolute", top: chips.top, left: chips.left, width: chips.width, height: chips.height, display: "flex", gap: CHIP.gap, justifyContent: "center", alignItems: "center" }}>
           {numbers.map((n, i) => (
-            <div key={`${n}-${i}`} style={{ padding: "14px 26px", borderRadius: 999, border: `3px solid rgba(238,245,234,0.45)`, fontFamily: MONO, fontSize: 42, fontWeight: 700, color: CHALK, background: "rgba(15,26,20,0.8)", opacity: i === numbers.length - 1 ? 1 : 0.6, whiteSpace: "nowrap" }}>
+            <div key={`${n}-${i}`} style={{ padding: `14px ${CHIP.padX}px`, borderRadius: 999, border: `${CHIP.border}px solid rgba(238,245,234,0.45)`, fontFamily: MONO, fontSize: chipSize, fontWeight: 700, color: CHALK, background: "rgba(15,26,20,0.8)", opacity: i === numbers.length - 1 ? 1 : 0.6, whiteSpace: "nowrap" }}>
               {n}
             </div>
           ))}
@@ -109,7 +110,7 @@ export function ViralMaths({ script, timeline, audio, broll }: ViralProps) {
         </div>
       ) : null}
 
-      <Captions timeline={timeline} fontFamily={MONO} color={CHALK} accent={ACCENT} fontSize={84} />
+      <Captions timeline={timeline} fontFamily={MONO} color={CHALK} accent={ACCENT} fontSize={84} em={EM} />
       {segment.kind === "cta" ? <SaveBadge accent={ACCENT} fontFamily={MONO} label={script.lang === "fr" ? "Garde ça" : "Save this"} ink={PAPER} /> : null}
       <PayoffFlash timeline={timeline} color={ACCENT} />
       <ProgressBar color={ACCENT} track="rgba(238,245,234,0.15)" />

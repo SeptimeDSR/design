@@ -1,7 +1,7 @@
 import { Audio, Video } from "@remotion/media";
 import { useMemo, type CSSProperties } from "react";
 import { AbsoluteFill, Easing, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { LAYOUT, bigWordSize, countUpText, hookState } from "./layout";
+import { LAYOUT, bigWordSize, captionFontSize, countUpText, hookState } from "./layout";
 import { captionPages, msToFrame, segmentAt, type ViralProps } from "./props";
 
 export { emphasisOf } from "./props";
@@ -231,6 +231,7 @@ export function Captions({
   uppercase = false,
   fontWeight = 800,
   stroke = true,
+  em = 0.6,
 }: {
   timeline: ViralProps["timeline"];
   fontFamily: string;
@@ -241,6 +242,8 @@ export function Captions({
   fontWeight?: number;
   // Texte sombre sur fond clair (payoff) : pas de contour sombre, il ferait une tache.
   stroke?: boolean;
+  // Chasse moyenne de la police : un mot trop long réduit la taille au lieu de sortir du cadre.
+  em?: number;
 }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -249,6 +252,7 @@ export function Captions({
   const page = pages.find((p) => ms >= p.startMs && ms < p.endMs) ?? (ms >= timeline.durationMs ? pages.at(-1) : undefined);
   if (!page) return null;
   const box = LAYOUT.captions;
+  const size = captionFontSize(page.words.map((w) => w.text), fontSize, uppercase ? em * 1.15 : em);
   return (
     <div style={{ position: "absolute", top: box.top, left: box.left, width: box.width, height: box.height, display: "flex", alignItems: "flex-start", justifyContent: "center" }}>
       <div
@@ -258,13 +262,13 @@ export function Captions({
           justifyContent: "center",
           columnGap: "0.36em",
           fontFamily,
-          fontSize,
+          fontSize: size,
           fontWeight,
           lineHeight: 1.06,
           letterSpacing: "-0.02em",
           textAlign: "center",
           textTransform: uppercase ? "uppercase" : "none",
-          ...(stroke ? outline(fontSize) : {}),
+          ...(stroke ? outline(size) : {}),
         }}
       >
         {page.words.map((w, i) => {
@@ -276,7 +280,7 @@ export function Captions({
               style={{
                 display: "inline-block",
                 color: active ? accent : color,
-                translate: `0px ${interpolate(frame, [from, from + 4, from + 9], [0, -0.1 * fontSize, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}px`,
+                translate: `0px ${interpolate(frame, [from, from + 4, from + 9], [0, -0.1 * size, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}px`,
               }}
             >
               {w.text}

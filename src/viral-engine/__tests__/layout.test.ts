@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LAYOUT, SAFE, VIEW, bigWordSize, chapterLabel, countUpText, fitFontSize, hookState, sceneFor, sfxCues, textWidth } from "../../remotion/viral/layout";
+import { LAYOUT, SAFE, VIEW, bigWordSize, captionFontSize, chapterLabel, chipFontSize, CHIP, countUpText, fitFontSize, hookState, lineCount, sceneFor, sfxCues, textWidth } from "../../remotion/viral/layout";
 import { captionPages } from "../../remotion/viral/props";
 import { fallbackScript } from "../heat";
 import { buildTimeline } from "../story";
@@ -67,7 +67,7 @@ describe("le hook se lit en entier dès la première image", () => {
   it("à 0 ms, la carte du hook montre la phrase entière ; elle disparaît à la fin du hook", () => {
     const start = hookState(timeline, 0);
     expect(start.visible).toBe(true);
-    expect(start.words.map((w) => w.text).join(" ")).toBe("Tu es le dernier à bouffer la tontine ?");
+    expect(start.words.map((w) => w.text).join(" ")).toBe("Tu es le dernier à bouffer la tontine\u00a0?");
     expect(start.fontSize).toBeGreaterThanOrEqual(96);
     const hookEnd = timeline.segments[0].endMs;
     expect(hookState(timeline, hookEnd).visible).toBe(false);
@@ -126,5 +126,46 @@ describe("bruitages générés : impact, whoosh à chaque coupe, montée, ding s
     expect(riser.atMs).toBeLessThan(payoff.startMs);
     expect(riser.atMs).toBeGreaterThanOrEqual(0);
     for (const c of cues) expect(c.atMs).toBeLessThan(timeline.durationMs);
+  });
+});
+
+describe("revue finale : aucun texte ne déborde en largeur, même avec un mot très long", () => {
+  const LONG = "Anticonstitutionnellement";
+  const longHook: ViralScript = { ...TONTINE, hook: `${LONG} : la tontine est-elle légale ?`, beats: [{ text: `Le mot ${LONG} existe.` }, ...TONTINE.beats.slice(1)] };
+  const tl = buildTimeline(longHook);
+
+  it("la ponctuation haute française reste collée au mot par une espace insécable (jamais seule sur une ligne)", () => {
+    const { words } = hookState(tl, 0, 0.6, 124);
+    expect(words[0].text).toBe(`${LONG}\u00a0:`);
+  });
+
+  it("hook : le mot le plus long tient dans la carte, dans les 3 chasses (story 0,6 / maths 0,6 / film 0,4)", () => {
+    for (const [em, max] of [[0.6, 124], [0.4, 150]] as const) {
+      const { fontSize } = hookState(tl, 0, em, max);
+      expect(textWidth(LONG, fontSize, em), `em ${em}`).toBeLessThanOrEqual(LAYOUT.hook.width);
+      // « : » reste collé au mot (espace insécable) : la mesure compte le mot ET sa ponctuation.
+      expect(textWidth(`${LONG}\u00a0:`, fontSize, em), `em ${em} avec « : »`).toBeLessThanOrEqual(LAYOUT.hook.width);
+    }
+  });
+
+  it("sous-titres : chaque page tient dans sa boîte (largeur du mot le plus long, hauteur des lignes)", () => {
+    for (const [base, em] of [[92, 0.6], [84, 0.6], [118, 0.4]] as const) {
+      for (const page of captionPages(tl)) {
+        const words = page.words.map((w) => w.text);
+        const size = captionFontSize(words, base, em);
+        expect(size).toBeLessThanOrEqual(base);
+        for (const w of words) expect(textWidth(w, size, em), w).toBeLessThanOrEqual(LAYOUT.captions.width);
+        expect(lineCount(words.join(" "), size, LAYOUT.captions.width, em) * size * 1.06).toBeLessThanOrEqual(LAYOUT.captions.height);
+      }
+    }
+    expect(captionFontSize(["la", "tontine"], 92, 0.6)).toBe(92);
+  });
+
+  it("maths : les pastilles de chiffres tiennent sur la largeur du tableau", () => {
+    const chips = ["500 000 000 F", "1 250 000 F", "9 400 000 F"];
+    const size = chipFontSize(chips, 0.6);
+    const total = chips.reduce((sum, c) => sum + textWidth(c, size, 0.6) + 2 * CHIP.padX + 2 * CHIP.border, 0) + CHIP.gap * (chips.length - 1);
+    expect(total).toBeLessThanOrEqual(LAYOUT.chips.width);
+    expect(chipFontSize(["9 400 F"], 0.6)).toBe(CHIP.maxSize);
   });
 });

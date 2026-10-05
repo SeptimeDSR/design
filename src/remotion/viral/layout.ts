@@ -64,9 +64,28 @@ export function hookState(timeline: Timeline, ms: number, em = 0.56, maxSize = 1
   const hook = timeline.segments.find((s) => s.kind === "hook") ?? timeline.segments[0];
   const words = wordTimings(hook.text, hook.startMs, hook.endMs);
   const box = LAYOUT.hook;
-  let fontSize = maxSize;
+  // Le mot le plus long borne la taille : un mot ne se coupe pas, il doit tenir sur la largeur.
+  let fontSize = Math.min(maxSize, longestFit(words.map((w) => w.text), box.width, em));
   while (fontSize > 64 && lineCount(hook.text, fontSize, box.width, em) * fontSize * 1.08 > box.height) fontSize -= 4;
   return { visible: ms < hook.endMs, words, fontSize };
+}
+
+const longestFit = (words: string[], width: number, em: number) => Math.floor(width / Math.max(1, Math.max(0, ...words.map((w) => w.length)) * em));
+
+// Sous-titres : la taille du template, réduite seulement si un mot dépasse la largeur ou si la page dépasse la hauteur.
+export function captionFontSize(words: string[], base: number, em: number): number {
+  const box = LAYOUT.captions;
+  let size = Math.min(base, longestFit(words, box.width, em));
+  while (size > 40 && lineCount(words.join(" "), size, box.width, em) * size * 1.06 > box.height) size -= 2;
+  return size;
+}
+
+// Pastilles des chiffres déjà vus (maths) : même taille pour toutes, la rangée entière tient sur le tableau.
+export const CHIP = { maxSize: 42, padX: 26, border: 3, gap: 18 } as const;
+export function chipFontSize(chips: string[], em: number): number {
+  const chrome = chips.length * 2 * (CHIP.padX + CHIP.border) + CHIP.gap * Math.max(0, chips.length - 1);
+  const chars = chips.reduce((n, c) => n + c.length, 0);
+  return Math.min(CHIP.maxSize, Math.floor((LAYOUT.chips.width - chrome) / Math.max(1, chars * em)));
 }
 
 const UNIT = /^(F|FCFA|CFA|€|\$|%|km|kg|ans?|mois|h|min|x)$/i;

@@ -76,7 +76,7 @@ export function ViralStory({ script, timeline, audio, broll }: ViralProps) {
 
       {isCta ? <SaveIcon color={ACCENT} startFrame={startFrame} /> : null}
 
-      <Captions timeline={timeline} fontFamily={FONT} color={darkPayoff ? INK : BONE} accent={darkPayoff ? BONE : hue} stroke={!darkPayoff} />
+      <Captions timeline={timeline} fontFamily={FONT} color={darkPayoff ? INK : BONE} accent={darkPayoff ? BONE : hue} stroke={!darkPayoff} em={EM} />
       {isCta ? <SaveBadge accent={ACCENT} fontFamily={FONT} label={script.lang === "fr" ? "Garde ça" : "Save this"} /> : null}
       <PayoffFlash timeline={timeline} />
       <ProgressBar color={isPayoff ? INK : ACCENT} />

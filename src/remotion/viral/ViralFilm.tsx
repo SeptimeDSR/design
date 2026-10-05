@@ -72,7 +72,7 @@ export function ViralFilm({ script, timeline, audio, broll }: ViralProps) {
 
       {isPayoff ? <BigWord word={scene.word} startFrame={startFrame} fontFamily={SERIF} color={darkPayoff ? NIGHT : SILVER} em={EM} fontWeight={400} top={LAYOUT.bigWord.top + 160} stroke={!darkPayoff} /> : null}
 
-      <Captions timeline={timeline} fontFamily={SERIF} color={darkPayoff ? NIGHT : SILVER} accent={darkPayoff ? "#5a2d00" : AMBER} fontSize={118} fontWeight={400} stroke={!darkPayoff} />
+      <Captions timeline={timeline} fontFamily={SERIF} color={darkPayoff ? NIGHT : SILVER} accent={darkPayoff ? "#5a2d00" : AMBER} fontSize={118} fontWeight={400} stroke={!darkPayoff} em={EM} />
       {segment.kind === "cta" ? <SaveBadge accent={AMBER} fontFamily={SERIF} label={script.lang === "fr" ? "Garde ça" : "Save this"} /> : null}
 
       <svg width="0" height="0" style={{ position: "absolute" }}>
