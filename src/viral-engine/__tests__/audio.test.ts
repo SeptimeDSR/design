@@ -56,3 +56,17 @@ describe("tts", () => {
     expect(await detectEngine("en", "silent")).toBe("silent");
   });
 });
+
+describe("python de Piper", () => {
+  it("prend VIRAL_PYTHON s'il est défini, sinon le venv de l'usine s'il existe, sinon python3", async () => {
+    const { pythonBin } = await import("../tts");
+    const home = mkdtempSync(join(tmpdir(), "septim-py-"));
+    expect(pythonBin({ VIRAL_HOME: home })).toBe("python3");
+    const venvPython = join(home, "venv", process.platform === "win32" ? "Scripts/python.exe" : "bin/python");
+    const { mkdirSync, writeFileSync } = await import("node:fs");
+    mkdirSync(join(venvPython, ".."), { recursive: true });
+    writeFileSync(venvPython, "");
+    expect(pythonBin({ VIRAL_HOME: home })).toBe(venvPython);
+    expect(pythonBin({ VIRAL_HOME: home, VIRAL_PYTHON: "/opt/py/bin/python3" })).toBe("/opt/py/bin/python3");
+  });
+});

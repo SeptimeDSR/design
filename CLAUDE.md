@@ -18,6 +18,5 @@ Plugins `septim-design` et `septim-viral` dans `plugins/` (marketplace `septim` 
 
 Usine vidéo : `src/viral-engine/` (TDD, `npm test`), templates `src/remotion/viral/` (imports relatifs uniquement). Toute règle virale chiffrée vit dans `src/viral-engine/viral-checklist.json`. Le démon ne publie jamais sans OUI et ne dépense jamais de crédits.
 
-Commandes : `npm run dev`, `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`,
-`npm run viral -- "sujet" [--template story|maths|film] [--script f.json] [--lint-only] [--broll dossier]`,
-`npm run viral:doctor`, `npm run viral:daemon`, `npm run video:studio`.
+Commandes : `npm run dev`, `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, `npm run video:studio`.
+Usine : `septim` (bin/septim.mjs, `npm link` ; sinon `npm run septim -- …`) — `video "sujet" [--template story|maths|film] [--script f.json] [--broll dossier]`, `lint f.json`, `videos`, `voir <ref>`, `publier <ref>`, `jeter <ref>`, `studio`, `start`, `mcp`, `connect <client> [--write]`, `setup [--voix]`, `doctor`. Toutes les portes passent par `src/viral-engine/factory.ts` ; serveur dans `src/viral-engine/server/`, MCP dans `mcp.ts`, Studio dans `studio/`. Mode d'emploi : `docs/GUIDE.md` (un test vérifie qu'il cite chaque commande, outil MCP, route et variable).

@@ -95,7 +95,7 @@ export function readVersion(root: string): string {
 
 // Serveur local de l'usine : Studio, API REST, contrat OpenAPI et MCP HTTP sur un seul port.
 export async function startServer(opts: ServerOptions): Promise<RunningServer> {
-  const host = opts.host ?? "127.0.0.1";
+  const host = opts.host || "127.0.0.1";
   const token = opts.token?.trim() || undefined;
   if (!isLoopback(host) && !token) {
     throw new FactoryError(

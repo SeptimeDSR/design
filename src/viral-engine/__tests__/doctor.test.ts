@@ -9,7 +9,7 @@ describe("doctor", () => {
     expect(d.canRender).toBe(true);
     expect(d.voice).toBe("silent");
     expect(d.publishMode).toBe("manual");
-    expect(d.fixes.find((f) => f.id === "voice")?.commands.join(" ")).toContain("piper.download_voices fr_FR-tom-medium");
+    expect(d.fixes.find((f) => f.id === "voice")?.commands.join(" ")).toContain("septim setup --voix");
     expect(d.fixes.find((f) => f.id === "llm")?.commands.join(" ")).toContain("ollama pull qwen2.5");
   });
 

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "septim": {
+      "command": "node",
+      "args": ["bin/septim.mjs", "mcp"]
+    }
+  }
+}

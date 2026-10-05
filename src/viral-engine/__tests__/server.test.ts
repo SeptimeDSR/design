@@ -151,6 +151,13 @@ describe("serveur : garde-fous réseau", () => {
     await expect(startServer({ factory: f.factory, port: 0, host: "0.0.0.0" })).rejects.toMatchObject({ code: "forbidden" });
   });
 
+  it("SEPTIM_HOST vide dans .env (host \"\") → écoute en local, ne refuse pas de démarrer", async () => {
+    const f = fakeFactory();
+    const srv = await startServer({ factory: f.factory, port: 0, host: "" });
+    opened.push(srv);
+    expect(srv.url).toMatch(/^http:\/\/127\.0\.0\.1:/);
+  });
+
   it("port déjà pris → erreur claire qui propose --port", async () => {
     const blocker = createServer();
     await new Promise<void>((r) => blocker.listen(0, "127.0.0.1", r));

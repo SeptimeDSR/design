@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { loadConfig, loadDotEnv, type ViralConfig } from "./config";
+import { pythonBin } from "./tts";
 
 export type Probes = {
   ollama: boolean;
@@ -22,7 +23,7 @@ export function diagnose(p: Probes) {
     fixes.push({
       id: "voice",
       label: "Voix française gratuite (sinon piste silencieuse)",
-      commands: ["pip install piper-tts", "python3 -m piper.download_voices fr_FR-tom-medium --data-dir .septim-viral/voices"],
+      commands: ["septim setup --voix   # Piper (gratuit, local) dans .septim-viral/venv + voix fr_FR-tom-medium"],
     });
   if (!p.ollama)
     fixes.push({
@@ -30,7 +31,7 @@ export function diagnose(p: Probes) {
       label: "LLM local pour le démon (sinon script de secours ; en interactif, Claude écrit le script)",
       commands: ["curl -fsSL https://ollama.com/install.sh | sh", "ollama pull qwen2.5:7b"],
     });
-  if (!p.whatsappSession) fixes.push({ id: "whatsapp", label: "Lier WhatsApp (une fois)", commands: ["npm run viral:daemon   # scanne le QR avec WhatsApp > Appareils connectés"] });
+  if (!p.whatsappSession) fixes.push({ id: "whatsapp", label: "Lier WhatsApp (une fois)", commands: ["septim start   # scanne le QR avec WhatsApp > Appareils connectés"] });
   if (!p.chrome)
     fixes.push({
       id: "chrome",
@@ -74,7 +75,7 @@ export async function probe(cfg: ViralConfig, env: Record<string, string | undef
   const { hasPostizCredentials } = await import("./publish");
   return {
     ollama,
-    piperVoice: existsSync(join(voiceDir, `${voice}.onnx`)) && spawnSync("python3", ["-c", "import piper"], { stdio: "ignore" }).status === 0,
+    piperVoice: existsSync(join(voiceDir, `${voice}.onnx`)) && spawnSync(pythonBin({ ...env, VIRAL_HOME: cfg.home }), ["-c", "import piper"], { stdio: "ignore" }).status === 0,
     kokoro,
     chrome: !!env.WHATSAPP_CHROME_PATH && existsSync(env.WHATSAPP_CHROME_PATH),
     postiz: !!env.POSTIZ_API_KEY || hasPostizCredentials(),

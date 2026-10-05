@@ -15,11 +15,18 @@ const PIPER_VOICE: Record<Lang, string> = {
 };
 const KOKORO_VOICE = process.env.VIRAL_KOKORO_VOICE ?? "am_michael";
 
+// install.sh --voix installe Piper dans un venv de l'usine (pip --user est refusé par Ubuntu 23+ et Debian 12, PEP 668).
+export function pythonBin(env: Record<string, string | undefined> = process.env): string {
+  if (env.VIRAL_PYTHON) return env.VIRAL_PYTHON;
+  const venv = join(env.VIRAL_HOME ?? ".septim-viral", "venv", process.platform === "win32" ? "Scripts/python.exe" : "bin/python");
+  return existsSync(venv) ? venv : "python3";
+}
+
 const piperDir = () => process.env.VIRAL_PIPER_DIR ?? join(process.env.VIRAL_HOME ?? ".septim-viral", "voices");
 
 function piperReady(lang: Lang): boolean {
   if (!existsSync(join(piperDir(), `${PIPER_VOICE[lang]}.onnx`))) return false;
-  return spawnSync("python3", ["-c", "import piper"], { stdio: "ignore" }).status === 0;
+  return spawnSync(pythonBin(), ["-c", "import piper"], { stdio: "ignore" }).status === 0;
 }
 
 async function kokoroReady(): Promise<boolean> {
@@ -41,7 +48,7 @@ export async function detectEngine(lang: Lang, pref = process.env.VIRAL_TTS ?? "
 function runPiper(text: string, lang: Lang, outPath: string, speed: number): Promise<void> {
   return new Promise((resolve, reject) => {
     const args = ["-m", "piper", "-m", PIPER_VOICE[lang], "--data-dir", piperDir(), "-f", outPath, "--length-scale", (1 / speed).toFixed(3)];
-    const child = spawn("python3", args, { stdio: ["pipe", "ignore", "pipe"] });
+    const child = spawn(pythonBin(), args, { stdio: ["pipe", "ignore", "pipe"] });
     let err = "";
     child.stderr.on("data", (d) => (err += d));
     child.on("error", reject);

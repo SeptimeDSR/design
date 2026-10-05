@@ -9,7 +9,7 @@ import { CLIENT_NAMES, isMcpClient, MCP_CLIENTS, mcpConfig, writeMcpConfig } fro
 import { formatDiagnosis } from "./doctor";
 import { FactoryError } from "./errors";
 import { createFactory, type VideoDetail, type VideoSummary } from "./factory";
-import { connectClaudeCode, setup } from "./setup";
+import { connectClaudeCode, installVoice, setup } from "./setup";
 import type { JobStatus } from "./store";
 import { attachWebhooks, flushWebhooks } from "./webhooks";
 
@@ -34,7 +34,7 @@ Ouvrir les portes
   septim connect <client> [--write]   brancher un assistant : ${MCP_CLIENTS.join(", ")}
 
 Installer et réparer
-  septim setup [--sans-claude]        .env, plugins et MCP de Claude Code, puis diagnostic
+  septim setup [--sans-claude] [--voix]   .env, plugins et MCP de Claude Code, voix gratuite, diagnostic
   septim doctor                       ce qui tourne, et les commandes pour le reste
   septim design init [dossier]        installer septim-design dans un autre projet
   septim version
@@ -116,9 +116,9 @@ const list = (v?: string) => (v ? v.split(",").map((s) => s.trim()).filter(Boole
 async function studio(args: string[], io: CliIO, opts: { daemon: boolean }): Promise<"running"> {
   const { values } = parseArgs({ args, options: { port: { type: "string" }, host: { type: "string" } } });
   const env = process.env;
-  const port = Number(values.port ?? env.SEPTIM_PORT ?? 4321);
+  const port = Number(values.port ?? (env.SEPTIM_PORT || 4321));
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new FactoryError("bad_request", `--port doit être un numéro de port (par exemple 4321), pas « ${values.port} ».`);
-  const host = values.host ?? env.SEPTIM_HOST ?? "127.0.0.1";
+  const host = values.host || env.SEPTIM_HOST || "127.0.0.1";
   const { startServer } = await import("./server/http");
   const { mcpHttpHandler } = await import("./mcp");
   const factory = createFactory();
@@ -232,8 +232,9 @@ async function dispatch(command: string, args: string[], io: CliIO): Promise<num
     case "connect":
       return connect(args, io);
     case "setup": {
-      const { values } = parseArgs({ args, options: { "sans-claude": { type: "boolean", default: false } } });
-      const ok = setup(repoRoot(), io, { withClaude: !values["sans-claude"] });
+      const { values } = parseArgs({ args, options: { "sans-claude": { type: "boolean", default: false }, voix: { type: "boolean", default: false } } });
+      let ok = setup(repoRoot(), io, { withClaude: !values["sans-claude"] });
+      if (values.voix) ok = installVoice(createFactory().home, io) && ok;
       out("");
       out(formatDiagnosis(await createFactory().doctor()));
       out("");

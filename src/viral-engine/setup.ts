@@ -61,3 +61,29 @@ export function setup(root: string, io: IO, opts: { withClaude: boolean; claudeP
   ok = connectClaudeCode(root, io) && ok;
   return ok;
 }
+
+type Run = (cmd: string, args: string[]) => number;
+const inherit: Run = (cmd, args) => spawnSync(cmd, args, { stdio: "inherit" }).status ?? 1;
+
+// septim setup --voix : Piper (voix gratuite, locale) dans un venv de l'usine, puis la voix française.
+// pip --user est refusé par Ubuntu 23+ et Debian 12 (PEP 668) : un venv marche partout, sans sudo.
+export function installVoice(home: string, io: IO, opts: { voice?: string; run?: Run } = {}): boolean {
+  const run = opts.run ?? inherit;
+  const voice = opts.voice ?? process.env.VIRAL_PIPER_VOICE ?? "fr_FR-tom-medium";
+  const venv = join(home, "venv");
+  const py = join(venv, process.platform === "win32" ? "Scripts/python.exe" : "bin/python");
+  if (run("python3", ["-m", "venv", venv]) !== 0) {
+    io.err.write("✗ Impossible de créer le venv Python. Sur Ubuntu/WSL : sudo apt install python3-venv, puis relance septim setup --voix.\n");
+    return false;
+  }
+  if (run(py, ["-m", "pip", "install", "--upgrade", "piper-tts"]) !== 0) {
+    io.err.write("✗ pip n'a pas pu installer piper-tts (réseau ?). Relance septim setup --voix.\n");
+    return false;
+  }
+  if (run(py, ["-m", "piper.download_voices", voice, "--data-dir", join(home, "voices")]) !== 0) {
+    io.err.write(`✗ Téléchargement de la voix ${voice} raté. Relance septim setup --voix.\n`);
+    return false;
+  }
+  say(io, `✓ Voix ${voice} installée (Piper, gratuite) : les prochaines vidéos parlent.`);
+  return true;
+}

@@ -84,6 +84,32 @@ describe("septim : aide et répartition", () => {
   });
 });
 
+describe("septim setup --voix", () => {
+  it("installe Piper dans le venv de l'usine (pas pip --user, refusé par PEP 668) puis la voix française", async () => {
+    const { installVoice } = await import("../setup");
+    const home = mkdtempSync(join(tmpdir(), "septim-voix-"));
+    const calls: string[][] = [];
+    const ok = installVoice(home, { out: capture().stream, err: capture().stream }, { voice: "fr_FR-tom-medium", run: (cmd, args) => (calls.push([cmd, ...args]), 0) });
+    expect(ok).toBe(true);
+    const py = join(home, "venv", "bin", "python");
+    expect(calls).toEqual([
+      ["python3", "-m", "venv", join(home, "venv")],
+      [py, "-m", "pip", "install", "--upgrade", "piper-tts"],
+      [py, "-m", "piper.download_voices", "fr_FR-tom-medium", "--data-dir", join(home, "voices")],
+    ]);
+  });
+
+  it("venv impossible (python3-venv absent) → échec expliqué, rien d'autre lancé", async () => {
+    const { installVoice } = await import("../setup");
+    const err = capture();
+    const calls: string[][] = [];
+    const ok = installVoice(mkdtempSync(join(tmpdir(), "septim-voix-")), { out: capture().stream, err: err.stream }, { voice: "fr_FR-tom-medium", run: (cmd, args) => (calls.push([cmd, ...args]), 1) });
+    expect(ok).toBe(false);
+    expect(calls).toHaveLength(1);
+    expect(err.text).toMatch(/python3-venv/);
+  });
+});
+
 describe("septim : vidéos depuis le terminal", () => {
   it("videos, voir, jeter et publier passent par la fabrique (références « #5F8A », ambiguïté refusée)", async () => {
     const { store } = tempHome();

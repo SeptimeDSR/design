@@ -248,13 +248,13 @@ export async function runDaemon(): Promise<void> {
   cron.schedule("0 9 * * *", () => void collectRewards(deps).catch((e) => console.error("[analytics]", e)));
   console.log(`SEPTIM-VIRAL-OS en marche · cycle « ${cfg.cron} » · publication ${mode} · notifications ${cfg.notifier}`);
 
-  const port = Number(process.env.SEPTIM_PORT ?? 4321);
+  const port = Number(process.env.SEPTIM_PORT || 4321);
   if (port !== 0) {
     const { startServer } = await import("./server/http");
     const { mcpHttpHandler } = await import("./mcp");
     const corsOrigins = (process.env.SEPTIM_CORS_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
     try {
-      const srv = await startServer({ factory, port, host: process.env.SEPTIM_HOST, token: process.env.SEPTIM_TOKEN, corsOrigins, mcp: mcpHttpHandler(factory) });
+      const srv = await startServer({ factory, port, host: process.env.SEPTIM_HOST || undefined, token: process.env.SEPTIM_TOKEN, corsOrigins, mcp: mcpHttpHandler(factory) });
       console.log(`Studio, API et MCP HTTP : ${srv.url}${process.env.SEPTIM_TOKEN ? "/?token=…" : ""}`);
     } catch (error) {
       // WhatsApp et le cycle continuent : seul le serveur manque.

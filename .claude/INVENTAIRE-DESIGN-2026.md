@@ -121,6 +121,20 @@ Variable PRO vide = version FREE affichée. Le site ne dépend jamais d'un créd
 | Postiz | 🔌 chez toi | Cloud 29 $/mois (publication publique) · auto-hébergé gratuit (TikTok/YouTube privés sans audit) | Publication TikTok, YouTube, Instagram, Facebook + analytics | `npm i -g postiz && postiz auth:login` |
 | PRO Higgsfield (B-roll) | ✅ branche rendue et vérifiée avec des clips de test | ≈ 3 $ / 10 s en 720p | Plans cinéma derrière les sous-titres | `--broll <dossier>` après ton OUI chiffré |
 
+### Les portes de l'usine (plan « toutes les portes »)
+
+| Porte | Statut | Prix | Commande |
+| --- | --- | --- | --- |
+| Commande `septim` (terminal, depuis n'importe quel dossier) | ✅ | Gratuit | `bash scripts/install.sh`, puis `septim aide` |
+| Studio navigateur (ordinateur et téléphone en Wi-Fi) | ✅ testé dans Chromium (27 vérifications) | Gratuit | `septim studio` |
+| API REST + OpenAPI 3.1 | ✅ | Gratuit | `http://127.0.0.1:4321/api/v1/openapi.json` |
+| Serveur MCP `septim` (stdio + HTTP) : 9 outils, 2 ressources, prompt `nouvelle_video` | ✅ | Gratuit (`@modelcontextprotocol/sdk` 1.32) | `septim connect <client> --write` |
+| Webhooks signés HMAC-SHA256 | ✅ | Gratuit | `VIRAL_WEBHOOK_URL`, `VIRAL_WEBHOOK_SECRET` |
+| Workflow n8n de départ (sans nœud Code) | ✅ JSON vérifié par test, non importé dans un vrai n8n | n8n gratuit en auto-hébergé | `docs/n8n-septim.json` |
+| Commandes `/septim-viral:videos`, `:publier`, `:studio`, `:aide` | ✅ `claude plugin validate --strict` | Gratuit | dans Claude Code |
+
+Mode d'emploi complet : `docs/GUIDE.md`.
+
 ## G. Le site
 
 Refait selon la science de la rétention : clarté en 0,5 s, promesse ouverte payée au chapitre 7 (≥ 80 % de la page), HUD « Chapitre n sur 7 », interruptions visuelles, secrets tirés au hasard (2,5 par visite en moyenne), son généré **opt-in**, fil infini au lieu d'un footer (mentions légales dans l'en-tête), titres qui s'étirent avec la vitesse du scroll, téléphones qui jouent les vrais templates de l'usine. Palette indigo du tissu Ndop, polices Anybody + Instrument Sans.
