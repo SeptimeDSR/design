@@ -31,6 +31,8 @@ type Route = {
 };
 
 const STATUSES: JobStatus[] = ["rendered", "notified", "publishing", "published", "rejected", "failed"];
+// Les mots du Studio et du terminal marchent aussi dans l'API.
+const STATUS_FR: Record<string, JobStatus> = { "a-valider": "notified", prete: "notified", publiee: "published", jetee: "rejected", ratee: "failed" };
 
 const bad = (message: string) => new FactoryError("bad_request", message);
 
@@ -97,14 +99,15 @@ function streamVideo(c: RouteContext): Reply {
 
 const API: Route[] = [
   { method: "GET", path: "/api/v1/health", public: true, handle: (c) => ({ json: { ok: true, version: c.version } }) },
-  { method: "GET", path: "/api/v1/openapi.json", public: true, handle: (c) => ({ json: { ...openapi, servers: [{ url: c.baseUrl }] } }) },
+  { method: "GET", path: "/api/v1/openapi.json", public: true, handle: (c) => ({ json: { ...openapi, info: { ...openapi.info, version: c.version }, servers: [{ url: c.baseUrl }] } }) },
   { method: "GET", path: "/api/v1/doctor", handle: async (c) => ({ json: await c.factory.doctor() }) },
   {
     method: "GET",
     path: "/api/v1/videos",
     handle: (c) => {
-      const status = c.query.get("status") || undefined;
-      if (status && !STATUSES.includes(status as JobStatus)) throw bad(`status doit valoir ${STATUSES.join(", ")}.`);
+      const rawStatus = c.query.get("status") || undefined;
+      const status = rawStatus ? (STATUS_FR[rawStatus] ?? rawStatus) : undefined;
+      if (status && !STATUSES.includes(status as JobStatus)) throw bad(`status doit valoir ${[...Object.keys(STATUS_FR), ...STATUSES].join(", ")}.`);
       const rawLimit = c.query.get("limit");
       if (rawLimit !== null && !/^\d+$/.test(rawLimit)) throw bad("limit doit être un entier entre 1 et 100.");
       const limit = rawLimit === null ? undefined : Number(rawLimit);
@@ -125,7 +128,15 @@ const API: Route[] = [
   {
     method: "POST",
     path: "/api/v1/videos/:ref/publish",
-    handle: async (c) => ({ json: await c.factory.publish(c.params.ref, optionalString(c.body.confirm, "confirm") ?? "") }),
+    handle: async (c) => {
+      // « confirmation » (le nom du MCP) est accepté aussi : la phrase compte, pas le nom du champ.
+      const confirm = optionalString(c.body.confirm, "confirm") ?? optionalString(c.body.confirmation, "confirmation");
+      if (!confirm) {
+        const ref = c.factory.getVideo(c.params.ref).ref;
+        throw new FactoryError("confirmation_required", `Champ confirm absent : envoie {"confirm": "OUI #${ref}"}, la phrase écrite par l'humain.`, { expected: `OUI #${ref}` });
+      }
+      return { json: await c.factory.publish(c.params.ref, confirm) };
+    },
   },
   { method: "POST", path: "/api/v1/videos/:ref/reject", handle: (c) => ({ json: c.factory.reject(c.params.ref) }) },
   { method: "POST", path: "/api/v1/videos/:ref/redo", handle: (c) => ({ status: 202, json: c.factory.redo(c.params.ref) }) },

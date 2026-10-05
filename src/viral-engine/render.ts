@@ -26,7 +26,8 @@ export async function renderWithRemotion(job: Job, props: ViralProps, jobDir: st
 
   const browserExecutable = process.env.REMOTION_BROWSER_EXECUTABLE || null;
   const id = `viral-${job.script.template}`;
-  const composition = await selectComposition({ serveUrl, id, inputProps: props, browserExecutable });
+  // logLevel error : pas de bruit (« Detected differing memory amounts… ») dans le terminal de l'utilisateur.
+  const composition = await selectComposition({ serveUrl, id, inputProps: props, browserExecutable, logLevel: "error" });
   const outputLocation = join(jobDir, "video.mp4");
   await renderMedia({
     composition,
@@ -37,6 +38,7 @@ export async function renderWithRemotion(job: Job, props: ViralProps, jobDir: st
     inputProps: props,
     outputLocation,
     browserExecutable,
+    logLevel: "error",
     concurrency: Number(process.env.VIRAL_RENDER_CONCURRENCY ?? 2),
   });
   return outputLocation;

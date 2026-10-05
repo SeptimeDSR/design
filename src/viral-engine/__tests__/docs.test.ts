@@ -70,9 +70,9 @@ describe("documentation : elle ne dérive pas du code", () => {
     expect(skill).not.toMatch(/npm run viral -- --publish/);
   });
 
-  it(".mcp.json (racine) et docs/n8n-septim.json sont valides", () => {
-    const mcp = JSON.parse(read(".mcp.json"));
-    expect(mcp.mcpServers.septim.args).toEqual(["bin/septim.mjs", "mcp"]);
+  it("le MCP septim a une seule définition (hook de session, pas de .mcp.json en double) ; docs/n8n-septim.json est valide", () => {
+    expect(existsSync(join(ROOT, ".mcp.json"))).toBe(false);
+    expect(read(".claude/hooks/session-start.sh")).toContain("bin/septim.mjs\" connect claude-code");
     const n8n = JSON.parse(read("docs/n8n-septim.json"));
     const types = n8n.nodes.map((n: { type: string }) => n.type);
     expect(types).toContain("n8n-nodes-base.webhook");

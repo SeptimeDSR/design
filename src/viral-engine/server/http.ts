@@ -181,7 +181,8 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       return;
     }
 
-    const match = matchRoute(req.method ?? "GET", pathname);
+    // HEAD = GET sans corps (Node ne l'envoie pas) : sondes de surveillance et lecteurs vidéo.
+    const match = matchRoute(req.method === "HEAD" ? "GET" : (req.method ?? "GET"), pathname);
     if (!match) throw new FactoryError("not_found", `Route inconnue : ${req.method} ${pathname}. La liste est dans /api/v1/openapi.json.`);
     const { route, params } = match;
     if (!route.public && !authorized(req, route.tokenInQuery ? url.searchParams : undefined)) {

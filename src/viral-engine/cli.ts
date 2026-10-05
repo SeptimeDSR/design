@@ -1,10 +1,10 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import type { Writable } from "node:stream";
 import { parseArgs } from "node:util";
 import { checkScript, cleanTopic, runJob } from "./pipeline";
 import { createConsoleNotifier } from "./notify";
-import { loadConfig, loadDotEnv } from "./config";
+import { loadConfig, loadDotEnv, type ViralConfig } from "./config";
 import { enqueueOutbox } from "./outbox";
 import { createFactory } from "./factory";
 import { attachWebhooks, flushWebhooks } from "./webhooks";
@@ -14,6 +14,9 @@ export type CliIO = { out: Writable; err: Writable };
 
 // Un chemin tapé par l'humain se lit depuis le dossier où il a tapé la commande, pas depuis le repo.
 export const userPath = (p: string) => resolve(process.env.SEPTIM_CWD ?? process.env.INIT_CWD ?? process.cwd(), p);
+
+// La file WhatsApp ne se remplit que si WhatsApp est lié : sinon un vieux message partirait au premier septim start.
+export const queueToWhatsApp = (cfg: ViralConfig, noNotify: boolean) => cfg.notifier === "whatsapp" && !noNotify && existsSync(join(cfg.home, "wa"));
 
 const line = (stream: NodeJS.WritableStream, text = "") => void stream.write(`${text}\n`);
 
@@ -67,6 +70,8 @@ export async function runCli(argv: string[], io: CliIO = { out: process.stdout, 
     } catch (error) {
       throw new Error(`Script illisible (${scriptPath}) : ${(error as Error).message}`);
     }
+    // Le corps de l'API ({"script": {…}}) marche aussi : même fichier pour le terminal et pour curl.
+    if (script && typeof script === "object" && script.script && typeof script.script === "object" && !("hook" in script)) script = script.script;
   }
 
   if (values["lint-only"]) {
@@ -78,7 +83,7 @@ export async function runCli(argv: string[], io: CliIO = { out: process.stdout, 
   }
 
   // Le CLI n'ouvre jamais WhatsApp : il affiche ici et dépose le message pour le démon.
-  const toWhatsApp = cfg.notifier === "whatsapp" && !values["no-notify"];
+  const toWhatsApp = queueToWhatsApp(cfg, values["no-notify"]);
   const job = await runJob(
     { topic, template, lang, script, brollDir: values.broll ? userPath(values.broll) : undefined },
     {
@@ -94,6 +99,8 @@ export async function runCli(argv: string[], io: CliIO = { out: process.stdout, 
   line(io.out, `  Hook  : ${job.script.hook}`);
   line(io.out, `  Script: ${job.source} · voix ${job.ttsEngine} · ${Math.round(job.timeline.durationMs / 1000)} s`);
   if (toWhatsApp) line(io.out, "  WhatsApp : message en file, le démon l'envoie (septim start).");
+  else if (cfg.notifier === "whatsapp" && !values["no-notify"]) line(io.out, "  WhatsApp pas encore lié : rien mis en file (septim start pour le lier).");
+  if (job.status !== "failed") line(io.out, `  Publier : septim publier ${job.id.slice(0, 4)}   (ou le Studio, ou OUI #${job.id.slice(0, 4)} sur WhatsApp)`);
   if (job.error) line(io.out, `  Erreur: ${job.error}`);
   return job.status === "failed" ? 1 : 0;
 }

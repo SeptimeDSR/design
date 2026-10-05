@@ -218,3 +218,18 @@ describe("runJob : bruitages", () => {
     for (const f of ["hit.wav", "whoosh.wav", "riser.wav", "ding.wav"]) expect(existsSync(join(dir, "jobs", job.id, "sfx", f))).toBe(true);
   });
 });
+
+describe("checkScript : dit exactement quoi corriger, garde les plans", () => {
+  it("nomme seulement les champs manquants", async () => {
+    const { checkScript } = await import("../pipeline");
+    const r = checkScript({ topic: "x", lang: "fr", template: "story", formula: "question" }, { hook: "Tu sais ?", beats: [{ text: "un" }] });
+    expect(r.issues[0].message).toMatch(/Il manque : payoff/);
+    expect(r.issues[0].message).not.toMatch(/hook/);
+  });
+
+  it("le champ visual d'un beat survit à l'assemblage (sinon le B-roll ne s'en sert jamais)", async () => {
+    const { checkScript } = await import("../pipeline");
+    const r = checkScript({ topic: "la tontine", lang: "fr", template: "story", formula: "question" }, { hook: "Tu es le dernier ?", beats: [{ text: "Dix membres.", visual: "ten people counting cash" }], payoff: "La réponse : 9 400 F." });
+    expect(r.script?.beats[0].visual).toBe("ten people counting cash");
+  });
+});

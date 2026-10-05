@@ -59,6 +59,7 @@ const COMMANDS = ["video", "lint", "videos", "voir", "publier", "jeter", "studio
 const STATUS_FR: Record<JobStatus, string> = { rendered: "Rendue", notified: "À valider", publishing: "En publication", published: "Publiée", rejected: "Jetée", failed: "Ratée" };
 const STATUS_ARG: Record<string, JobStatus> = { "a-valider": "notified", prete: "notified", publiee: "published", jetee: "rejected", ratee: "failed" };
 const TEMPLATES_FR: Record<string, string> = { story: "Histoire", maths: "Maths", film: "Film" };
+const BROLL_FR: Record<string, string> = { comfyui: "IA locale ComfyUI (gratuit)", pexels: "Pexels (gratuit)", pixabay: "Pixabay (gratuit)", procedural: "fonds animés générés", dossier: "tes clips" };
 
 export function parseCommand(argv: string[]): { command: string; args: string[] } {
   const [first, ...args] = argv;
@@ -95,6 +96,7 @@ function videoDetail(v: VideoDetail): string[] {
     `Template  ${TEMPLATES_FR[v.template] ?? v.template}, ${seconds(v.durationMs)}, voix ${v.voice}, script ${v.source}`,
     `Créée     ${when(v.createdAt)}${v.publishedAt ? `, publiée ${when(v.publishedAt)}` : ""}`,
     `Fichier   ${v.hasVideo ? v.videoPath : "absent du disque"}`,
+    `Plans     ${BROLL_FR[v.broll?.source ?? "procedural"] ?? v.broll?.source}${v.broll?.credits.length ? `, crédits : ${[...new Set(v.broll.credits.map((c) => c.author))].join(", ")}` : ""}`,
     "",
     "Légende",
     ...v.caption.split("\n").map((l) => `  ${l}`),

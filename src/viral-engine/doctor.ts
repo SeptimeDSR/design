@@ -1,6 +1,6 @@
 import { existsSync, readdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { loadConfig, loadDotEnv, type ViralConfig } from "./config";
 import { pythonBin } from "./tts";
 
@@ -24,8 +24,10 @@ export type Probes = {
 
 export type Fix = { id: string; label: string; commands: string[] };
 
-export function diagnose(p: Probes) {
+// Les commandes « >> .env » visent le .env de l'usine : septim se tape depuis n'importe quel dossier.
+export function diagnose(p: Probes, opts: { envFile?: string } = {}) {
   const fixes: Fix[] = [];
+  const env = `'${(opts.envFile ?? ".env").replace(/'/g, "'\\''")}'`;
   if (!p.piperVoice)
     fixes.push({
       id: "voice",
@@ -43,25 +45,25 @@ export function diagnose(p: Probes) {
     fixes.push({
       id: "chrome",
       label: "Envoyer de vraies vidéos WhatsApp (sinon envoi en document)",
-      commands: ["wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb", "sudo apt install ./google-chrome-stable_current_amd64.deb", "echo WHATSAPP_CHROME_PATH=/usr/bin/google-chrome >> .env"],
+      commands: ["wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb", "sudo apt install ./google-chrome-stable_current_amd64.deb", `echo WHATSAPP_CHROME_PATH=/usr/bin/google-chrome >> ${env}`],
     });
   if (!p.postiz) fixes.push({ id: "postiz", label: "Publication automatique (sinon légende à coller)", commands: ["npm i -g postiz", "postiz auth:login"] });
-  if (!p.youtubeKey) fixes.push({ id: "youtube", label: "Tendances YouTube du Cameroun (clé gratuite)", commands: ["echo YOUTUBE_API_KEY=ta_cle >> .env"] });
-  if (!p.apify) fixes.push({ id: "apify", label: "Tendances TikTok Creative Center (optionnel, offre gratuite)", commands: ["echo APIFY_TOKEN=ton_token >> .env"] });
+  if (!p.youtubeKey) fixes.push({ id: "youtube", label: "Tendances YouTube du Cameroun (clé gratuite)", commands: [`echo YOUTUBE_API_KEY=ta_cle >> ${env}`] });
+  if (!p.apify) fixes.push({ id: "apify", label: "Tendances TikTok Creative Center (optionnel, offre gratuite)", commands: [`echo APIFY_TOKEN=ton_token >> ${env}`] });
   if (!p.comfyui && !p.pexels && !p.pixabay)
     fixes.push({
       id: "broll",
       label: "Vrais plans vidéo en rapport avec le sujet, gratuits (sinon fonds animés)",
       commands: [
-        "echo PEXELS_API_KEY=ta_cle >> .env   # clé gratuite en 1 minute : https://www.pexels.com/api/",
+        `echo PEXELS_API_KEY=ta_cle >> ${env}   # clé gratuite en 1 minute : https://www.pexels.com/api/`,
         "# avec une carte NVIDIA 8 Go+ : IA locale ComfyUI + Wan 2.2, voir docs/GUIDE.md « Gratuit d'abord »",
       ],
     });
   if (!p.musicTracks)
     fixes.push({
       id: "music",
-      label: "Ta musique sous la voix (optionnel ; sinon lit lo-fi généré)",
-      commands: ["mkdir -p ~/septim-musique && echo VIRAL_MUSIC_DIR=$HOME/septim-musique >> .env   # pistes libres de droits ou générées avec ACE-Step"],
+      label: "Ta musique sous la voix (optionnel ; sinon nappe lo-fi générée)",
+      commands: [`mkdir -p ~/septim-musique && echo VIRAL_MUSIC_DIR=$HOME/septim-musique >> ${env}   # pistes libres de droits ou générées avec ACE-Step`],
     });
   if (!p.chatterbox) fixes.push({ id: "voice-hd", label: "Voix HD expressive et clonage de ta voix (optionnel, GPU conseillé)", commands: ["septim setup --voix-hd   # Chatterbox Multilingual, licence MIT, puis VIRAL_TTS=chatterbox"] });
 
@@ -86,7 +88,7 @@ export function formatDiagnosis(d: ReturnType<typeof diagnose>): string {
     `Publication : ${d.publishMode === "postiz" ? "Postiz" : "manuelle (légende prête à coller)"}`,
     `Messages    : ${d.notify === "whatsapp" ? "WhatsApp" : "console (WhatsApp pas encore lié)"}`,
     `Plans       : ${{ comfyui: "IA locale ComfyUI (gratuit)", pexels: "Pexels (gratuit)", pixabay: "Pixabay (gratuit)", procedural: "fonds animés générés" }[d.broll]}`,
-    `Musique     : ${d.music === "pistes" ? "tes pistes" : "lit lo-fi généré"}`,
+    `Musique     : ${d.music === "pistes" ? "tes pistes" : "nappe lo-fi générée"}`,
   ];
   for (const f of d.fixes) lines.push("", `À faire : ${f.label}`, ...f.commands.map((c) => `  ${c}`));
   return lines.join("\n");
@@ -121,5 +123,5 @@ export async function probe(cfg: ViralConfig, env: Record<string, string | undef
 if (process.argv[1]?.endsWith("doctor.ts")) {
   loadDotEnv();
   const cfg = loadConfig();
-  probe(cfg).then((p) => console.log(formatDiagnosis(diagnose(p))));
+  probe(cfg).then((p) => console.log(formatDiagnosis(diagnose(p, { envFile: resolve(".env") }))));
 }

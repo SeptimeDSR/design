@@ -11,6 +11,7 @@ Usine à vidéos courtes. **Tu écris, le moteur rend, l'humain dit OUI.** Parle
 
 Prends la première porte qui marche, et garde-la pour toute la session :
 
+0. Si le dossier courant contient `bin/septim.mjs`, c'est l'usine : utilise `node ./bin/septim.mjs …` (un `septim` global peut pointer vers une autre copie).
 1. **MCP** : les outils `septim_create_video`, `septim_lint_script`, `septim_get_task`, `septim_get_video`, `septim_publish_video`… sont disponibles (`septim connect claude-code` les a branchés). C'est la voie préférée.
 2. **Terminal** : `command -v septim` trouve la commande. Toutes les commandes ci-dessous s'écrivent `septim …`, depuis n'importe quel dossier.
 3. **Sans `npm link`** : `node <usine>/bin/septim.mjs …`, où `<usine>` est le dossier courant s'il contient `bin/septim.mjs`, sinon `$SEPTIM_FACTORY`, sinon `~/septim`.

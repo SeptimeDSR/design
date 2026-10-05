@@ -349,4 +349,27 @@ describe("serveur : Studio, contrat, routes", () => {
     const plain = await boot();
     expect((await plain.post("/mcp", {})).status).toBe(404);
   });
+
+  it("frottements du mode d'emploi : statuts en français, champ « confirmation » accepté, HEAD, version, source des plans", async () => {
+    const s = await boot();
+    seedJob(s.store, "5f8a4d25");
+    seedJob(s.store, "1234abcd");
+    s.store.saveJob({ ...s.store.getJob("1234abcd")!, status: "rejected", broll: { source: "pexels", credits: [{ provider: "pexels", author: "Ama", url: "https://www.pexels.com/video/1/" }] } });
+    const valider = (await (await s.get("/api/v1/videos?status=a-valider")).json()) as { videos: { id: string }[] };
+    expect(valider.videos.map((v) => v.id)).toEqual(["5f8a4d25"]);
+    const jetees = (await (await s.get("/api/v1/videos?status=jetee")).json()) as { videos: { id: string }[] };
+    expect(jetees.videos.map((v) => v.id)).toEqual(["1234abcd"]);
+    expect(((await (await s.get("/api/v1/videos/1234")).json()) as { broll: { source: string } }).broll.source).toBe("pexels");
+    const missing = await s.post("/api/v1/videos/5f8a/publish", {});
+    expect(((await missing.json()) as { error: { message: string } }).error.message).toMatch(/confirm/);
+    const viaAlias = await s.post("/api/v1/videos/5f8a/publish", { confirmation: "OUI #5f8a" });
+    expect(viaAlias.status).toBe(200);
+    const head = await fetch(`${s.srv.url}/api/v1/health`, { method: "HEAD" });
+    expect(head.status).toBe(200);
+    const headVideo = await fetch(`${s.srv.url}/api/v1/videos/5f8a/video`, { method: "HEAD" });
+    expect(headVideo.status).toBe(200);
+    expect(headVideo.headers.get("content-length")).toBe(String(VIDEO_BYTES));
+    const doc = (await (await s.get("/api/v1/openapi.json")).json()) as { info: { version: string } };
+    expect(doc.info.version).toBe(VERSION);
+  });
 });

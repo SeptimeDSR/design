@@ -123,7 +123,7 @@ Tu reprends le projet Septim (site qui retient + usine à vidéos virales SEPTIM
 | P5 | ✅ | MCP stdio + HTTP (9 outils, 2 ressources, prompt) |
 | P6 | ✅ | Studio navigateur + test Playwright (`tests/studio/`) |
 | P7 | ✅ | commande `septim` (bin, connect, setup, start) |
-| P8 | ✅ | commandes `/septim-viral:*`, `install.sh`, `docs/GUIDE.md`, n8n, `.mcp.json` |
+| P8 | ✅ | commandes `/septim-viral:*`, `install.sh`, `docs/GUIDE.md`, n8n (MCP de Claude Code branché par le hook) |
 | P10 | ✅ | gratuit d'abord : B-roll ComfyUI/Pexels/Pixabay, musique, voix HD Chatterbox |
 | P11 | voir registre | templates imbattables (zone sûre, hook dès 0 ms, bruitages, compteurs) |
 | P9 | voir registre | vérification de bout en bout, sous-agents, revue finale |

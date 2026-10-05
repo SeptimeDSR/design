@@ -14,7 +14,11 @@ bash ~/septim/scripts/install.sh --voix
 septim studio
 ```
 
+Les exemples supposent un clone dans `~/septim` : si tu as cloné ailleurs, remplace `~/septim` par ton dossier partout.
+
 Ouvre http://127.0.0.1:4321, écris un sujet (« la tontine à Douala »), clique **Fabriquer la vidéo**. Deux minutes plus tard, la vidéo est dans la liste : regarde-la, puis **Publier #ref** et **Confirmer : OUI #ref**. Sans Postiz, l'usine te donne la légende prête à coller dans TikTok avec le son tendance.
+
+Sans Ollama ni Claude, le script vient du script de secours (générique) et, sans voix installée, la vidéo est muette avec sous-titres : pour une vraie vidéo, fais écrire le script par Claude (`/septim-viral:viral "sujet"`) ou installe Ollama, et la voix (`septim setup --voix`). `septim doctor` dit ce qui manque.
 
 ---
 
@@ -63,13 +67,13 @@ Tout ce que font les outils à crédits a une voie gratuite, et c'est celle-ci q
 | Plans vidéo en rapport avec le sujet | **Banques libres** Pexels puis Pixabay (usage commercial, sans attribution obligatoire ; l'usine garde les crédits) | une clé gratuite (`PEXELS_API_KEY`) |
 | Fonds animés, motion design | **Remotion** : fonds procéduraux, texte cinétique, compteurs, bruitages générés | rien |
 | Voix off (ElevenLabs, Pika) | **Piper** (rapide, CPU) ; **Chatterbox Multilingual** (MIT, expressif, clone ta voix) | `septim setup --voix` / `--voix-hd` |
-| Musique (Pika, Suno) | **Tes pistes** : ACE-Step 1.5 en local (open source, < 4 Go de VRAM) ou bibliothèques libres de droits ; sinon lit lo-fi généré | `VIRAL_MUSIC_DIR` |
+| Musique (Pika, Suno) | **Tes pistes** : ACE-Step 1.5 en local (open source, < 4 Go de VRAM) ou bibliothèques libres de droits ; sinon nappe lo-fi générée | `VIRAL_MUSIC_DIR` |
 | Script (ChatGPT, Claude payant) | **Claude dans ta session**, ou **Ollama + qwen2.5** en local pour le démon | `ollama pull qwen2.5:7b` |
 | Publication programmée (Postiz cloud 29 $/mois) | **Postiz auto-hébergé** ou mode manuel (légende prête à coller) | rien |
 | Composants IA (21st.dev payant) | **shadcn**, Magic UI, Aceternity, React Bits (gratuits) | rien |
 | Scène 3D (Spline payant) | **three.js / React Three Fiber** ; Spline gratuit pour éditer | rien |
 
-`septim doctor` affiche l'étage de chaque brique (« Plans : Pexels (gratuit) », « Musique : lit lo-fi généré »…) et la commande gratuite pour monter d'un cran.
+`septim doctor` affiche l'étage de chaque brique (« Plans : Pexels (gratuit) », « Musique : nappe lo-fi générée »…) et la commande gratuite pour monter d'un cran.
 
 ### Plans vidéo : trois étages, jamais bloquants
 
@@ -121,7 +125,7 @@ Plus expressive que Piper, plus lente sans GPU. Ne clone que ta voix, ou celle d
 | [Navigateur](#navigateur--le-studio) | toi, sur l'ordinateur ou le téléphone | `septim studio` |
 | [Terminal](#terminal--la-commande-septim) | toi, en une ligne | `septim video "sujet"` |
 | [Claude Code](#claude-code) | Claude écrit le script, l'usine rend | `/septim-viral:viral "sujet"` |
-| [MCP](#mcp--brancher-nimporte-quel-assistant) | Claude Desktop, Cursor, VS Code, Windsurf, Codex, Gemini, n8n | `septim connect <client>` |
+| [MCP](#mcp--brancher-nimporte-quel-assistant) | Claude Desktop, Cursor, VS Code, Windsurf, Codex, Gemini (stdio) ; n8n et clients distants (HTTP) | `septim connect <client>` ; `http://127.0.0.1:4321/mcp` |
 | [API](#api-rest) | n8n, Make, Zapier, Postman, Raccourcis iPhone | `http://127.0.0.1:4321/api/v1` |
 | [Webhooks](#webhooks) | être prévenu sans interroger | `VIRAL_WEBHOOK_URL` dans `.env` |
 | [WhatsApp](#whatsapp) | valider depuis le téléphone | `septim start` |
@@ -131,9 +135,12 @@ Plus expressive que Piper, plus lente sans GPU. Ne clone que ta voix, ou celle d
 ## Navigateur : le Studio
 
 ```bash
-septim studio                      # http://127.0.0.1:4321
+septim studio                      # http://127.0.0.1:4321 (Ctrl+C pour arrêter)
 septim studio --port 4400          # si 4321 est déjà pris
+septim studio > ~/septim-studio.log 2>&1 &   # en arrière-plan ; « kill %1 » (ou kill <pid>) pour l'arrêter
 ```
+
+Pour qu'il tourne tout le temps et redémarre seul, utilise pm2 (voir « Tout lancer en permanence »).
 
 Une seule page :
 
@@ -163,22 +170,53 @@ Ouvre cette adresse une fois : le Studio garde le token sur l'appareil et le ret
 | --- | --- |
 | `septim video "la tontine" [--template story\|maths\|film] [--lang fr\|en] [--script s.json] [--broll dossier] [--no-notify]` | fabriquer une vidéo (environ 2 min) |
 | `septim lint script.json [--template maths] [--lang fr]` | vérifier un script sans rien rendre |
-| `septim videos [--status a-valider\|publiee\|jetee\|ratee] [--limit 20]` | lister les vidéos |
+| `septim videos [--status a-valider\|publiee\|jetee\|ratee] [--limit 20]` | lister les vidéos (`prete` = `a-valider`) |
 | `septim voir <ref>` | hook, légende, hashtags, chemin du MP4 |
 | `septim publier <ref>` | publier ; taper la commande vaut « OUI #ref » |
 | `septim jeter <ref>` | jeter |
 | `septim studio [--port 4321] [--host 127.0.0.1]` | Studio, API et MCP HTTP |
 | `septim start` | tout en permanence : démon, WhatsApp, cycle de 6 h, Studio, API, MCP HTTP |
 | `septim mcp` | serveur MCP stdio (pour les assistants) |
-| `septim connect <client> [--write]` | brancher un assistant MCP |
-| `septim setup [--sans-claude] [--voix]` | `.env`, Claude Code, voix, diagnostic |
+| `septim connect <client> [--write]` | brancher un assistant MCP (sans client : la liste) |
+| `septim setup [--sans-claude] [--voix] [--voix-hd]` | `.env`, Claude Code, voix (HD : Chatterbox), diagnostic |
 | `septim doctor` | état de l'usine et commandes pour le reste |
 | `septim design init [dossier]` | installer septim-design dans un autre projet Next.js |
 | `septim version` | version de l'usine |
 
 Une référence, c'est le début de l'identifiant de la vidéo : `5f8a`, `#5F8A` et `5F8A` désignent la même vidéo. Si deux vidéos commencent pareil, l'usine refuse et liste les deux : tape un ou deux caractères de plus.
 
+| Statut affiché | `--status` (terminal, API) | Valeur interne (API, webhooks) |
+| --- | --- | --- |
+| À valider | `a-valider` (ou `prete`) | `notified` |
+| Publiée | `publiee` | `published` |
+| Jetée | `jetee` | `rejected` |
+| Ratée | `ratee` | `failed` |
+
+Templates : `story` = Histoire, `maths` = Maths, `film` = Film. Jeter une vidéo ne supprime pas son MP4 : les fichiers sont dans `.septim-viral/jobs/<id>/` ; supprime le dossier d'une vidéo jetée pour libérer la place.
+
 Alias anglais : `create`, `list`, `show`, `publish`, `reject`. Les anciens scripts restent : `npm run viral -- "sujet"`, `npm run viral:doctor`, `npm run viral:daemon` (depuis le dossier du repo).
+
+---
+
+### Le format du script
+
+Un script se vérifie avec `septim lint script.json` (ou **Vérifier le script**, ou `POST /api/v1/lint`) et se rend avec `septim video "sujet" --script script.json`. Le même fichier marche aussi enveloppé comme le corps de l'API (`{"script": {…}}`).
+
+```json
+{
+  "topic": "la tontine",
+  "hook": "Tu es le dernier à bouffer la tontine ?",
+  "beats": [
+    { "text": "Dix membres, 50 000 F chacun, chaque mois.", "emphasis": "50 000 F", "visual": "ten people counting banknotes around a table" },
+    { "text": "Le dernier, lui, cotise dix mois.", "emphasis": "dernier" }
+  ],
+  "payoff": "La réponse : le dernier perd environ 9 400 F.",
+  "caption": "Ton rang dans la tontine, c'est de l'argent.",
+  "hashtags": ["#tontine", "#argent"]
+}
+```
+
+Règles (vérifiées par le linter) : hook dit en 3 secondes au plus et qui implique le spectateur, beats de 3,5 secondes au plus, réponse à 80 % de la vidéo ou plus, durée de 20 à 60 secondes. `emphasis` est le mot affiché en géant, `visual` le plan à montrer (B-roll gratuit). Le CTA « Garde ça, tu vas en avoir besoin demain. » est ajouté par l'usine.
 
 ---
 
@@ -206,7 +244,7 @@ septim connect claude-code          # ajoute le serveur MCP septim en portée ut
 | `/nouvelle_video` | prompt MCP du serveur `septim` : écrire, vérifier et fabriquer |
 | `/septim-design:septim-design` | le directeur artistique des sites (voir son plugin) |
 
-Dans ce repo, `.mcp.json` déclare aussi le serveur `septim` pour le projet : Claude Code le propose à l'ouverture.
+Dans une session Claude Code cloud sur ce repo, le hook de démarrage branche le serveur `septim` tout seul (même commande que `septim connect claude-code`). Un seul endroit le déclare : pas de `.mcp.json` de projet, qui ferait un doublon.
 
 ---
 
@@ -243,7 +281,7 @@ claude mcp list                      # septim … ✓ Connected
 septim connect claude-desktop --write
 ```
 
-Fichier : `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS), `%APPDATA%\Claude\claude_desktop_config.json` (Windows), `~/.config/Claude/claude_desktop_config.json` (Linux). Sous Windows avec l'usine dans WSL, mets à la main `"command": "wsl"` et `"args": ["-e", "bash", "-lc", "septim mcp"]`.
+Fichier : `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS), `%APPDATA%\Claude\claude_desktop_config.json` (Windows), `~/.config/Claude/claude_desktop_config.json` (Linux, versions communautaires : Claude Desktop n'a pas de version Linux officielle). Sous Windows avec l'usine dans WSL, mets à la main `"command": "wsl"` et `"args": ["-e", "bash", "-lc", "septim mcp"]`.
 
 ### Cursor
 
@@ -281,7 +319,16 @@ septim connect gemini --write        # ~/.gemini/settings.json
 
 ### Clients distants (n8n, connecteurs) : MCP HTTP
 
-`septim studio` et `septim start` servent aussi le MCP en HTTP streamable, sans état, sur `http://127.0.0.1:4321/mcp` (POST seulement). Dans n8n : nœud **MCP Client Tool**, transport HTTP streamable, en-tête `Authorization: Bearer <SEPTIM_TOKEN>` si tu as défini un token. Depuis un autre appareil : `--host 0.0.0.0` avec un token, ou un tunnel (voir Sécurité).
+`septim studio` et `septim start` servent aussi le MCP en HTTP streamable, sans état, sur `http://127.0.0.1:4321/mcp` (POST seulement). Pour tester à la main (les deux en-têtes `Accept` sont exigés par le protocole, sinon 406) :
+
+```bash
+curl -s http://127.0.0.1:4321/mcp -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1"}}}'
+curl -s http://127.0.0.1:4321/mcp -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+```
+
+Dans n8n : nœud **MCP Client Tool**, transport HTTP streamable, en-tête `Authorization: Bearer <SEPTIM_TOKEN>` si tu as défini un token. Depuis un autre appareil : `--host 0.0.0.0` avec un token, ou un tunnel (voir Sécurité).
 
 ---
 
@@ -290,7 +337,9 @@ septim connect gemini --write        # ~/.gemini/settings.json
 Base : `http://127.0.0.1:4321/api/v1`. Le contrat OpenAPI 3.1 est servi à `GET /api/v1/openapi.json` : importe-le dans n8n, Make, Postman ou Insomnia.
 
 - **Token** : quand `SEPTIM_TOKEN` est défini, chaque appel (sauf `/health` et `/openapi.json`) envoie `Authorization: Bearer <token>`.
-- **Corps** : JSON (`Content-Type: application/json`), 1 Mo au plus. Un POST sans corps est accepté.
+- **Corps** : JSON (`Content-Type: application/json`), 1 Mo au plus. Un POST sans corps est accepté. `HEAD` marche sur toutes les routes `GET`.
+- **Publier** : la phrase va dans `confirm` (`confirmation`, le nom utilisé par le MCP, est accepté aussi).
+- **Statuts** : `?status=` accepte les mots du terminal (`a-valider`, `publiee`, `jetee`, `ratee`) et les valeurs internes (`notified`, `published`, `rejected`, `failed`, `rendered`, `publishing`).
 - **Erreurs** : `{"error": {"code", "message", "details?"}}` avec `bad_request` 400, `unauthorized` 401, `forbidden` 403, `not_found` 404, `ambiguous_ref` 409 (`details.matches`), `conflict` 409, `payload_too_large` 413, `unsupported_media_type` 415, `confirmation_required` 428 (`details.expected`).
 
 Dans les exemples, `U=http://127.0.0.1:4321/api/v1` et `A="Authorization: Bearer $SEPTIM_TOKEN"` (inutile sans token).
@@ -307,10 +356,10 @@ Dans les exemples, `U=http://127.0.0.1:4321/api/v1` et `A="Authorization: Bearer
 | `POST /api/v1/videos/:ref/publish` | publier avec `{"confirm":"OUI #5f8a"}` | `curl -H "$A" -H 'Content-Type: application/json' -d '{"confirm":"OUI #5f8a"}' $U/videos/5f8a/publish` |
 | `POST /api/v1/videos/:ref/reject` | jeter | `curl -H "$A" -X POST $U/videos/5f8a/reject` |
 | `POST /api/v1/videos/:ref/redo` | jeter et refaire → 202 + tâche | `curl -H "$A" -X POST $U/videos/5f8a/redo` |
-| `GET /api/v1/tasks` | toutes les tâches | `curl -H "$A" $U/tasks` |
+| `GET /api/v1/tasks` | les tâches lancées par le Studio, l'API et le MCP (pas celles de `septim video`, qui rend directement) | `curl -H "$A" $U/tasks` |
 | `GET /api/v1/tasks/:id` | suivre une tâche | `curl -H "$A" $U/tasks/3fa9c1d2` |
 | `POST /api/v1/lint` | vérifier un script | `curl -H "$A" -H 'Content-Type: application/json' -d @lint.json $U/lint` (`{"script": {...}, "template": "maths"}`) |
-| `GET /api/v1/lessons` | ce qui marche | `curl -H "$A" $U/lessons` |
+| `GET /api/v1/lessons` | ce qui marche (vide tant qu'aucune vidéo publiée n'a 48 h de vues) | `curl -H "$A" $U/lessons` |
 
 Une référence avec `#` s'encode : `%235f8a`. Le plus simple : `5f8a`.
 
@@ -362,6 +411,8 @@ valid = hmac.compare_digest(expected, request.headers.get("X-Septim-Signature", 
 | `REFAIS #5f8a` | en fait une autre version sur le même sujet |
 | `PRO #5f8a` | annonce le coût de la version Higgsfield ; ne dépense rien |
 | « ok », « oui ? », « je regarde » | rien : elle redemande un `OUI #ref` net |
+
+Une vidéo fabriquée par `septim video` pendant que le démon tourne ailleurs est mise en file (`.septim-viral/outbox/`) et le démon l'envoie ; tant que WhatsApp n'est pas lié, rien n'est mis en file. `--no-notify` évite aussi la file.
 
 Si deux vidéos commencent par les mêmes caractères, l'usine ne devine pas : elle te demande la référence plus longue. Si WhatsApp ne transmet pas ta réponse : `septim publier 5f8a`, le Studio ou `/septim-viral:publier 5f8a` (même registre, jamais deux fois).
 
@@ -476,7 +527,7 @@ Tout est optionnel : sans rien, l'usine tourne en gratuit (rendu Remotion, voix 
 | `COMFYUI_WAN_MODEL` | `wan2.2_ti2v_5B_fp16.safetensors` | modèle Wan du workflow intégré |
 | `VIRAL_COMFYUI_TIMEOUT_MS` | `1200000` | délai par plan IA |
 | `VIRAL_BROLL_CLIPS` | `12` (`4` avec ComfyUI) | plans par vidéo |
-| `VIRAL_MUSIC_DIR` | vide | tes pistes ; vide = lit lo-fi généré |
+| `VIRAL_MUSIC_DIR` | vide | tes pistes ; vide = nappe lo-fi générée |
 | `VIRAL_CHATTERBOX_VOICE` | vide | WAV de ta voix à cloner (voix HD) |
 | `VIRAL_CHATTERBOX_SCRIPT` | script intégré | avancé : autre worker Chatterbox |
 | `NEXT_PUBLIC_WHATSAPP_NUMBER` | vide | site : numéro du bouton WhatsApp |
@@ -484,7 +535,7 @@ Tout est optionnel : sans rien, l'usine tourne en gratuit (rendu Remotion, voix 
 | `NEXT_PUBLIC_HERO_VIDEO_URL` | vide | site : vidéo hero PRO (sinon Remotion) |
 | `TWENTY_FIRST_API_KEY` | vide | MCP 21st.dev (composants) |
 
-Une variable vide n'est pas une variable absente : laisse commentées (`#`) celles dont la valeur par défaut te va.
+Les lignes vides du `.env` (clés, numéros) sont sans effet. Les variables « avancées » sont commentées (`#`) dans `.env.example` parce qu'une valeur vide y remplacerait le défaut : décommente seulement celles que tu changes. `septim doctor` affiche les commandes `>> .env` avec le chemin complet du `.env` de l'usine : copie-les telles quelles, de n'importe quel dossier.
 
 ---
 

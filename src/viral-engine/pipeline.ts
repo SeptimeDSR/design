@@ -41,7 +41,13 @@ const PREFIXES = /^(je veux|j'aimerais|fais(-moi)?|crée|cree|make|create)\s+(un
 export function checkScript(input: ScriptInput, raw: Partial<ViralScript>) {
   const script = assembleScript(input, raw);
   if (!script) {
-    return { script: null, issues: [{ rule: "script.invalid", message: "hook, beats et payoff sont obligatoires." }], durationMs: 0, payoffRatio: 0 };
+    const missing = [
+      typeof raw.hook === "string" && raw.hook.trim() ? "" : "hook",
+      Array.isArray(raw.beats) && raw.beats.length ? "" : "beats",
+      typeof raw.payoff === "string" && raw.payoff.trim() ? "" : "payoff",
+    ].filter(Boolean);
+    const message = missing.length ? `Il manque : ${missing.join(", ")}.` : "beats doit contenir des textes ({\"text\": \"…\"}).";
+    return { script: null, issues: [{ rule: "script.invalid", message }], durationMs: 0, payoffRatio: 0 };
   }
   const timeline = buildTimeline(script);
   const payoff = timeline.segments.find((s) => s.kind === "payoff")!;

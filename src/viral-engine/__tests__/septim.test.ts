@@ -153,6 +153,35 @@ describe("septim : vidéos depuis le terminal", () => {
     expect(store.getJob("ab12cdef")!.status).toBe("rejected");
   });
 
+  it("voir affiche la source des plans et leurs crédits", async () => {
+    const { store } = tempHome();
+    const job = seedJob(store, "5f8a4d25", { topic: "la tontine" });
+    store.saveJob({ ...job, broll: { source: "pexels", credits: [{ provider: "pexels", author: "Ama", url: "https://www.pexels.com/video/1/" }] } });
+    const r = await run(["voir", "5f8a"]);
+    expect(r.out).toMatch(/Plans\s+Pexels \(gratuit\), crédits : Ama/);
+  });
+
+  it("lint accepte aussi le corps de l'API ({\"script\": {…}})", async () => {
+    tempHome();
+    const dir = mkdtempSync(join(tmpdir(), "septim-lint-"));
+    writeFileSync(join(dir, "corps.json"), JSON.stringify({ script: JSON.parse(readFileSync(join(__dirname, "fixtures", "tontine.json"), "utf8")) }));
+    process.env.SEPTIM_CWD = dir;
+    const r = await run(["lint", "corps.json", "--template", "maths"]);
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/conforme/);
+  });
+
+  it("la file WhatsApp ne se remplit que si WhatsApp est lié (sinon un vieux message partirait plus tard)", async () => {
+    const { queueToWhatsApp } = await import("../cli");
+    const { home } = tempHome();
+    const { loadConfig } = await import("../config");
+    expect(queueToWhatsApp(loadConfig({ VIRAL_HOME: home, VIRAL_NOTIFIER: "whatsapp" }), false)).toBe(false);
+    mkdirSync(join(home, "wa"), { recursive: true });
+    expect(queueToWhatsApp(loadConfig({ VIRAL_HOME: home, VIRAL_NOTIFIER: "whatsapp" }), false)).toBe(true);
+    expect(queueToWhatsApp(loadConfig({ VIRAL_HOME: home, VIRAL_NOTIFIER: "whatsapp" }), true)).toBe(false);
+    expect(queueToWhatsApp(loadConfig({ VIRAL_HOME: home, VIRAL_NOTIFIER: "console" }), false)).toBe(false);
+  });
+
   it("lint <fichier> relatif au dossier où l'on tape la commande", async () => {
     tempHome();
     process.env.SEPTIM_CWD = join(__dirname, "fixtures");

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve as resolvePath } from "node:path";
 import { loadConfig, type Env } from "./config";
 import { publishWithLedger } from "./daemon";
 import { diagnose, probe as realProbe, type Probes } from "./doctor";
@@ -51,6 +51,8 @@ export type VideoDetail = VideoSummary & {
   posted?: Job["posted"];
   error?: string;
   publishMode: string;
+  // D'où viennent les plans de fond (ComfyUI, Pexels, Pixabay, tes clips, procédural) et à qui les créditer.
+  broll?: Job["broll"];
 };
 
 export type FactoryEvent = "video.ready" | "video.failed" | "video.published" | "video.rejected";
@@ -135,6 +137,7 @@ export function createFactory(partial: Partial<FactoryDeps> = {}) {
     posted: job.posted,
     error: job.error,
     publishMode: resolveModeFromEnv(env),
+    broll: job.broll,
   });
 
   const validate = (req: VideoRequest): VideoRequest => {
@@ -272,7 +275,7 @@ export function createFactory(partial: Partial<FactoryDeps> = {}) {
       emit("video.rejected", { video: detail(next) });
       return summary(next);
     },
-    doctor: async () => diagnose(await (partial.probe ?? (() => realProbe(cfg, env)))()),
+    doctor: async () => diagnose(await (partial.probe ?? (() => realProbe(cfg, env)))(), { envFile: resolvePath(env.SEPTIM_ROOT ?? process.cwd(), ".env") }),
     lessons() {
       const path = join(cfg.home, "LESSONS.md");
       const arms = Object.entries(store.loadState().bandit ?? {})

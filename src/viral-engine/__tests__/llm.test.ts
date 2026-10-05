@@ -62,3 +62,20 @@ describe("robustesse des réponses du LLM", () => {
     expect(s?.beats[1].emphasis).toBeUndefined();
   });
 });
+
+describe("Ollama absent : message clair", () => {
+  it("« fetch failed » devient « Ollama absent … script de secours »", async () => {
+    const { generateScript } = await import("../llm");
+    const { loadConfig } = await import("../config");
+    const warns: string[] = [];
+    const orig = console.warn;
+    console.warn = (m: string) => void warns.push(m);
+    try {
+      const r = await generateScript({ topic: "la tontine", lang: "fr", template: "story", formula: "question" }, loadConfig({}), { chat: async () => { throw new TypeError("fetch failed"); } });
+      expect(r.source).toBe("fallback");
+    } finally {
+      console.warn = orig;
+    }
+    expect(warns.join(" ")).toMatch(/Ollama absent \(http:\/\/127\.0\.0\.1:11434\).*script de secours/);
+  });
+});

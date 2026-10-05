@@ -20,6 +20,8 @@ if command -v claude >/dev/null 2>&1; then
   for plugin in septim-design@septim septim-viral@septim; do
     claude plugin install "$plugin" --scope user >/dev/null 2>&1 || warn "installation de $plugin impossible"
   done
+  # Serveur MCP septim en portée utilisateur (une seule définition : pas de .mcp.json de projet en double).
+  node "$PWD/bin/septim.mjs" connect claude-code >/dev/null 2>&1 || warn "MCP septim non branché"
 fi
 
 # Rendus Remotion sans téléchargement : le Chrome headless préinstallé du conteneur.

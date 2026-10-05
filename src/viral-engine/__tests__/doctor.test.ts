@@ -38,6 +38,13 @@ describe("doctor", () => {
     expect(diagnose({ ...allMissing, chatterbox: true, ttsPref: "chatterbox" }).voice).toBe("chatterbox");
     const text = formatDiagnosis(diagnose({ ...allMissing, pexels: true }));
     expect(text).toMatch(/Plans\s*:\s*Pexels/);
-    expect(text).toMatch(/Musique\s*:\s*lit lo-fi/);
+    expect(text).toMatch(/Musique\s*:\s*nappe lo-fi/);
+  });
+
+  it("les commandes « >> .env » visent le .env de l'usine (chemin absolu), quel que soit le dossier où l'on tape", () => {
+    const d = diagnose(allMissing, { envFile: "/home/ana/mon septim/.env" });
+    const appends = d.fixes.flatMap((f) => f.commands).filter((c) => c.includes(">>"));
+    expect(appends.length).toBeGreaterThanOrEqual(4);
+    for (const c of appends) expect(c, c).toContain(">> '/home/ana/mon septim/.env'");
   });
 });

@@ -2,11 +2,11 @@
 description: Carte de toutes les portes de l'usine SEPTIM (navigateur, terminal, Claude Code, MCP, API, webhooks, WhatsApp) et l'état de l'usine
 ---
 
-Donne à l'utilisateur, en français et sans rien lancer d'autre que le diagnostic, la carte des portes de l'usine SEPTIM.
+Donne à l'utilisateur, en français et sans rien lancer d'autre que la recherche de la commande et le diagnostic, la carte des portes de l'usine SEPTIM.
 
-1. Trouve la commande de l'usine : `septim` si `command -v septim` la trouve ; sinon `node <usine>/bin/septim.mjs`, où `<usine>` est le dossier courant s'il contient `bin/septim.mjs`, sinon `$SEPTIM_FACTORY`, sinon `~/septim`. Si aucune n'existe, dis d'installer une fois : `git clone https://github.com/SeptimeDSR/design ~/septim && bash ~/septim/scripts/install.sh`, et arrête-toi.
+1. Trouve la commande de l'usine, dans cet ordre : `node ./bin/septim.mjs` si le dossier courant contient `bin/septim.mjs` (c'est l'usine elle-même), sinon `septim` si `command -v septim` la trouve, sinon `node $SEPTIM_FACTORY/bin/septim.mjs`, sinon `node ~/septim/bin/septim.mjs`. Dans la suite, `septim` désigne la commande trouvée. Si aucune n'existe, dis d'installer une fois : `git clone https://github.com/SeptimeDSR/design ~/septim && bash ~/septim/scripts/install.sh`, et arrête-toi.
 2. Lance `septim doctor` (avec la commande trouvée) et garde le résultat.
-3. Réponds avec ce tableau, puis le diagnostic résumé en 4 lignes (voix, script automatique, publication, messages) et la première chose à installer s'il en manque :
+3. Réponds avec ce tableau, puis le diagnostic résumé en 6 lignes (voix, script automatique, publication, messages, plans vidéo, musique) et la première chose à installer s'il en manque :
 
 | Porte | Comment | Pour |
 | --- | --- | --- |
@@ -18,4 +18,4 @@ Donne à l'utilisateur, en français et sans rien lancer d'autre que le diagnost
 | Webhooks | `VIRAL_WEBHOOK_URL` + `VIRAL_WEBHOOK_SECRET` dans `.env` | prévenir les autres logiciels (signature HMAC) |
 | WhatsApp | `septim start`, puis réponds `OUI #ref`, `NON #ref`, `REFAIS #ref` | valider depuis le téléphone |
 
-Termine par une ligne : « Rien n'est publié sans la phrase OUI #ref pour cette vidéo, et aucun crédit n'est dépensé sans ton accord chiffré. Mode d'emploi complet : docs/GUIDE.md. »
+Termine par une ligne : « Rien n'est publié sans la phrase OUI #ref pour cette vidéo, et aucun crédit n'est dépensé sans ton accord chiffré. Mode d'emploi complet : docs/GUIDE.md dans le dossier de l'usine. »
