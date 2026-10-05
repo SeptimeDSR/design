@@ -1,0 +1,21 @@
+{
+  "name": "septim-design",
+  "version": "1.0.0",
+  "description": "Directeur artistique autonome pour tous les projets : comprend le projet, puis livre des sites qui retiennent (Lenis, GSAP, Motion, 3D, Remotion) avec une version FREE et une version PRO à crédits (Higgsfield, Runway, Pika).",
+  "author": {
+    "name": "SeptimeDSR"
+  },
+  "homepage": "https://github.com/SeptimeDSR/design",
+  "repository": "https://github.com/SeptimeDSR/design",
+  "keywords": [
+    "design",
+    "frontend",
+    "animation",
+    "gsap",
+    "lenis",
+    "remotion",
+    "3d",
+    "video",
+    "superpowers"
+  ]
+}

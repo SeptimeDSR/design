@@ -2,12 +2,33 @@
 
 Audit réalisé le 5 octobre 2026. Les prix viennent de recherches web faites ce jour-là et changent souvent : vérifie sur le site de chaque outil avant d'acheter des crédits.
 
+## Le plugin `septim-design` (tout est dedans)
+
+Installation unique, valable pour tous tes projets :
+
+```
+/plugin marketplace add SeptimeDSR/design
+/plugin install septim-design@septim
+```
+
+| Contenu du plugin | Détail |
+| --- | --- |
+| Skill `septim-design` | Directeur artistique autonome. Lit le projet (mémoire dans `.septim/PROJECT.md`), résume, pose **une** question ou attaque directement si tu donnes la demande, puis passe par superpowers (brainstorming → plan → exécution → vérification) |
+| Skills `hero-shot`, `cinematic-dolly` | Plans vidéo, FREE Remotion d'abord, PRO à crédits seulement après ton « oui » |
+| Skill `frontend-design` | La skill officielle Anthropic (Apache-2.0), incluse |
+| 8 serveurs MCP | 21st, magicui, shadcn, remotion-docs, playwright, higgsfield, runway, pika |
+| `bootstrap.mjs` | Installe dans chaque projet les paquets npm, les skills officielles GSAP et Remotion, les templates FREE/PRO. Corrige tsconfig et ESLint. Ne remplace aucun fichier |
+
+Utilisation : `/septim-design:septim-design` (ou `/septim-design:septim-design <ta demande>`), `/septim-design:hero-shot`, `/septim-design:cinematic-dolly`.
+
+superpowers n'est **pas** une dépendance forcée : une dépendance manquante empêche le plugin entier de charger, et ton superpowers vient de ton compte claude.ai (synchronisé), pas du marketplace officiel. Le skill l'utilise s'il est là. Sinon il donne la commande `/plugin install superpowers@claude-plugins-official`.
+
 ## Légende statut
 
 | Statut | Signification |
 | --- | --- |
 | ✅ Installé + vérifié | Présent dans le repo, build/test OK dans le conteneur |
-| 🔌 Configuré | Déclaré dans `.mcp.json`, se connecte sur ta machine (login OAuth ou clé API) |
+| 🔌 Configuré | Déclaré dans le plugin (`plugins/septim-design/.mcp.json`), se connecte sur ta machine (login OAuth ou clé API) |
 | 🖥️ App externe | Ne s'installe pas via npm, il faut une app desktop |
 | ❌ N'existe pas | Nom donné dans la demande introuvable, remplacé (voir plus bas) |
 
@@ -17,9 +38,9 @@ Audit réalisé le 5 octobre 2026. Les prix viennent de recherches web faites ce
 
 | Outil | Statut | Prix | À quoi ça sert | Commande |
 | --- | --- | --- | --- | --- |
-| **21st MCP** (ex-Magic MCP, 21st.dev) | 🔌 `.mcp.json` → `21st` | Clé gratuite. Recherche/récupération de composants gratuite. Génération IA (`generate`) = abonnement 21st AI payant | Chercher et injecter des composants React/shadcn de la communauté 21st.dev | `export TWENTY_FIRST_API_KEY=...` (clé sur 21st.dev/mcp), puis demande « trouve un composant 21st pour un pricing avec toggle ». Alternative : `npx @21st-dev/cli@latest init --client claude` |
-| **Magic UI MCP** | 🔌 `.mcp.json` → `magicui` | Gratuit (composants MIT ; templates Pro payants) | Effets marketing qui brillent : marquee, blur-fade, beams, grilles animées | « Ajoute un marquee de logos Magic UI » |
-| **shadcn MCP** + registres `@magicui`, `@aceternity`, `@react-bits` | 🔌 `.mcp.json` → `shadcn`, ✅ `components.json` | Gratuit (Aceternity Pro / React Bits Pro payants en option) | Une seule porte d'entrée vers Aceternity UI et React Bits, l'alternative gratuite demandée | `npx shadcn@latest add @aceternity/<composant>`, ou « liste les composants React Bits de texte animé » via le MCP |
+| **21st MCP** (ex-Magic MCP, 21st.dev) | 🔌 MCP `21st` | Clé gratuite. Recherche/récupération de composants gratuite. Génération IA (`generate`) = abonnement 21st AI payant | Chercher et injecter des composants React/shadcn de la communauté 21st.dev | `export TWENTY_FIRST_API_KEY=...` (clé sur 21st.dev/mcp), puis demande « trouve un composant 21st pour un pricing avec toggle ». Alternative : `npx @21st-dev/cli@latest init --client claude` |
+| **Magic UI MCP** | 🔌 MCP `magicui` | Gratuit (composants MIT ; templates Pro payants) | Effets marketing qui brillent : marquee, blur-fade, beams, grilles animées | « Ajoute un marquee de logos Magic UI » |
+| **shadcn MCP** + registres `@magicui`, `@aceternity`, `@react-bits` | 🔌 MCP `shadcn`, ✅ `components.json` | Gratuit (Aceternity Pro / React Bits Pro payants en option) | Une seule porte d'entrée vers Aceternity UI et React Bits, l'alternative gratuite demandée | `npx shadcn@latest add @aceternity/<composant>`, ou « liste les composants React Bits de texte animé » via le MCP |
 | **Spline** (MCP officiel) | 🖥️ intégré à l'app desktop Spline | Free · Starter 15 $/siège/mois · Professional 25 $/siège/mois | Scènes 3D interactives éditées en live par Claude | Installe l'app desktop Spline et ouvre-la : elle enregistre son MCP toute seule (127.0.0.1). Exporte la scène → `NEXT_PUBLIC_SPLINE_SCENE` |
 | `@splinetool/react-spline` + `@splinetool/runtime` | ✅ | Gratuit | Afficher une scène Spline dans le site | `<HeroScene />` dans `src/components/hero/hero-scene.tsx` |
 | `three` + `@react-three/fiber` + `@react-three/drei` | ✅ | Gratuit | Version FREE de la 3D : l'orbe codé qui s'affiche tant qu'il n'y a pas de scène Spline | `src/components/hero/orb-scene.tsx` |
@@ -37,18 +58,18 @@ Audit réalisé le 5 octobre 2026. Les prix viennent de recherches web faites ce
 | Outil | Statut | Prix | À quoi ça sert | Commande |
 | --- | --- | --- | --- | --- |
 | **Remotion** 4 (`remotion`, `@remotion/player`, `@remotion/cli`) | ✅ MP4 rendu et vérifié | **Gratuit** jusqu'à 3 personnes. Au-delà : licence entreprise 25 $/dev/mois, minimum 100 $/mois | Vidéos écrites en React, rendues en MP4, **0 crédit** | `npm run video:studio` · `npm run video:render` (hero-shot) · `npm run video:dolly` |
-| **Remotion docs MCP** (`@remotion/mcp`) | 🔌 `.mcp.json` → `remotion-docs` | Gratuit | Donne à Claude la doc Remotion à jour | Automatique |
-| **Higgsfield MCP** (Soul + Seedance + Kling, Veo, Cinema Studio… 30+ modèles) | 🔌 `.mcp.json` → `higgsfield` | **PAYANT (crédits)**. Starter 19 $/mois (270 crédits) · Plus 59 $/mois (47 $ en annuel, 1 200 crédits) · Ultra 129 $/mois (99 $ en annuel, 3 000 crédits) · accès 3 $ = 40 crédits. Cinema Studio 5 s 720p ≈ 25 crédits ; Seedance 2.0 ≈ 3 $ les 10 s en 720p. Crédits d'abonnement non reportés d'un mois sur l'autre | /hero-shot et /cinematic-dolly en version cinéma | `/mcp` → `higgsfield` → login navigateur. Ensuite `/hero-shot <brief>` |
-| **Runway MCP** (génération) | 🔌 `.mcp.json` → `runway` | **PAYANT (crédits)**. Standard 15 $/mois · Pro 35 $/mois (2 250 crédits) · Max 95 $/mois (9 500 crédits). Gen-4.5 ≈ 25 crédits/s (10 s ≈ 250 crédits) ; Seedance 2.0 ≈ 3,60 $ les 10 s en 720p | Option PRO alternative : Gen-4.5, Seedance 2.0, Kling 3.0 | `/mcp` → `runway` → login |
-| **Pika MCP** | 🔌 `.mcp.json` → `pika` | **PAYANT (crédits)**. Free = 0 crédit (packs seulement) · Starter 10 $/mois (900) · Creator 35 $/mois (3 150) · Fancy 95 $/mois (8 550+) | Option PRO : vidéo, image, musique, voix via ton Pika Agent | `/mcp` → `pika` → login. Plugin officiel aussi dispo : repo GitHub `Pika-Labs/Pika-Plugins` (commandes `/pika:*`) |
+| **Remotion docs MCP** (`@remotion/mcp`) | 🔌 MCP `remotion-docs` | Gratuit | Donne à Claude la doc Remotion à jour | Automatique |
+| **Higgsfield MCP** (Soul + Seedance + Kling, Veo, Cinema Studio… 30+ modèles) | 🔌 MCP `higgsfield` | **PAYANT (crédits)**. Starter 19 $/mois (270 crédits) · Plus 59 $/mois (47 $ en annuel, 1 200 crédits) · Ultra 129 $/mois (99 $ en annuel, 3 000 crédits) · accès 3 $ = 40 crédits. Cinema Studio 5 s 720p ≈ 25 crédits ; Seedance 2.0 ≈ 3 $ les 10 s en 720p. Crédits d'abonnement non reportés d'un mois sur l'autre | `/septim-design:hero-shot` et `/septim-design:cinematic-dolly` en version cinéma | `/mcp` → `higgsfield` → login navigateur. Ensuite `/septim-design:hero-shot <brief>` |
+| **Runway MCP** (génération) | 🔌 MCP `runway` | **PAYANT (crédits)**. Standard 15 $/mois · Pro 35 $/mois (2 250 crédits) · Max 95 $/mois (9 500 crédits). Gen-4.5 ≈ 25 crédits/s (10 s ≈ 250 crédits) ; Seedance 2.0 ≈ 3,60 $ les 10 s en 720p | Option PRO alternative : Gen-4.5, Seedance 2.0, Kling 3.0 | `/mcp` → `runway` → login |
+| **Pika MCP** | 🔌 MCP `pika` | **PAYANT (crédits)**. Free = 0 crédit (packs seulement) · Starter 10 $/mois (900) · Creator 35 $/mois (3 150) · Fancy 95 $/mois (8 550+) | Option PRO : vidéo, image, musique, voix via ton Pika Agent | `/mcp` → `pika` → login. Plugin officiel aussi dispo : repo GitHub `Pika-Labs/Pika-Plugins` (commandes `/pika:*`) |
 
 ### Règle d'or appliquée dans le code
 
 | Effet | Version PRO (crédits) | Version FREE (marche tout de suite) | Où |
 | --- | --- | --- | --- |
 | Vidéo hero | `NEXT_PUBLIC_HERO_VIDEO_URL` = rendu Higgsfield / Runway / Pika, avec le commentaire `// BESOIN CREDIT: Higgsfield Seedance pour cette vidéo. Alternative gratuite: Remotion <Video> installé ici` | Remotion `<Player>` qui joue la composition `HeroShot` | `src/components/video/hero-video.tsx` |
-| Plan hero (commande) | `/hero-shot` → Higgsfield Soul + Seedance, **après ta confirmation de dépense** | `/hero-shot` → `HeroShot.tsx` puis `npm run video:render` | `.claude/commands/hero-shot.md` |
-| Travelling cinéma | `/cinematic-dolly` → Higgsfield / Runway, **après confirmation** | Parallaxe de calques Remotion `CinematicDolly.tsx` | `.claude/commands/cinematic-dolly.md` |
+| Plan hero (commande) | `/septim-design:hero-shot` → Higgsfield Soul + Seedance, **après ta confirmation de dépense** | `/septim-design:hero-shot` → `HeroShot.tsx` puis `npm run video:render` | `plugins/septim-design/skills/hero-shot` |
+| Travelling cinéma | `/septim-design:cinematic-dolly` → Higgsfield / Runway, **après confirmation** | Parallaxe de calques Remotion `CinematicDolly.tsx` | `plugins/septim-design/skills/cinematic-dolly` |
 | 3D hero | Scène Spline (`NEXT_PUBLIC_SPLINE_SCENE`) | Orbe three.js/R3F | `src/components/hero/hero-scene.tsx` |
 
 Variable PRO vide = version FREE affichée. Le site ne dépend jamais d'un crédit pour fonctionner.
@@ -57,16 +78,17 @@ Variable PRO vide = version FREE affichée. Le site ne dépend jamais d'un créd
 
 | Skill | Statut | Prix | À quoi ça sert |
 | --- | --- | --- | --- |
-| **frontend-design** (officielle Anthropic, Apache-2.0) | ✅ copiée dans `.claude/skills/frontend-design` | Gratuit | Direction artistique forte, éviter le look « généré par IA » |
+| **frontend-design** (officielle Anthropic, Apache-2.0) | ✅ incluse dans le plugin | Gratuit | Direction artistique forte, éviter le look « généré par IA » |
 | **GSAP AI Skills** officielles (greensock) : core, scrolltrigger, timeline, react, plugins, frameworks, performance, utils | ✅ 8 skills | Gratuit | Claude écrit du GSAP propre (useGSAP, cleanup, ScrollTrigger) |
 | **Remotion Agent Skills** officielles : best-practices, create, markup, render, studio, captions, multimedia, maps, saas, interactivity, docs, upgrade | ✅ 12 skills (`.agents/skills`, liées dans `.claude/skills`) | Gratuit | Claude respecte les conventions Remotion (timing, assets, rendu) |
-| **septim-design** | ⚠️ pas présent dans cet environnement cloud | — | Ton skill perso : il vit sur ta machine / ton compte. `/septim-design:septim-design` marche là où ce plugin est installé |
+| **septim-design** + `hero-shot` + `cinematic-dolly` | ✅ plugin `septim-design@septim` (ce repo) | Gratuit | L'orchestrateur autonome, voir la section du haut |
+| **superpowers** | ✅ déjà sur ton compte (synchronisé claude.ai) | Gratuit | Méthode : brainstorming, plans, exécution, vérification |
 
 ## E. Bonus utile
 
 | Outil | Statut | Prix | À quoi ça sert |
 | --- | --- | --- | --- |
-| **Playwright MCP** (Microsoft) | 🔌 `.mcp.json` → `playwright` | Gratuit | Claude ouvre le site dans un vrai navigateur et vérifie que l'animation marche |
+| **Playwright MCP** (Microsoft) | 🔌 MCP `playwright` | Gratuit | Claude ouvre le site dans un vrai navigateur et vérifie que l'animation marche |
 | `@fontsource-variable/bricolage-grotesque`, `jetbrains-mono` | ✅ | Gratuit | Polices auto-hébergées (aucun appel Google Fonts au build) |
 | `clsx`, `tailwind-merge`, `class-variance-authority`, `lucide-react` | ✅ | Gratuit | Base requise par les composants shadcn / Magic UI / Aceternity / 21st |
 
@@ -85,7 +107,7 @@ Variable PRO vide = version FREE affichée. Le site ne dépend jamais d'un créd
 ## Première connexion sur ta machine
 
 1. `npm install`, puis `npm run dev` : le site tourne en version FREE, sans aucune clé.
-2. `export TWENTY_FIRST_API_KEY=...` (clé gratuite sur 21st.dev/mcp), puis lance `claude` dans le dossier et accepte les serveurs MCP du projet.
+2. Dans Claude Code : `/plugin marketplace add SeptimeDSR/design` puis `/plugin install septim-design@septim`. Pour 21st : `export TWENTY_FIRST_API_KEY=...` (clé gratuite sur 21st.dev/mcp) avant de lancer `claude`.
 3. Dans Claude Code : `/mcp` → connecte `higgsfield`, `runway`, `pika` (login navigateur, aucune clé API à copier).
 4. Spline : installe l'app desktop et ouvre-la, le MCP s'enregistre tout seul.
 5. Copie `.env.example` en `.env.local` et remplis les variables PRO quand tu as des assets payants.
@@ -96,6 +118,8 @@ Variable PRO vide = version FREE affichée. Le site ne dépend jamais d'un créd
 - Navigateur headless, desktop 1440 px + mobile 390 px : 0 erreur console, 0 débordement horizontal, canvas 3D rendu, section épinglée GSAP qui défile à l'horizontale.
 - `npm run video:render` : MP4 1920×1080, 6 s, 1,7 Mo, rendu sans crédit.
 - `npm audit --omit=dev` : 0 vulnérabilité dans les dépendances de prod.
+- Plugin : `claude plugin validate --strict` OK (plugin + marketplace). Installé depuis le marketplace local : statut « enabled », 4 skills et 8 MCP détectés, ~365 tokens ajoutés par session.
+- Bootstrap testé sur un projet Next.js vierge : installe tout, 2ᵉ passage = `ready: true`, typecheck + ESLint + build OK avec les templates branchés.
 - Limite : depuis le conteneur, seuls npm et le CDN des skills étaient joignables. Les endpoints MCP (21st, Higgsfield, Runway, Pika) et les registres de composants n'ont pas pu être appelés ici ; ils sont configurés, et la connexion se fait chez toi.
 
 ## Sources

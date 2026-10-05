@@ -1,0 +1,17 @@
+{
+  "name": "septim",
+  "owner": {
+    "name": "SeptimeDSR"
+  },
+  "metadata": {
+    "description": "Plugins Septim pour Claude Code"
+  },
+  "plugins": [
+    {
+      "name": "septim-design",
+      "source": "./plugins/septim-design",
+      "description": "Directeur artistique autonome : sites qui retiennent, version FREE et PRO, branché sur superpowers.",
+      "version": "1.0.0"
+    }
+  ]
+}

@@ -1,12 +1,10 @@
 {
-  "enabledMcpjsonServers": [
-    "21st",
-    "magicui",
-    "shadcn",
-    "remotion-docs",
-    "playwright",
-    "higgsfield",
-    "runway",
-    "pika"
-  ]
+  "extraKnownMarketplaces": {
+    "septim": {
+      "source": { "source": "github", "repo": "SeptimeDSR/design" }
+    }
+  },
+  "enabledPlugins": {
+    "septim-design@septim": true
+  }
 }

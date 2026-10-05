@@ -12,5 +12,7 @@ Chaque effet visuel ou vidéo existe en deux versions :
 
 Inventaire complet des outils, prix et commandes : `.claude/INVENTAIRE-DESIGN-2026.md`.
 
+Le plugin `septim-design` vit dans `plugins/septim-design` (marketplace `septim` déclarée dans `.claude-plugin/marketplace.json`). Les templates de `plugins/septim-design/skills/septim-design/templates/` sont la source de vérité. Une correction faite dans `src/` doit y être reportée, et inversement. Valider avec `claude plugin validate --strict plugins/septim-design`.
+
 Commandes : `npm run dev`, `npm run typecheck`, `npm run lint`, `npm run build`,
 `npm run video:studio`, `npm run video:render`, `npm run video:dolly`.

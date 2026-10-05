@@ -1,7 +1,7 @@
 "use client";
 
 import { Player } from "@remotion/player";
-import { HeroShot, heroShotConfig } from "@/remotion/compositions/HeroShot";
+import { HeroShot, heroShotConfig } from "../../remotion/compositions/HeroShot";
 
 const proVideo = process.env.NEXT_PUBLIC_HERO_VIDEO_URL;
 
