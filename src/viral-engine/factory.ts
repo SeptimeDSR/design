@@ -13,7 +13,8 @@ import { resolveModeFromEnv } from "./publish-mode";
 import { createStore, RefError, type Job, type JobStatus } from "./store";
 import { TEMPLATES, type Lang, type TemplateId, type ViralScript } from "./types";
 
-export type VideoRequest = { topic?: string; template?: TemplateId; lang?: Lang; script?: Partial<ViralScript> };
+// brollDir : seulement le terminal (dossier local de l'humain) ; l'API et le MCP ne le transmettent jamais.
+export type VideoRequest = { topic?: string; template?: TemplateId; lang?: Lang; script?: Partial<ViralScript>; brollDir?: string };
 
 export type Task = {
   id: string;
@@ -225,6 +226,7 @@ export function createFactory(partial: Partial<FactoryDeps> = {}) {
 
   return {
     home: cfg.home,
+    store,
     createVideo: (req: VideoRequest): Task => enqueue("create", validate(req)),
     redo(input: string): Task {
       const job = rejectUnderLock(resolve(input));

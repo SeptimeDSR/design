@@ -322,3 +322,44 @@ describe("septim : vrais processus, lancés depuis un autre dossier", () => {
     expect(existsSync(join(home, "tasks"))).toBe(true);
   }, 70_000);
 });
+
+describe("revue finale : septim video et septim mcp préviennent les webhooks", () => {
+  it("septim video passe par la file de la fabrique : webhook video.ready reçu, brollDir transmis, ref unique affichée", async () => {
+    const { createServer } = await import("node:http");
+    const got: { event: string; ref?: string }[] = [];
+    const srv = createServer((req, res) => {
+      let body = "";
+      req.on("data", (c) => (body += c)).on("end", () => {
+        const p = JSON.parse(body);
+        got.push({ event: p.event, ref: p.video?.ref });
+        res.end("ok");
+      });
+    });
+    await new Promise<void>((r) => srv.listen(0, "127.0.0.1", () => r()));
+    try {
+      const { store } = tempHome();
+      seedJob(store, "5f8a1111");
+      process.env.VIRAL_WEBHOOK_URL = `http://127.0.0.1:${(srv.address() as { port: number }).port}/hook`;
+      const { runCli } = await import("../cli");
+      const requests: unknown[] = [];
+      const runJob = async (req: { brollDir?: string }) => {
+        requests.push(req);
+        return seedJob(store, "5f8a2222", req as never);
+      };
+      const out = capture();
+      const code = await runCli(["la", "tontine", "--broll", "/tmp/clips", "--no-notify"], { out: out.stream, err: capture().stream }, { runJob });
+      expect(code).toBe(0);
+      expect(requests).toMatchObject([{ topic: "la tontine", brollDir: "/tmp/clips" }]);
+      expect(got).toEqual([{ event: "video.ready", ref: "5f8a2" }]);
+      expect(out.text).toContain("septim publier 5f8a2");
+    } finally {
+      srv.close();
+    }
+  });
+
+  it("septim mcp branche les webhooks (même fabrique que le Studio)", () => {
+    const src = readFileSync(join(ROOT, "src/viral-engine/septim.ts"), "utf8");
+    const mcpCase = src.slice(src.indexOf('case "mcp"'), src.indexOf('case "connect"'));
+    expect(mcpCase).toMatch(/attachWebhooks\(/);
+  });
+});

@@ -183,7 +183,7 @@ Ouvre cette adresse une fois : le Studio garde le token sur l'appareil et le ret
 | `septim design init [dossier]` | installer septim-design dans un autre projet Next.js |
 | `septim version` | version de l'usine |
 
-Une référence, c'est le début de l'identifiant de la vidéo : `5f8a`, `#5F8A` et `5F8A` désignent la même vidéo. Si deux vidéos commencent pareil, l'usine refuse et liste les deux : tape un ou deux caractères de plus.
+Une référence, c'est le début de l'identifiant de la vidéo : `5f8a`, `#5F8A` et `5F8A` désignent la même vidéo. Si deux vidéos commencent pareil, l'usine affiche d'elle-même une référence plus longue (`5f8a1`, `5f8a2`) ; une référence trop courte est refusée avec la liste des deux, jamais devinée.
 
 | Statut affiché | `--status` (terminal, API) | Valeur interne (API, webhooks) |
 | --- | --- | --- |
@@ -367,7 +367,7 @@ Une référence avec `#` s'encode : `%235f8a`. Le plus simple : `5f8a`.
 
 ## Webhooks
 
-Avec `VIRAL_WEBHOOK_URL` dans `.env`, l'usine envoie un `POST` à chaque événement : `video.ready`, `video.failed`, `video.published`, `video.rejected`.
+Avec `VIRAL_WEBHOOK_URL` dans `.env`, l'usine envoie un `POST` à chaque événement : `video.ready`, `video.failed`, `video.published`, `video.rejected`, quelle que soit la porte (Studio, API, MCP, terminal ou réponse WhatsApp).
 
 ```json
 {
@@ -578,5 +578,4 @@ Les lignes vides du `.env` (clés, numéros) sont sans effet. Les variables « a
 - **Docker** et **CI GitHub Actions** : pas vérifiables depuis l'environnement de travail (pas de démon Docker) ; à faire quand une machine avec Docker est disponible.
 - **Application mobile** : le Studio en Wi-Fi (ou par tunnel) couvre le téléphone.
 - **Windows natif** : WSL est la voie documentée.
-- **Webhook `video.published` pour une publication faite depuis WhatsApp** : WhatsApp publie par le même registre, mais n'émet pas encore l'événement (le Studio, l'API, le MCP et le terminal l'émettent).
 - **Durée de la voix** : le script est vérifié sur une estimation du débit, pas sur la voix réelle.

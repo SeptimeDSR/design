@@ -2,12 +2,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { Writable } from "node:stream";
 import { parseArgs } from "node:util";
-import { checkScript, cleanTopic, runJob } from "./pipeline";
+import { checkScript, cleanTopic, type JobRequest, type PipelineDeps } from "./pipeline";
 import { createConsoleNotifier } from "./notify";
 import { loadConfig, loadDotEnv, type ViralConfig } from "./config";
 import { enqueueOutbox } from "./outbox";
-import { createFactory } from "./factory";
+import { createFactory, type FactoryDeps } from "./factory";
 import { attachWebhooks, flushWebhooks } from "./webhooks";
+import type { Job } from "./store";
 import { TEMPLATES, type Lang, type TemplateId } from "./types";
 
 export type CliIO = { out: Writable; err: Writable };
@@ -37,7 +38,11 @@ export async function publishFromTerminal(ref: string, io: CliIO): Promise<numbe
 // npm run viral -- "je veux une histoire sur la tontine" [--template story|maths|film] [--lang fr|en]
 //   [--script script.json] [--lint-only] [--broll dossier-clips-PRO] [--no-notify]
 // npm run viral -- --publish <ref>        publie un job déjà validé (même registre que le démon : jamais deux fois)
-export async function runCli(argv: string[], io: CliIO = { out: process.stdout, err: process.stderr }): Promise<number> {
+export async function runCli(
+  argv: string[],
+  io: CliIO = { out: process.stdout, err: process.stderr },
+  deps: { runJob?: (req: JobRequest, partial: Partial<PipelineDeps>) => Promise<Job> } = {},
+): Promise<number> {
   const { values, positionals } = parseArgs({
     args: argv,
     allowPositionals: true,
@@ -84,15 +89,30 @@ export async function runCli(argv: string[], io: CliIO = { out: process.stdout, 
 
   // Le CLI n'ouvre jamais WhatsApp : il affiche ici et dépose le message pour le démon.
   const toWhatsApp = queueToWhatsApp(cfg, values["no-notify"]);
-  const job = await runJob(
-    { topic, template, lang, script, brollDir: values.broll ? userPath(values.broll) : undefined },
-    {
-      notify: async (text, media) => {
-        await notify(text, media);
-        if (toWhatsApp) enqueueOutbox(cfg.home, { text, mediaPath: media });
-      },
+  // Même file et mêmes événements que le Studio, l'API et le MCP : les webhooks voient aussi les vidéos du terminal.
+  const factory = createFactory({
+    ...(deps.runJob ? { runJob: deps.runJob as FactoryDeps["runJob"] } : {}),
+    notify: async (text, media) => {
+      await notify(text, media);
+      if (toWhatsApp) enqueueOutbox(cfg.home, { text, mediaPath: media });
     },
-  );
+  });
+  attachWebhooks(factory);
+  let task;
+  try {
+    task = factory.createVideo({ topic, template, lang, script, brollDir: values.broll ? userPath(values.broll) : undefined });
+    await factory.idle();
+    task = factory.getTask(task.id);
+  } finally {
+    await flushWebhooks();
+  }
+  const job = task.jobId ? factory.store.getJob(task.jobId) : undefined;
+  if (!job) {
+    line(io.out, `\n✗ Tâche ${task.id} : ${task.status}`);
+    line(io.out, `  Erreur: ${task.error ?? "rendu raté"}`);
+    return 1;
+  }
+  const ref = factory.store.ref(job.id);
 
   line(io.out, `\n${job.status === "failed" ? "✗" : "✓"} Job ${job.id} : ${job.status}`);
   if (job.videoPath) line(io.out, `  Vidéo : ${job.videoPath}`);
@@ -100,7 +120,7 @@ export async function runCli(argv: string[], io: CliIO = { out: process.stdout, 
   line(io.out, `  Script: ${job.source} · voix ${job.ttsEngine} · ${Math.round(job.timeline.durationMs / 1000)} s`);
   if (toWhatsApp) line(io.out, "  WhatsApp : message en file, le démon l'envoie (septim start).");
   else if (cfg.notifier === "whatsapp" && !values["no-notify"]) line(io.out, "  WhatsApp pas encore lié : rien mis en file (septim start pour le lier).");
-  if (job.status !== "failed") line(io.out, `  Publier : septim publier ${job.id.slice(0, 4)}   (ou le Studio, ou OUI #${job.id.slice(0, 4)} sur WhatsApp)`);
+  if (job.status !== "failed") line(io.out, `  Publier : septim publier ${ref}   (ou le Studio, ou OUI #${ref} sur WhatsApp)`);
   if (job.error) line(io.out, `  Erreur: ${job.error}`);
   return job.status === "failed" ? 1 : 0;
 }

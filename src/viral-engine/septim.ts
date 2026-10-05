@@ -228,7 +228,9 @@ async function dispatch(command: string, args: string[], io: CliIO): Promise<num
     }
     case "mcp": {
       const { runStdio } = await import("./mcp");
-      await runStdio(createFactory());
+      const factory = createFactory();
+      attachWebhooks(factory);
+      await runStdio(factory);
       return "running";
     }
     case "connect":
