@@ -2,14 +2,27 @@
 
 Audit réalisé le 5 octobre 2026. Les prix viennent de recherches web faites ce jour-là et changent souvent : vérifie sur le site de chaque outil avant d'acheter des crédits.
 
-## Le plugin `septim-design` (tout est dedans)
+## Les 2 plugins Septim (tout est dedans)
 
 Installation unique, valable pour tous tes projets :
 
 ```
 /plugin marketplace add SeptimeDSR/design
 /plugin install septim-design@septim
+/plugin install septim-viral@septim
 ```
+
+Dans une session cloud sur ce repo, le hook `.claude/hooks/session-start.sh` les installe tout seul (plus de « commande introuvable »).
+
+### `septim-viral` (SEPTIM-VIRAL-OS)
+
+| Contenu | Détail |
+| --- | --- |
+| Skill `viral` → `/septim-viral:viral "je veux une histoire sur…"` | Claude écrit le script H.E.A.T, le linter viral le valide (`--lint-only`), le moteur rend le MP4 gratuit, le message « Vidéo prête boss » part, rien n'est publié sans OUI, aucun crédit sans budget annoncé |
+| Démon `npm run viral:daemon` (pm2) | Cycle toutes les 6 h, réponses WhatsApp OUI / NON / REFAIS / PRO, analytics à 48 h qui apprennent quels templates et hooks marchent (`LESSONS.md`) |
+| `npm run viral:doctor` | Dit honnêtement ce qui tourne (voix, LLM, WhatsApp, publication) et donne les commandes pour le reste |
+
+### `septim-design`
 
 | Contenu du plugin | Détail |
 | --- | --- |
@@ -94,10 +107,36 @@ Variable PRO vide = version FREE affichée. Le site ne dépend jamais d'un créd
 
 ---
 
+## F. SEPTIM-VIRAL-OS (l'usine à vidéos)
+
+| Brique | Statut | Prix | À quoi ça sert | Commande |
+| --- | --- | --- | --- | --- |
+| Moteur `src/viral-engine` (128 tests) | ✅ | Gratuit | Tendances → hook H.E.A.T → voix → rendu 9:16 → WhatsApp → publication → apprentissage | `npm run viral -- "sujet"` |
+| 3 templates 9:16 (story, maths, film) | ✅ MP4 rendus et vérifiés | Gratuit | Sous-titres mot à mot, coup visuel à chaque beat, barre de progression, réponse à ≥ 80 %, CTA « garde ça » | `--template story\|maths\|film` |
+| Voix Piper (FR) / Kokoro (EN) | ✅ code vérifié avec une vraie voix Piper | Gratuit, local | Voix grave à 1,1× | voir `viral:doctor` |
+| Lit lo-fi généré par code | ✅ | Gratuit, sans droits | Fond sonore qui ne fatigue pas | automatique |
+| Ollama + qwen2.5 | 🔌 chez toi | Gratuit, local | Script automatique du démon (repli conforme sinon) | `ollama pull qwen2.5:7b` |
+| Tendances | ✅ code | Google Trends (gratuit), YouTube (clé gratuite), Apify (offre gratuite) | Sujet du jour | `YOUTUBE_API_KEY`, `APIFY_TOKEN` |
+| WhatsApp (whatsapp-web.js) | ✅ code, 🔌 QR chez toi | Gratuit, **non officiel** | « Vidéo prête boss, je publie ? » | `npm run viral:daemon` |
+| Postiz | 🔌 chez toi | Cloud 29 $/mois (publication publique) · auto-hébergé gratuit (TikTok/YouTube privés sans audit) | Publication TikTok, YouTube, Instagram, Facebook + analytics | `npm i -g postiz && postiz auth:login` |
+| PRO Higgsfield (B-roll) | ✅ branche rendue et vérifiée avec des clips de test | ≈ 3 $ / 10 s en 720p | Plans cinéma derrière les sous-titres | `--broll <dossier>` après ton OUI chiffré |
+
+## G. Le site
+
+Refait selon la science de la rétention : clarté en 0,5 s, promesse ouverte payée au chapitre 7 (≥ 80 % de la page), HUD « Chapitre n sur 7 », interruptions visuelles, secrets tirés au hasard (2,5 par visite en moyenne), son généré **opt-in**, fil infini au lieu d'un footer (mentions légales dans l'en-tête), titres qui s'étirent avec la vitesse du scroll, téléphones qui jouent les vrais templates de l'usine. Palette indigo du tissu Ndop, polices Anybody + Instrument Sans.
+
 ## Ce qui n'existe pas dans la demande et ce qui le remplace
 
 | Demandé | Réalité (vérifié sur le registre npm et la doc officielle) | Remplacé par |
 | --- | --- | --- |
+| `@modelcontextprotocol/server-facebook` / `server-youtube` | 404 sur npm | Postiz (publie FB, IG, YouTube, TikTok) ; MCP communautaires optionnels listés dans `plugins/septim-viral/skills/viral/references/setup.md` |
+| « TikTok MCP le plus étoilé » pour publier | Seym0n/tiktok-mcp (159 ⭐) lit seulement, ne publie pas | Postiz pour publier, Apify pour les tendances |
+| « MCP WhatsApp officiel » | Il n'existe pas ; lharries/whatsapp-mcp est non officiel | whatsapp-web.js dans le démon (toi seul comme destinataire) |
+| Kokoro pour la voix française | kokoro-js ne fait que l'anglais | Piper `fr_FR-tom-medium` (FR), Kokoro (EN) |
+| « Son trending scrappé et utilisé » | Aucune API ne permet d'attacher un son de la bibliothèque TikTok | Le message WhatsApp donne le son tendance, à ajouter dans l'app au moment de poster |
+| « Publie automatiquement partout » | TikTok et YouTube forcent le privé pour les apps non auditées | Postiz cloud (apps approuvées) ou mode manuel (légende prête à coller) |
+| « X trending sounds » | X n'a pas de sons, son API est payante | Google Trends, YouTube, TikTok Creative Center |
+| Cron dans WSL | WSL ne lance pas cron sans systemd | `node-cron` dans le démon, gardé en vie par pm2 |
 | `npx @21st-dev/mcp-server` | 404 sur npm. Magic MCP est devenu « 21st MCP » | Serveur HTTP `https://21st.dev/api/mcp` + clé API (ou `@21st-dev/cli init`) |
 | `@splinetool/mcp` | 404 sur npm. Le MCP Spline est intégré à l'app desktop. Le serveur communautaire `aydinfer/spline-mcp-server` est archivé | App desktop Spline + R3F en FREE |
 | `npx remotion mcp` | Ce n'est pas une commande. Le MCP officiel `@remotion/mcp` sert à la **doc** ; le rendu passe par le CLI + les skills | `@remotion/mcp` + Remotion CLI + 12 skills. Le paquet communautaire `remotion-mcp` existe mais n'est pas officiel, donc pas installé |
@@ -106,6 +145,7 @@ Variable PRO vide = version FREE affichée. Le site ne dépend jamais d'un créd
 
 ## Première connexion sur ta machine
 
+0. Usine vidéo : `npm run viral:doctor`, suis ses commandes (voix, Ollama, WhatsApp, Postiz), puis `npm i -g pm2 && pm2 start ecosystem.config.cjs`.
 1. `npm install`, puis `npm run dev` : le site tourne en version FREE, sans aucune clé.
 2. Dans Claude Code : `/plugin marketplace add SeptimeDSR/design` puis `/plugin install septim-design@septim`. Pour 21st : `export TWENTY_FIRST_API_KEY=...` (clé gratuite sur 21st.dev/mcp) avant de lancer `claude`.
 3. Dans Claude Code : `/mcp` → connecte `higgsfield`, `runway`, `pika` (login navigateur, aucune clé API à copier).
@@ -120,6 +160,9 @@ Variable PRO vide = version FREE affichée. Le site ne dépend jamais d'un créd
 - `npm audit --omit=dev` : 0 vulnérabilité dans les dépendances de prod.
 - Plugin : `claude plugin validate --strict` OK (plugin + marketplace). Installé depuis le marketplace local : statut « enabled », 4 skills et 8 MCP détectés, ~365 tokens ajoutés par session.
 - Bootstrap testé sur un projet Next.js vierge : installe tout, 2ᵉ passage = `ready: true`, typecheck + ESLint + build OK avec les templates branchés.
+- Usine : 128 tests vitest verts ; rendus réels des 3 templates ; pipeline de bout en bout avec une vraie voix Piper (MP4 h264 + aac) ; démon lancé, cycle hors ligne, réponse « oui » → publié en mode manuel ; branche PRO B-roll rendue avec des clips de test.
+- Site : navigateur 1440 / 390 / reduced-motion : 0 erreur, 0 débordement, HUD qui avance, aucun AudioContext avant un clic, fil infini qui grandit, secrets aléatoires.
+- Skills testées par sous-agents : 3 scénarios RED sans skill (ils ont révélé 5 vrais défauts, corrigés) puis GREEN avec skill (voir `docs/skill-tests.md`).
 - Limite : depuis le conteneur, seuls npm et le CDN des skills étaient joignables. Les endpoints MCP (21st, Higgsfield, Runway, Pika) et les registres de composants n'ont pas pu être appelés ici ; ils sont configurés, et la connexion se fait chez toi.
 
 ## Sources
@@ -135,3 +178,10 @@ Variable PRO vide = version FREE affichée. Le site ne dépend jamais d'un créd
 - Pika MCP : https://mcp.pika.me/ · https://github.com/Pika-Labs/Pika-Plugins · tarifs : https://pricingsaas.com/companies/pika
 - Comparatif 21st / Magic UI / Aceternity : https://vp0.com/blogs/21st-dev-vs-magic-ui-vs-aceternity
 - Spline tarifs : https://costbench.com/software/ai-3d-generation/spline/
+- Postiz : https://github.com/gitroomhq/postiz-app · tarifs : https://postplanify.com/postiz-pricing
+- TikTok Content Posting API (apps non auditées en privé) : https://developers.tiktok.com/doc/content-posting-api-reference-direct-post
+- YouTube videos.insert (projets non audités en privé) : https://developers.google.com/youtube/v3/docs/videos/insert
+- Piper voix FR : https://huggingface.co/rhasspy/piper-voices · Kokoro : https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX
+- WhatsApp MCP (non officiel) : https://github.com/lharries/whatsapp-mcp · TikTok MCP : https://github.com/Seym0n/tiktok-mcp
+- Apify TikTok Creative Center : https://apify.com/eunit/tiktok-trends-scraper
+- Statistique des 3 secondes : https://jellymarketing.ca/blog/stop-the-scroll-in-3-seconds-secrets-to-high-performing-short-form-video-hooks/

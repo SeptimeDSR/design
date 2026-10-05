@@ -11,7 +11,7 @@ Parle la langue de l'utilisateur (français par défaut).
 
 ## 1. Charger le projet (à chaque invocation, sans rien demander)
 
-1. `.septim/PROJECT.md` existe : lis-le, c'est ta mémoire du projet.
+1. `.septim/PROJECT.md` existe : lis-le, c'est ta mémoire du projet. Lis aussi `.septim/LESSONS.md` s'il existe.
 2. Sinon : lis `package.json`, la config du framework, `CLAUDE.md`/`README`, le point d'entrée de l'app, le CSS global (tokens, polices), les composants existants. Écris ensuite `.septim/PROJECT.md` selon `references/project-memory.md`.
 3. Lance `node <base de ce skill>/scripts/bootstrap.mjs --check` pour savoir ce qui manque à la stack.
 
@@ -71,6 +71,7 @@ Avant de dire « fini » :
 1. Lance build, typecheck et lint.
 2. Ouvre la page dans un navigateur (MCP `playwright`) à 1440 px et à 390 px. Vérifie : 0 erreur console, pas de scroll horizontal, contenu au-dessus de la ligne de flottaison visible, `prefers-reduced-motion` respecté.
 3. Ajoute à `.septim/PROJECT.md` les décisions prises (direction, tokens, sections, assets PRO en attente).
+4. Auto-amélioration : chaque erreur nouvelle que tu as corrigée devient une ligne `symptôme | cause | correctif` dans `.septim/LESSONS.md` (relu à l'étape 1). Si tu travailles dans le repo Septim lui-même, ajoute-la aussi au tableau ci-dessous.
 
 ## Erreurs déjà rencontrées
 

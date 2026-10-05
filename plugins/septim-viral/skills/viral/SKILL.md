@@ -47,6 +47,10 @@ Le moteur rend le MP4 9:16 (Remotion, 0 crédit), écrit le job dans `.septim-vi
 
 `pm2 start ecosystem.config.cjs` : un cycle toutes les 6 h, réponses WhatsApp OUI / NON / REFAIS / PRO, analytics à 48 h qui entraînent le choix des prochains templates et hooks (`.septim-viral/LESSONS.md`). Le démon ne dépense jamais de crédits. Installation complète : `references/setup.md`.
 
+## Auto-amélioration
+
+Avant d'écrire un script, lis `.septim-viral/LESSONS.md` : le démon y note, 48 h après chaque publication, quel template et quelle formule de hook ont fait plus ou moins de vues que la médiane. Privilégie ce qui gagne, sans copier deux fois le même hook. Une erreur nouvelle corrigée pendant la session : ajoute-la en une ligne au même fichier.
+
 ## Message final
 
 Toujours, dans cet ordre : le MP4 (chemin), le hook, la durée et le moment de la réponse, la voix utilisée, la légende par plateforme, ce qui n'a **pas** été fait (publication, PRO) et ce qu'il faut pour le faire.

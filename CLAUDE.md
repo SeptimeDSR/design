@@ -12,7 +12,10 @@ Chaque effet visuel ou vidéo existe en deux versions :
 
 Inventaire complet des outils, prix et commandes : `.claude/INVENTAIRE-DESIGN-2026.md`.
 
-Le plugin `septim-design` vit dans `plugins/septim-design` (marketplace `septim` déclarée dans `.claude-plugin/marketplace.json`). Les templates de `plugins/septim-design/skills/septim-design/templates/` sont la source de vérité. Une correction faite dans `src/` doit y être reportée, et inversement. Valider avec `claude plugin validate --strict plugins/septim-design`.
+Plugins `septim-design` et `septim-viral` dans `plugins/` (marketplace `septim` : `.claude-plugin/marketplace.json`). Les templates de `plugins/septim-design/skills/septim-design/templates/` sont la source de vérité des composants génériques (`smooth-scroll`, `reveal`, `retention/*`) : une correction faite dans `src/components/` doit y être reportée, et inversement. Valider avec `claude plugin validate --strict plugins/<nom>`.
 
-Commandes : `npm run dev`, `npm run typecheck`, `npm run lint`, `npm run build`,
-`npm run video:studio`, `npm run video:render`, `npm run video:dolly`.
+Usine vidéo : `src/viral-engine/` (TDD, `npm test`), templates `src/remotion/viral/` (imports relatifs uniquement). Toute règle virale chiffrée vit dans `src/viral-engine/viral-checklist.json`. Le démon ne publie jamais sans OUI et ne dépense jamais de crédits.
+
+Commandes : `npm run dev`, `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`,
+`npm run viral -- "sujet" [--template story|maths|film] [--script f.json] [--lint-only] [--broll dossier]`,
+`npm run viral:doctor`, `npm run viral:daemon`, `npm run video:studio`.
