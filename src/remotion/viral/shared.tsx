@@ -1,4 +1,4 @@
-import { Audio } from "@remotion/media";
+import { Audio, Video } from "@remotion/media";
 import { useMemo } from "react";
 import { AbsoluteFill, Easing, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { captionPages, msToFrame, segmentAt, type ViralProps } from "./props";
@@ -134,5 +134,28 @@ export function SaveBadge({ accent, fontFamily, label }: { accent: string; fontF
         {label}
       </div>
     </div>
+  );
+}
+
+// PRO : un plan généré (Higgsfield Soul / Seedance) par segment, en boucle sur la liste, assombri pour garder les sous-titres lisibles.
+export function BrollBackground({ broll, timeline, dim = 0.45 }: { broll: string[]; timeline: ViralProps["timeline"]; dim?: number }) {
+  const { fps } = useVideoConfig();
+  return (
+    <AbsoluteFill>
+      {timeline.segments.map((s, i) => (
+        <Video
+          key={i}
+          name={`Plan ${i}`}
+          src={resolveSrc(broll[i % broll.length])}
+          from={msToFrame(s.startMs, fps)}
+          durationInFrames={Math.max(1, msToFrame(s.endMs - s.startMs, fps))}
+          premountFor={fps}
+          muted
+          objectFit="cover"
+          style={{ position: "absolute", width: "100%", height: "100%" }}
+        />
+      ))}
+      <AbsoluteFill style={{ backgroundColor: `rgba(0,0,0,${dim})` }} />
+    </AbsoluteFill>
   );
 }

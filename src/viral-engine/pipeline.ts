@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { mkdirSync } from "node:fs";
+import { copyFileSync, mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { allArms, armKey, chooseArm, parseArm } from "./bandit";
 import { loadConfig, type Env, type ViralConfig } from "./config";
@@ -15,7 +15,8 @@ import { FORMULAS, type Lang, type TemplateId, type ViralScript } from "./types"
 import type { ViralProps } from "../remotion/viral/props";
 
 // script : écrit par Claude en mode interactif (/septim-viral:viral). Il doit passer le linter, sinon erreur explicite.
-export type JobRequest = { topic?: string; template?: TemplateId; lang?: Lang; script?: Partial<ViralScript> };
+// brollDir : PRO, clips générés (Higgsfield Soul / Seedance) utilisés en fond à la place des décors procéduraux.
+export type JobRequest = { topic?: string; template?: TemplateId; lang?: Lang; script?: Partial<ViralScript>; brollDir?: string };
 
 export type PipelineDeps = {
   env: Env;
@@ -101,6 +102,14 @@ export async function runJob(req: JobRequest, partial: Partial<PipelineDeps> = {
     jobDir,
   };
 
+  const broll = req.brollDir
+    ? readdirSync(req.brollDir)
+        .filter((f) => /\.(mp4|mov|webm)$/i.test(f))
+        .sort()
+    : [];
+  if (broll.length) mkdirSync(join(jobDir, "broll"), { recursive: true });
+  broll.forEach((f) => copyFileSync(join(req.brollDir!, f), join(jobDir, "broll", f)));
+
   const props: ViralProps = {
     script,
     timeline,
@@ -108,6 +117,7 @@ export async function runJob(req: JobRequest, partial: Partial<PipelineDeps> = {
       segments: timeline.segments.map((s, i) => ({ src: `viral/${id}/voice/${String(i).padStart(2, "0")}.wav`, startMs: s.startMs })),
       ambient: `viral/${id}/ambient.wav`,
     },
+    broll: broll.length ? broll.map((f) => `viral/${id}/broll/${f}`) : undefined,
   };
 
   const notify = partial.notify ?? (async (text: string) => console.log(text));

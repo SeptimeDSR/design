@@ -1,5 +1,5 @@
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import { AudioTracks, Captions, ProgressBar, SaveBadge, emphasisOf, usePunch } from "./shared";
+import { AudioTracks, BrollBackground, Captions, ProgressBar, SaveBadge, emphasisOf, usePunch } from "./shared";
 import { msToFrame, type ViralProps } from "./props";
 
 const PAPER = "#0f1a14";
@@ -32,7 +32,7 @@ export function ViralMaths({ script, timeline, audio, broll }: ViralProps) {
       }}
     >
       {/* BESOIN CREDIT: Higgsfield Seedance pour un plan de tableau filmé. Alternative gratuite: papier quadrillé Remotion. */}
-      {broll?.length ? null : null}
+      {broll?.length ? <BrollBackground broll={broll} timeline={timeline} dim={0.75} /> : null}
 
       <AbsoluteFill style={{ top: 200, height: "auto", padding: "0 70px", alignItems: "center" }}>
         {/* Les données s'empilent comme au tableau : pas de « + » qui ferait lire une fausse addition. */}

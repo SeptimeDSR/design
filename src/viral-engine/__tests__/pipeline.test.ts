@@ -121,3 +121,22 @@ describe("checkScript (--lint-only)", () => {
     expect(checkScript({ topic: "x", lang: "fr", template: "story", formula: "question" }, { hook: "Tu sais ?" }).issues[0].rule).toBe("script.invalid");
   });
 });
+
+describe("runJob PRO avec plans B-roll", () => {
+  it("copie les clips et les passe au rendu", async () => {
+    const { mkdirSync, writeFileSync } = await import("node:fs");
+    const dir = home();
+    const broll = join(dir, "clips");
+    mkdirSync(broll);
+    writeFileSync(join(broll, "b.mp4"), "x");
+    writeFileSync(join(broll, "a.mp4"), "x");
+    writeFileSync(join(broll, "notes.txt"), "x");
+    let seen: unknown;
+    const job = await runJob(
+      { topic: "le café", brollDir: broll },
+      { ...fakeDeps([]), render: async (_j: unknown, props: { broll?: string[] }, d: string) => ((seen = props.broll), join(d, "video.mp4")), env: { VIRAL_HOME: dir, VIRAL_TTS: "silent" } },
+    );
+    expect(seen).toEqual([`viral/${job.id}/broll/a.mp4`, `viral/${job.id}/broll/b.mp4`]);
+    expect(existsSync(join(dir, "jobs", job.id, "broll", "a.mp4"))).toBe(true);
+  });
+});

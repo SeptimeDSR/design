@@ -14,7 +14,8 @@
     "test": "vitest run",
     "viral": "tsx src/viral-engine/cli.ts",
     "viral:daemon": "tsx src/viral-engine/daemon.ts",
-    "viral:ambient": "tsx src/viral-engine/ambient.ts"
+    "viral:ambient": "tsx src/viral-engine/ambient.ts",
+    "viral:doctor": "tsx src/viral-engine/doctor.ts"
   },
   "dependencies": {
     "@fontsource-variable/anybody": "^5.3.0",

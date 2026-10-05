@@ -6,7 +6,7 @@ import { loadConfig } from "./config";
 import type { Lang, TemplateId } from "./types";
 
 // npm run viral -- "je veux une histoire sur la tontine" [--template story|maths|film] [--lang fr|en]
-//   [--script script.json] [--lint-only] [--no-notify]
+//   [--script script.json] [--lint-only] [--broll dossier-clips-PRO] [--no-notify]
 async function main() {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
@@ -14,6 +14,7 @@ async function main() {
       template: { type: "string" },
       lang: { type: "string" },
       script: { type: "string" },
+      broll: { type: "string" },
       "lint-only": { type: "boolean", default: false },
       "no-notify": { type: "boolean", default: false },
     },
@@ -34,7 +35,7 @@ async function main() {
 
   const notifier = createNotifier(values["no-notify"] ? "console" : cfg.notifier, cfg);
   await notifier.start();
-  const job = await runJob({ topic, template, lang, script }, { notify: (text, media) => notifier.send(text, media) });
+  const job = await runJob({ topic, template, lang, script, brollDir: values.broll }, { notify: (text, media) => notifier.send(text, media) });
 
   console.log(`\n${job.status === "failed" ? "✗" : "✓"} Job ${job.id} : ${job.status}`);
   if (job.videoPath) console.log(`  Vidéo : ${job.videoPath}`);

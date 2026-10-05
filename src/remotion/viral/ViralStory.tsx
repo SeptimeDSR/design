@@ -1,5 +1,5 @@
 import { AbsoluteFill, Easing, interpolate, useVideoConfig } from "remotion";
-import { AudioTracks, Captions, ProgressBar, SaveBadge, emphasisOf, usePunch } from "./shared";
+import { AudioTracks, BrollBackground, Captions, ProgressBar, SaveBadge, emphasisOf, usePunch } from "./shared";
 import type { ViralProps } from "./props";
 
 const INK = "#0d0d0b";
@@ -21,7 +21,9 @@ export function ViralStory({ script, timeline, audio, broll }: ViralProps) {
   return (
     <AbsoluteFill style={{ backgroundColor: isPayoff ? ACCENT : INK, overflow: "hidden" }}>
       {/* BESOIN CREDIT: Higgsfield Soul + Seedance pour ces plans. Alternative gratuite: fonds procéduraux Remotion ci-dessous. */}
-      {broll?.length ? null : (
+      {broll?.length ? (
+        <BrollBackground broll={broll} timeline={timeline} />
+      ) : (
         <AbsoluteFill style={{ scale: `${1 + punch * 0.08}` }}>
           <div
             style={{

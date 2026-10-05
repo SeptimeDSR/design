@@ -1,5 +1,5 @@
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import { AudioTracks, Captions, ProgressBar, SaveBadge, usePunch } from "./shared";
+import { AudioTracks, BrollBackground, Captions, ProgressBar, SaveBadge, usePunch } from "./shared";
 import { msToFrame, type ViralProps } from "./props";
 
 const NIGHT = "#07080a";
@@ -20,7 +20,9 @@ export function ViralFilm({ script, timeline, audio, broll }: ViralProps) {
   return (
     <AbsoluteFill style={{ backgroundColor: NIGHT, overflow: "hidden" }}>
       {/* BESOIN CREDIT: Higgsfield Cinema Studio / Seedance pour de vrais plans de film. Alternative gratuite: décor en parallaxe Remotion. */}
-      {broll?.length ? null : (
+      {broll?.length ? (
+        <BrollBackground broll={broll} timeline={timeline} dim={0.35} />
+      ) : (
         <>
           <AbsoluteFill style={{ scale: `${push}`, background: `radial-gradient(ellipse at ${30 + (index % 3) * 20}% 40%, ${isPayoff ? AMBER : "#1d2a3a"} 0%, ${NIGHT} 70%)` }} />
           <AbsoluteFill style={{ scale: `${1 + (push - 1) * 2.2}`, opacity: 0.35 }}>

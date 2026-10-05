@@ -19,7 +19,7 @@ export async function renderWithRemotion(job: Job, props: ViralProps, jobDir: st
   const serveUrl = await getBundle();
   const publicJob = join(serveUrl, "public", "viral", job.id);
   mkdirSync(publicJob, { recursive: true });
-  for (const sub of ["voice", "ambient.wav"]) {
+  for (const sub of ["voice", "ambient.wav", "broll"]) {
     if (existsSync(join(jobDir, sub))) cpSync(join(jobDir, sub), join(publicJob, sub), { recursive: true });
   }
 
