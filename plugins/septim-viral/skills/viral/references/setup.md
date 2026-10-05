@@ -19,6 +19,12 @@ npm run viral:doctor            # dit ce qui manque, avec les commandes
 | Tendances TikTok Creative Center | offre gratuite Apify | `APIFY_TOKEN=…` |
 | Démon permanent | gratuit | `npm i -g pm2 && pm2 start ecosystem.config.cjs && pm2 save` |
 
+## Valider une vidéo
+
+Le message « Vidéo prête » se termine par une référence, par exemple `#5f8a`. Pour publier, réponds `OUI #5f8a` (ou réponds en citant le message de la vidéo). « ok », « oui ? » ou « je regarde » ne publient rien. `NON #5f8a` jette, `REFAIS #5f8a` en fait une autre, `PRO #5f8a` donne le coût de la version Higgsfield.
+
+Si WhatsApp ne transmet pas ta réponse (bibliothèque non officielle), publie depuis le terminal : `npm run viral -- --publish 5f8a`. C'est le même registre que le démon : une vidéo n'est jamais publiée deux fois.
+
 WSL ne lance pas cron sans systemd : le démon utilise `node-cron`, pm2 le garde en vie. Pour le relancer au démarrage de Windows : Planificateur de tâches → `wsl -e bash -lc "cd ~/septim && pm2 resurrect"`.
 
 ## MCP optionnels (usage interactif dans Claude Code)
