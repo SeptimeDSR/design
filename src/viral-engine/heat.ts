@@ -113,6 +113,8 @@ const FALLBACK_BEATS: Record<Lang, (topic: string) => Beat[]> = {
     { text: "Toi, tu vas le voir dans un instant.", emphasis: "Toi" },
     { text: "Mais d'abord, regarde bien ça.", emphasis: "regarde" },
     { text: "C'est là que tout se joue.", emphasis: "tout" },
+    { text: "Retiens bien ce que tu vas entendre.", emphasis: "Retiens" },
+    { text: "Parce que demain, tu en auras besoin.", emphasis: "demain" },
   ],
   en: (topic) => [
     { text: `We're already in the middle of it: ${topic}.`, emphasis: topic },
@@ -123,6 +125,8 @@ const FALLBACK_BEATS: Record<Lang, (topic: string) => Beat[]> = {
     { text: "You're about to see it.", emphasis: "You" },
     { text: "But first, look closely.", emphasis: "look" },
     { text: "This is where it all happens.", emphasis: "all" },
+    { text: "Remember what you're about to hear.", emphasis: "Remember" },
+    { text: "Because tomorrow, you'll need it.", emphasis: "tomorrow" },
   ],
 };
 
@@ -135,10 +139,7 @@ export function fallbackScript(input: HeatInput): ViralScript {
     formula,
     hook: FALLBACK_HOOKS[lang][formula],
     beats: FALLBACK_BEATS[lang](topic),
-    payoff:
-      lang === "fr"
-        ? `La réponse : avec ${topic}, tout se joue sur le détail que personne ne regarde.`
-        : `The answer: with ${topic}, it all comes down to the detail nobody looks at.`,
+    payoff: lang === "fr" ? "La réponse : le détail que personne ne regarde." : "The answer: the detail nobody looks at.",
     cta: RULES.cta[lang],
     caption: lang === "fr" ? `Ce que personne ne te dit sur ${topic}.` : `What nobody tells you about ${topic}.`,
     hashtags: lang === "fr" ? ["#lesaviezvous", "#apprendre", "#fyp"] : ["#didyouknow", "#learn", "#fyp"],
