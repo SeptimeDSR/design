@@ -19,9 +19,11 @@
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource/instrument-serif": "^5.3.0",
     "@gsap/react": "^2.1.2",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.1",
+    "@remotion/media": "4.0.533",
     "@remotion/player": "^4.0.533",
     "@splinetool/react-spline": "^4.1.0",
     "@splinetool/runtime": "^2.0.66",
