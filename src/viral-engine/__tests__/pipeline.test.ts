@@ -65,3 +65,59 @@ describe("runJob", () => {
     expect(job.error).toContain("Chrome absent");
   });
 });
+
+describe("runJob avec un script écrit par Claude (--script)", () => {
+  const good = {
+    hook: "Et si ta tontine te faisait perdre de l'argent ?",
+    beats: [
+      { text: "Dix personnes, dix mille chacun, chaque mois.", emphasis: "dix" },
+      { text: "Tu reçois cent mille le jour de ton tour.", emphasis: "cent" },
+      { text: "Ça ressemble à un bon plan, non ?" },
+      { text: "Sauf que l'argent n'a pas la même valeur.", emphasis: "valeur" },
+      { text: "Le premier reçoit tout, tout de suite.", emphasis: "premier" },
+      { text: "Le dernier attend dix mois entiers.", emphasis: "dernier" },
+      { text: "Pendant ce temps, les prix montent.", emphasis: "prix" },
+      { text: "Et personne ne fait jamais le calcul.", emphasis: "calcul" },
+      { text: "Moi, je l'ai fait pour toi.", emphasis: "fait" },
+    ],
+    payoff: "Le dernier perd environ cinq pour cent.",
+    caption: "Ta tontine, vraiment gagnante ?",
+    hashtags: ["#tontine"],
+  };
+
+  it("utilise le script tel quel, sans appeler de LLM, source « claude »", async () => {
+    const dir = home();
+    let llmCalls = 0;
+    const job = await runJob(
+      { topic: "la tontine", template: "maths", script: good },
+      { ...fakeDeps([]), llm: async () => (llmCalls++, ""), env: { VIRAL_HOME: dir, VIRAL_TTS: "silent" } },
+    );
+    expect(llmCalls).toBe(0);
+    expect(job.source).toBe("claude");
+    expect(job.script.hook).toBe(good.hook);
+    expect(job.script.template).toBe("maths");
+  });
+
+  it("refuse un script non conforme en listant les règles violées", async () => {
+    const dir = home();
+    await expect(
+      runJob({ topic: "la tontine", script: { ...good, hook: "La tontine est un sujet." } }, { ...fakeDeps([]), env: { VIRAL_HOME: dir, VIRAL_TTS: "silent" } }),
+    ).rejects.toThrow(/hook\.no_viewer/);
+  });
+});
+
+describe("checkScript (--lint-only)", () => {
+  it("donne la durée, le moment de la réponse et les problèmes", async () => {
+    const { checkScript } = await import("../pipeline");
+    const r = checkScript({ topic: "x", lang: "fr", template: "story", formula: "question" }, { hook: "Le sujet.", beats: [{ text: "Un." }], payoff: "Fin." });
+    expect(r.issues.map((i) => i.rule)).toEqual(expect.arrayContaining(["hook.no_viewer", "payoff.too_early"]));
+    expect(r.durationMs).toBeGreaterThan(0);
+    expect(r.payoffRatio).toBeGreaterThan(0);
+    expect(r.payoffRatio).toBeLessThan(1);
+  });
+
+  it("signale un JSON incomplet", async () => {
+    const { checkScript } = await import("../pipeline");
+    expect(checkScript({ topic: "x", lang: "fr", template: "story", formula: "question" }, { hook: "Tu sais ?" }).issues[0].rule).toBe("script.invalid");
+  });
+});

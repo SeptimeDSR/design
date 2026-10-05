@@ -1,27 +1,40 @@
+import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
-import { runJob } from "./pipeline";
+import { checkScript, cleanTopic, runJob } from "./pipeline";
 import { createNotifier } from "./notify";
 import { loadConfig } from "./config";
 import type { Lang, TemplateId } from "./types";
 
-// npm run viral -- "je veux une histoire sur la tontine" [--template story|maths|film] [--lang fr|en] [--no-notify]
+// npm run viral -- "je veux une histoire sur la tontine" [--template story|maths|film] [--lang fr|en]
+//   [--script script.json] [--lint-only] [--no-notify]
 async function main() {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
     options: {
       template: { type: "string" },
       lang: { type: "string" },
+      script: { type: "string" },
+      "lint-only": { type: "boolean", default: false },
       "no-notify": { type: "boolean", default: false },
     },
   });
   const cfg = loadConfig();
+  const topic = positionals.join(" ") || undefined;
+  const template = values.template as TemplateId | undefined;
+  const lang = (values.lang as Lang | undefined) ?? cfg.lang;
+  const script = values.script ? JSON.parse(readFileSync(values.script, "utf8")) : undefined;
+
+  if (values["lint-only"]) {
+    if (!script) throw new Error("--lint-only demande --script fichier.json");
+    const r = checkScript({ topic: cleanTopic(topic ?? script.topic ?? ""), lang, template: template ?? "story", formula: "question" }, script);
+    console.log(`Durée ${(r.durationMs / 1000).toFixed(1)} s · réponse à ${Math.round(r.payoffRatio * 100)} %`);
+    console.log(r.issues.length ? r.issues.map((i) => `✗ ${i.rule} : ${i.message}`).join("\n") : "✓ Script conforme aux règles virales.");
+    process.exit(r.issues.length ? 1 : 0);
+  }
+
   const notifier = createNotifier(values["no-notify"] ? "console" : cfg.notifier, cfg);
   await notifier.start();
-
-  const job = await runJob(
-    { topic: positionals.join(" ") || undefined, template: values.template as TemplateId | undefined, lang: values.lang as Lang | undefined },
-    { notify: (text, media) => notifier.send(text, media) },
-  );
+  const job = await runJob({ topic, template, lang, script }, { notify: (text, media) => notifier.send(text, media) });
 
   console.log(`\n${job.status === "failed" ? "✗" : "✓"} Job ${job.id} : ${job.status}`);
   if (job.videoPath) console.log(`  Vidéo : ${job.videoPath}`);
@@ -32,4 +45,7 @@ async function main() {
   process.exit(job.status === "failed" ? 1 : 0);
 }
 
-main();
+main().catch((error) => {
+  console.error(`✗ ${(error as Error).message}`);
+  process.exit(1);
+});

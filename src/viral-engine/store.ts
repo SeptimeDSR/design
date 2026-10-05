@@ -11,11 +11,11 @@ export type Job = {
   id: string;
   createdAt: string;
   status: JobStatus;
-  request: { topic?: string; template?: TemplateId; lang?: Lang };
+  request: { topic?: string; template?: TemplateId; lang?: Lang; script?: unknown };
   script: ViralScript;
   timeline: Timeline;
   arm: string;
-  source: "ollama" | "fallback";
+  source: "ollama" | "fallback" | "claude";
   ttsEngine: string;
   trend?: Trend;
   jobDir: string;

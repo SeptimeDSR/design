@@ -4,17 +4,18 @@ import { join } from "node:path";
 import { allArms, armKey, chooseArm, parseArm } from "./bandit";
 import { loadConfig, type Env, type ViralConfig } from "./config";
 import { writeAmbient } from "./ambient";
-import { generateScript, type LlmClient } from "./llm";
+import { assembleScript, generateScript, type LlmClient, type ScriptInput } from "./llm";
 import { formatFailedMessage, formatReadyMessage } from "./message";
 import { resolvePublishMode } from "./publish-plan";
-import { segmentTexts, buildTimeline } from "./story";
+import { segmentTexts, buildTimeline, lintScript } from "./story";
 import { createStore, type Job } from "./store";
 import { fetchTrends, pickTrend } from "./trends";
 import { synthesize, detectEngine } from "./tts";
-import { FORMULAS, type Lang, type TemplateId } from "./types";
+import { FORMULAS, type Lang, type TemplateId, type ViralScript } from "./types";
 import type { ViralProps } from "../remotion/viral/props";
 
-export type JobRequest = { topic?: string; template?: TemplateId; lang?: Lang };
+// script : écrit par Claude en mode interactif (/septim-viral:viral). Il doit passer le linter, sinon erreur explicite.
+export type JobRequest = { topic?: string; template?: TemplateId; lang?: Lang; script?: Partial<ViralScript> };
 
 export type PipelineDeps = {
   env: Env;
@@ -26,6 +27,17 @@ export type PipelineDeps = {
 };
 
 const PREFIXES = /^(je veux|j'aimerais|fais(-moi)?|crée|cree|make|create)\s+(une?|la|le|a|an|the)?\s*(histoire|vidéo|video|story)\s+(sur|about|de|on)\s+/i;
+
+// Vérification rapide sans rendu : Claude corrige son script jusqu'à zéro problème.
+export function checkScript(input: ScriptInput, raw: Partial<ViralScript>) {
+  const script = assembleScript(input, raw);
+  if (!script) {
+    return { script: null, issues: [{ rule: "script.invalid", message: "hook, beats et payoff sont obligatoires." }], durationMs: 0, payoffRatio: 0 };
+  }
+  const timeline = buildTimeline(script);
+  const payoff = timeline.segments.find((s) => s.kind === "payoff")!;
+  return { script, issues: lintScript(script, timeline), durationMs: timeline.durationMs, payoffRatio: payoff.startMs / timeline.durationMs };
+}
 
 export function cleanTopic(raw: string): string {
   return raw.trim().replace(/^[«"“'\s]+|[»"”'\s]+$/g, "").replace(PREFIXES, "").trim();
@@ -48,8 +60,19 @@ export async function runJob(req: JobRequest, partial: Partial<PipelineDeps> = {
   const arm = chooseArmFor(state, req.template);
   const { template, formula } = parseArm(arm);
 
-  const llm = partial.llm ? { chat: partial.llm } : undefined;
-  const { script, source } = await generateScript({ topic, lang, template, formula, trend: trend?.sound ?? trend?.title }, cfg, llm);
+  let script: ViralScript;
+  let source: Job["source"];
+  if (req.script) {
+    const checked = checkScript({ topic, lang, template, formula }, req.script);
+    if (!checked.script || checked.issues.length) {
+      throw new Error(`Script refusé par le linter viral :\n${checked.issues.map((i) => `- ${i.rule} : ${i.message}`).join("\n")}`);
+    }
+    script = checked.script;
+    source = "claude";
+  } else {
+    const llm = partial.llm ? { chat: partial.llm } : undefined;
+    ({ script, source } = await generateScript({ topic, lang, template, formula, trend: trend?.sound ?? trend?.title }, cfg, llm));
+  }
 
   const id = randomBytes(4).toString("hex");
   const jobDir = join(store.jobsDir, id);

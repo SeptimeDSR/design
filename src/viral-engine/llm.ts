@@ -6,7 +6,7 @@ import { buildTimeline, lintScript, normalizeBeats } from "./story";
 import type { Beat, HookFormula, Lang, TemplateId, ViralScript } from "./types";
 
 export type LlmClient = { chat(prompt: string): Promise<string> };
-type ScriptInput = { topic: string; lang: Lang; formula: HookFormula; template: TemplateId; trend?: string };
+export type ScriptInput = { topic: string; lang: Lang; formula: HookFormula; template: TemplateId; trend?: string };
 
 export function ollamaClient(cfg: ViralConfig): LlmClient {
   const client = new Ollama({ host: cfg.ollama.host });
@@ -22,7 +22,7 @@ export function ollamaClient(cfg: ViralConfig): LlmClient {
   };
 }
 
-function assemble(input: ScriptInput, raw: Partial<ViralScript>): ViralScript | null {
+export function assembleScript(input: ScriptInput, raw: Partial<ViralScript>): ViralScript | null {
   if (typeof raw.hook !== "string" || !Array.isArray(raw.beats) || typeof raw.payoff !== "string") return null;
   const beats: Beat[] = raw.beats
     .map((b) => (typeof b === "string" ? { text: b } : b))
@@ -51,7 +51,7 @@ export async function generateScript(
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const parsed = parseHeatResponse(await client.chat(prompt));
-      const script = parsed && assemble(input, parsed);
+      const script = parsed && assembleScript(input, parsed);
       if (script) {
         const issues = lintScript(script, buildTimeline(script));
         if (!issues.length) return { script, source: "ollama", attempts: attempt };

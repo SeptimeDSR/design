@@ -1,6 +1,6 @@
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { AudioTracks, Captions, ProgressBar, SaveBadge, emphasisOf, usePunch } from "./shared";
-import type { ViralProps } from "./props";
+import { msToFrame, type ViralProps } from "./props";
 
 const PAPER = "#0f1a14";
 const CHALK = "#e8f1e4";
@@ -11,7 +11,7 @@ const MONO = "'JetBrains Mono Variable', ui-monospace, monospace";
 export function ViralMaths({ script, timeline, audio, broll }: ViralProps) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const { segment, index, punch, local } = usePunch(timeline);
+  const { segment, index, punch } = usePunch(timeline);
   const terms = timeline.segments
     .slice(1, index + 1)
     .filter((s) => s.kind === "beat")
@@ -19,6 +19,8 @@ export function ViralMaths({ script, timeline, audio, broll }: ViralProps) {
     .slice(-3);
   const revealed = segment.kind === "payoff" || segment.kind === "cta";
   const answer = emphasisOf(script.payoff);
+  // Le soulignement se dessine depuis le début de la réponse et reste tracé pendant le CTA.
+  const payoffStart = msToFrame(timeline.segments.find((s) => s.kind === "payoff")?.startMs ?? 0, fps);
 
   return (
     <AbsoluteFill
@@ -33,8 +35,13 @@ export function ViralMaths({ script, timeline, audio, broll }: ViralProps) {
       {broll?.length ? null : null}
 
       <AbsoluteFill style={{ top: 200, height: "auto", padding: "0 70px", alignItems: "center" }}>
-        <div style={{ fontFamily: MONO, color: CHALK, fontSize: 56, opacity: 0.75, textAlign: "center", lineHeight: 1.4 }}>
-          {terms.length ? terms.join(" + ") : "x"}
+        {/* Les données s'empilent comme au tableau : pas de « + » qui ferait lire une fausse addition. */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, fontFamily: MONO, color: CHALK, fontSize: 54, minHeight: 210 }}>
+          {terms.map((t, i) => (
+            <span key={`${t}-${i}`} style={{ opacity: i === terms.length - 1 ? 1 : 0.45 }}>
+              {t}
+            </span>
+          ))}
         </div>
         <div
           style={{
@@ -47,7 +54,7 @@ export function ViralMaths({ script, timeline, audio, broll }: ViralProps) {
             scale: `${1 + punch * 0.12}`,
           }}
         >
-          = {revealed ? answer : "?"}
+          {revealed ? `= ${answer}` : "?"}
         </div>
         {revealed ? (
           <svg width="760" height="40" viewBox="0 0 760 40" style={{ marginTop: 10 }}>
@@ -58,7 +65,7 @@ export function ViralMaths({ script, timeline, audio, broll }: ViralProps) {
               fill="none"
               strokeLinecap="round"
               strokeDasharray="800"
-              strokeDashoffset={interpolate(local, [0, 0.6 * fps], [800, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.bezier(0.65, 0, 0.35, 1) })}
+              strokeDashoffset={interpolate(frame - payoffStart, [0, 0.6 * fps], [800, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.bezier(0.65, 0, 0.35, 1) })}
             />
           </svg>
         ) : null}
