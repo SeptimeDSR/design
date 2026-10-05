@@ -49,3 +49,4 @@ next-env.d.ts
 
 # Livrables envoyés en fichiers (vidéos de démo, bundles)
 /deliverables/
+.superpowers/
