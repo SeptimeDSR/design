@@ -1,7 +1,7 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { writeJsonAtomic } from "./lock";
 
 export const MCP_CLIENTS = ["claude-code", "claude-desktop", "cursor", "vscode", "windsurf", "codex", "gemini"] as const;
 export type McpClient = (typeof MCP_CLIENTS)[number];
@@ -67,11 +67,25 @@ function withoutSeptim(toml: string): string {
   const out: string[] = [];
   let skipping = false;
   for (const l of toml.split("\n")) {
-    const header = l.match(/^\s*\[([^\]]+)\]\s*$/)?.[1]?.trim();
-    if (header) skipping = header === "mcp_servers.septim" || header.startsWith("mcp_servers.septim.");
+    // [table], [[tableau]], commentaire en fin de ligne, clé entre guillemets : tout en-tête ferme le bloc précédent.
+    const m = l.match(/^\s*(\[\[?)\s*([^\]]+?)\s*\]\]?\s*(#.*)?$/);
+    if (m) {
+      const header = m[2].replace(/\s*\.\s*/g, ".").replace(/"septim"/g, "septim");
+      skipping = m[1] === "[" && (header === "mcp_servers.septim" || header.startsWith("mcp_servers.septim."));
+    }
     if (!skipping) out.push(l);
   }
   return out.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd();
+}
+
+// Le fichier d'un autre logiciel : copie .bak, écriture atomique, mêmes droits, et un lien symbolique (dotfiles) reste un lien.
+function safeWrite(path: string, content: string): void {
+  const target = existsSync(path) ? realpathSync(path) : path;
+  const mode = existsSync(target) ? statSync(target).mode & 0o777 : 0o644;
+  if (existsSync(target)) copyFileSync(target, `${target}.bak`);
+  const tmp = `${target}.${process.pid}.${randomBytes(3).toString("hex")}.tmp`;
+  writeFileSync(tmp, content, { mode });
+  renameSync(tmp, target);
 }
 
 // Écrit la configuration en gardant les autres serveurs et réglages. Un fichier illisible n'est jamais écrasé.
@@ -81,7 +95,7 @@ export function writeMcpConfig(client: Exclude<McpClient, "claude-code">, o: Con
   if (client === "codex") {
     const before = existsSync(c.path) ? readFileSync(c.path, "utf8") : "";
     const kept = withoutSeptim(before);
-    writeFileSync(c.path, `${kept ? `${kept}\n\n` : ""}${c.content}`);
+    safeWrite(c.path, `${kept ? `${kept}\n\n` : ""}${c.content}`);
     return c.path;
   }
   let current: Record<string, unknown> = {};
@@ -96,6 +110,6 @@ export function writeMcpConfig(client: Exclude<McpClient, "claude-code">, o: Con
   const key = client === "vscode" ? "servers" : "mcpServers";
   const entry = (JSON.parse(c.content) as Record<string, Record<string, unknown>>)[key].septim;
   const servers = (current[key] && typeof current[key] === "object" ? current[key] : {}) as Record<string, unknown>;
-  writeJsonAtomic(c.path, { ...current, [key]: { ...servers, septim: entry } });
+  safeWrite(c.path, `${JSON.stringify({ ...current, [key]: { ...servers, septim: entry } }, null, 2)}\n`);
   return c.path;
 }

@@ -363,3 +363,46 @@ describe("revue finale : septim video et septim mcp préviennent les webhooks", 
     expect(mcpCase).toMatch(/attachWebhooks\(/);
   });
 });
+
+describe("revue finale : septim connect ne casse jamais la config d'un autre logiciel", () => {
+  const opts = { root: "/opt/septim", node: NODE, home: "", platform: "linux" as NodeJS.Platform };
+
+  it("codex : en-tête commenté reconnu, tables [[…]] gardées, copie .bak, droits gardés, lien symbolique suivi", async () => {
+    const { chmodSync, lstatSync, statSync, symlinkSync } = await import("node:fs");
+    const home = mkdtempSync(join(tmpdir(), "septim-toml-"));
+    const real = join(home, "dotfiles", "codex.toml");
+    mkdirSync(join(home, "dotfiles"), { recursive: true });
+    const before = 'model = "o4"\n\n[mcp_servers.septim] # ancien\ncommand = "vieux"\n\n[[profiles]]\nname = "perso"\n\n[mcp_servers.autre]\ncommand = "x"\n';
+    writeFileSync(real, before);
+    chmodSync(real, 0o600);
+    mkdirSync(join(home, ".codex"), { recursive: true });
+    const link = join(home, ".codex", "config.toml");
+    symlinkSync(real, link);
+    writeMcpConfig("codex", { ...opts, home });
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+    const t = readFileSync(real, "utf8");
+    expect(t).not.toContain("vieux");
+    expect(t).toContain('[[profiles]]\nname = "perso"');
+    expect(t).toContain("[mcp_servers.autre]");
+    expect(t.match(/\[mcp_servers\.septim\]/g)).toHaveLength(1);
+    expect(statSync(real).mode & 0o777).toBe(0o600);
+    expect(readFileSync(`${real}.bak`, "utf8")).toBe(before);
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it("JSON : lien symbolique suivi et droits gardés aussi", async () => {
+    const { chmodSync, lstatSync, statSync, symlinkSync } = await import("node:fs");
+    const home = mkdtempSync(join(tmpdir(), "septim-json-"));
+    const real = join(home, "dotfiles", "cursor.json");
+    mkdirSync(join(home, "dotfiles"), { recursive: true });
+    writeFileSync(real, JSON.stringify({ mcpServers: { github: { command: "gh" } } }));
+    chmodSync(real, 0o600);
+    mkdirSync(join(home, ".cursor"), { recursive: true });
+    symlinkSync(real, join(home, ".cursor", "mcp.json"));
+    writeMcpConfig("cursor", { ...opts, home });
+    expect(lstatSync(join(home, ".cursor", "mcp.json")).isSymbolicLink()).toBe(true);
+    expect(JSON.parse(readFileSync(real, "utf8")).mcpServers.github).toEqual({ command: "gh" });
+    expect(statSync(real).mode & 0o777).toBe(0o600);
+    rmSync(home, { recursive: true, force: true });
+  });
+});

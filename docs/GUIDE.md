@@ -266,7 +266,7 @@ Le serveur MCP `septim` donne à l'assistant 9 outils, 2 ressources et 1 prompt.
 
 Ressources : `septim://checklist` (règles chiffrées) et `septim://guide-heat` (format du script). Prompt : `nouvelle_video {sujet}`.
 
-`septim connect <client>` affiche la configuration exacte (chemins absolus compris) ; `--write` l'écrit en gardant tes autres serveurs. Redémarre le client ensuite.
+`septim connect <client>` affiche la configuration exacte (chemins absolus compris) ; `--write` l'écrit en gardant tes autres serveurs et réglages (copie de l'ancien fichier en `.bak`, mêmes droits, lien symbolique de dotfiles conservé ; un JSON illisible n'est jamais touché). Redémarre le client ensuite.
 
 ### Claude Code
 
