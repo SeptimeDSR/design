@@ -37,9 +37,24 @@ Si les skills superpowers sont absentes, dis-le en une ligne (`/plugin install s
 `--check` signale des manques et la demande en a besoin : lance `node <base de ce skill>/scripts/bootstrap.mjs`. Annonce ce qu'il installe. Le script ne remplace aucun fichier. Il ajoute :
 - les paquets npm ;
 - les skills officielles GSAP et Remotion ;
-- les templates dans `<src>/components/septim/` et `<src>/remotion/`.
+- les templates dans `<src>/components/septim/` et `<src>/remotion/` (dont `retention/`).
 
-Ensuite, adapte les templates aux tokens du projet (couleurs, polices).
+Ensuite, importe `components/septim/retention/retention-tokens.css` dans le CSS global et remplace ses valeurs par les tokens du projet (couleurs, polices). Les templates Remotion utilisent `DISPLAY_FONT` : mets-y la police du projet.
+
+## 4 bis. La rétention (quand le but est que le visiteur reste)
+
+| Principe | Ce qu'il fait | Template |
+| --- | --- | --- |
+| Clarté en 0,5 s | Le hero dit quoi, pour qui, et l'action, sans scroller | à écrire dans la page |
+| Boucle ouverte (Zeigarnik) | Une promesse en haut, payée à ≥ 80 % de la page ; HUD « Chapitre n sur N » | `chapter-hud.tsx`, `chapters.ts` |
+| Scrollytelling | Chaque scroll révèle un chapitre | `countdown.tsx`, `interrupt-rail.tsx` |
+| Pattern interrupt | Chaque section casse le rythme de la précédente | `interrupt-rail.tsx` |
+| Récompense variable | Des secrets tirés au hasard à l'entrée dans l'écran | `secret-drop.tsx` |
+| Son | Nappe générée, **opt-in** uniquement, tic au changement de chapitre | `sound.tsx` |
+| Pas de stopping cue | Fil infini au lieu d'un footer ; mentions légales dans l'en-tête | `endless-feed.tsx`, `site-header.tsx` |
+| Un seul geste fort | Titres qui s'étirent avec la vitesse de scroll | `stretch-driver.tsx` |
+
+Vérifie au navigateur : aucun `AudioContext` avant un clic, le fil grandit encore avec `prefers-reduced-motion`, rien ne bouge sous les yeux quand un secret ou des cartes apparaissent.
 
 ## 5. Règle d'or FREE / PRO
 
@@ -67,3 +82,8 @@ Avant de dire « fini » :
 | `remotion studio` ne résout pas les imports | alias `@/` dans `remotion/` | imports relatifs uniquement |
 | `tsc` casse après l'installation des skills Remotion | exemples `.tsx` dans `.agents/` | exclure `.agents` et `.claude` (fait par bootstrap) |
 | Le build échoue hors ligne | `next/font/google` | polices `@fontsource-variable/*` |
+| `tsc` : `LayoutProps` introuvable (Next 16) | types de routes pas encore générés | `npx next typegen` avant `tsc` |
+| Classes `bg-nuit`, `stretch`… sans effet | tokens de rétention pas importés | importer `retention-tokens.css` |
+| Le fil infini s'arrête de charger | la sentinelle reste visible, l'observateur ne se redéclenche pas | ré-observer après chaque chargement (template `endless-feed.tsx`) |
+| Les cartes sautent de colonne en chargeant | colonnes CSS (`columns-*`) | grille CSS |
+| `Math.random()` dans le rendu | écart serveur/client, règle de pureté React | tirer le hasard dans le callback de l'observateur |

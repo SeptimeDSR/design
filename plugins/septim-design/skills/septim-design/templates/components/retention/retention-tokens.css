@@ -1,0 +1,34 @@
+/*
+ * Tokens attendus par les composants de rétention Septim.
+ * À importer une fois dans le CSS global : @import "../components/septim/retention/retention-tokens.css";
+ * Puis remplace les valeurs par celles du projet (couleurs, polices).
+ */
+@theme {
+  --color-nuit: #121640;
+  --color-ndop: #24307a;
+  --color-craie: #e9ecf2;
+  --color-camwood: #c2492f;
+  --color-raphia: #e8c15a;
+  --color-brume: #8f97c8;
+  --font-display: system-ui, sans-serif;
+}
+
+/* Motif de fond pour les sections de rupture (remplace par le motif du projet). */
+.ndop {
+  background-color: var(--color-ndop);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' viewBox='0 0 56 56'%3E%3Cpath d='M28 6 L50 28 L28 50 L6 28 Z' fill='none' stroke='%23e9ecf2' stroke-opacity='.22' stroke-width='3'/%3E%3C/svg%3E");
+}
+
+/* Titres qui s'étirent avec la vitesse de scroll (StretchDriver) : demande une police à axe de largeur. */
+.stretch {
+  font-family: var(--font-display);
+  font-stretch: var(--stretch, 100%);
+}
+
+@keyframes drop {
+  from {
+    opacity: 0;
+    translate: 0 2rem;
+    rotate: 4deg;
+  }
+}

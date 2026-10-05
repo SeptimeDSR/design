@@ -5,6 +5,9 @@ export const heroShotConfig = { fps: 30, durationInFrames: 180, width: 1920, hei
 
 export type HeroShotProps = { title?: string; tagline?: string };
 
+// Polices du projet : importe-les dans remotion/Root.tsx puis remplace ces piles.
+const DISPLAY_FONT = "system-ui, sans-serif";
+const MONO_FONT = "ui-monospace, monospace";
 const INK = "#0d0d0b";
 const BONE = "#ece7dc";
 const SIGNAL = "#ff4d1a";
@@ -40,7 +43,7 @@ export function HeroShot({ title = "Le scroll qui retient.", tagline = "Septim â
           style={{
             margin: 0,
             color: BONE,
-            fontFamily: "'Bricolage Grotesque Variable', system-ui, sans-serif",
+            fontFamily: DISPLAY_FONT,
             fontSize: 168,
             fontWeight: 760,
             lineHeight: 0.92,
@@ -66,7 +69,7 @@ export function HeroShot({ title = "Le scroll qui retient.", tagline = "Septim â
             color: BONE,
             opacity: taglineIn * 0.7,
             transform: `translateY(${(1 - taglineIn) * 20}px)`,
-            fontFamily: "'JetBrains Mono Variable', ui-monospace, monospace",
+            fontFamily: MONO_FONT,
             fontSize: 34,
           }}
         >

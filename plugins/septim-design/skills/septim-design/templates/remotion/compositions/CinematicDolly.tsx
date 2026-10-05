@@ -6,6 +6,8 @@ export const cinematicDollyConfig = { fps: 30, durationInFrames: 150, width: 192
 
 export type CinematicDollyProps = { title?: string };
 
+// Polices du projet : importe-les dans remotion/Root.tsx puis remplace ces piles.
+const DISPLAY_FONT = "system-ui, sans-serif";
 const INK = "#0d0d0b";
 const BONE = "#ece7dc";
 const SIGNAL = "#ff4d1a";
@@ -42,7 +44,7 @@ export function CinematicDolly({ title = "Entrez dans la scène." }: CinematicDo
             margin: 0,
             opacity: titleOpacity,
             color: BONE,
-            fontFamily: "'Bricolage Grotesque Variable', system-ui, sans-serif",
+            fontFamily: DISPLAY_FONT,
             fontSize: 120,
             fontWeight: 760,
             letterSpacing: "-0.04em",

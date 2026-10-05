@@ -11,6 +11,12 @@
       "name": "septim-design",
       "source": "./plugins/septim-design",
       "description": "Directeur artistique autonome : sites qui retiennent, version FREE et PRO, branché sur superpowers.",
+      "version": "1.1.0"
+    },
+    {
+      "name": "septim-viral",
+      "source": "./plugins/septim-viral",
+      "description": "Usine à vidéos virales : script H.E.A.T, rendu Remotion gratuit, WhatsApp « je publie ? », Postiz sur OUI.",
       "version": "1.0.0"
     }
   ]
