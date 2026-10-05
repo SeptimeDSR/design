@@ -64,7 +64,7 @@ export function formatDiagnosis(d: ReturnType<typeof diagnose>): string {
   return lines.join("\n");
 }
 
-export async function probe(cfg: ViralConfig, env = process.env): Promise<Probes> {
+export async function probe(cfg: ViralConfig, env: Record<string, string | undefined> = process.env): Promise<Probes> {
   const voiceDir = env.VIRAL_PIPER_DIR ?? join(cfg.home, "voices");
   const voice = env.VIRAL_PIPER_VOICE ?? "fr_FR-tom-medium";
   const ollama = await fetch(`${cfg.ollama.host}/api/tags`, { signal: AbortSignal.timeout(2000) })

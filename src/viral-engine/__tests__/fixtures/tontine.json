@@ -1,0 +1,20 @@
+{
+  "topic": "la tontine",
+  "hook": "Tu es le dernier à bouffer la tontine ?",
+  "beats": [
+    { "text": "Dix membres, 50 000 F chacun, chaque mois.", "emphasis": "50 000 F" },
+    { "text": "La cagnotte fait 500 000 F.", "emphasis": "500 000 F" },
+    { "text": "Le premier la bouffe dès le premier mois.", "emphasis": "premier" },
+    { "text": "Il a cotisé 50 000, il reçoit 500 000.", "emphasis": "500 000" },
+    { "text": "En vrai, c'est un prêt sans intérêt.", "emphasis": "prêt" },
+    { "text": "Le dernier, lui, cotise dix mois.", "emphasis": "dernier" },
+    { "text": "Et récupère seulement son propre argent.", "emphasis": "seulement" },
+    { "text": "Pendant ce temps, les prix montent.", "emphasis": "prix" },
+    { "text": "Avec 5 % d'inflation par an…", "emphasis": "5 %" },
+    { "text": "Chaque mois d'attente lui coûte un peu.", "emphasis": "attente" },
+    { "text": "Personne ne fait ce calcul en réunion.", "emphasis": "calcul" }
+  ],
+  "payoff": "La réponse : le dernier perd environ 9 400 F.",
+  "caption": "Ton rang dans la tontine, c'est de l'argent. Premier ou dernier ?",
+  "hashtags": ["#tontine", "#argent", "#cameroun", "#njangi"]
+}

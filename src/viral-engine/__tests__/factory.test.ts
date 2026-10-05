@@ -1,0 +1,213 @@
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { createFactory, type FactoryDeps } from "../factory";
+import { createStore, type Job } from "../store";
+import { fallbackScript } from "../heat";
+import { buildTimeline } from "../story";
+import type { PublishResult } from "../publish";
+import type { JobRequest } from "../pipeline";
+
+const TONTINE = JSON.parse(readFileSync(join(__dirname, "fixtures", "tontine.json"), "utf8"));
+
+function setup(over: Partial<FactoryDeps> = {}, ids = ["5f8a4d25", "1234abcd", "9999aaaa"]) {
+  const home = mkdtempSync(join(tmpdir(), "septim-factory-"));
+  const env = { VIRAL_HOME: home, VIRAL_PUBLISH_MODE: "manual" };
+  const store = createStore(home);
+  const order: string[] = [];
+  const published: string[] = [];
+  let n = 0;
+  const runJob = async (req: JobRequest): Promise<Job> => {
+    const id = ids[n++];
+    order.push(`start:${req.topic}`);
+    await new Promise((r) => setTimeout(r, 20));
+    const script = fallbackScript({ topic: req.topic ?? "tendance", lang: "fr", formula: "secret", template: req.template ?? "maths" });
+    const jobDir = join(home, "jobs", id);
+    mkdirSync(jobDir, { recursive: true });
+    writeFileSync(join(jobDir, "video.mp4"), "fake");
+    const job: Job = { id, createdAt: new Date(Date.now() + n).toISOString(), status: "notified", request: req, script, timeline: buildTimeline(script), arm: "maths:secret", source: "fallback", ttsEngine: "silent", jobDir, videoPath: join(jobDir, "video.mp4") };
+    store.saveJob(job);
+    order.push(`end:${req.topic}`);
+    return job;
+  };
+  const publish = async (job: Job): Promise<PublishResult> => {
+    published.push(job.id);
+    return { posted: {}, missing: [], failed: [], manualText: "légende" };
+  };
+  const factory = createFactory({ env, runJob, publish, notify: async () => undefined, ...over });
+  return { factory, store, home, order, published };
+}
+
+const events = (f: ReturnType<typeof setup>["factory"]) => {
+  const seen: string[] = [];
+  for (const e of ["video.ready", "video.failed", "video.published", "video.rejected"] as const) f.on(e, () => void seen.push(e));
+  return seen;
+};
+
+describe("factory : fabriquer", () => {
+  it("createVideo rend la main tout de suite (queued) et la tâche finit done avec jobId et ref, même si personne n'interroge", async () => {
+    const s = setup();
+    const seen = events(s.factory);
+    const task = s.factory.createVideo({ topic: "La tontine à Douala 🇨🇲" });
+    expect(task.status).toBe("queued");
+    await s.factory.idle();
+    const onDisk = JSON.parse(readFileSync(join(s.home, "tasks", `${task.id}.json`), "utf8"));
+    expect(onDisk).toMatchObject({ status: "done", jobId: "5f8a4d25", ref: "5f8a" });
+    expect(s.factory.getVideo("5f8a").topic).toBe("La tontine à Douala 🇨🇲");
+    expect(seen).toEqual(["video.ready"]);
+  });
+
+  it("createVideo : template inconnu, langue autre que fr/en, sujet de plus de 500 caractères → bad_request", () => {
+    const s = setup();
+    expect(() => s.factory.createVideo({ topic: "x", template: "clip" as never })).toThrow(expect.objectContaining({ code: "bad_request" }));
+    expect(() => s.factory.createVideo({ topic: "x", lang: "de" as never })).toThrow(expect.objectContaining({ code: "bad_request" }));
+    expect(() => s.factory.createVideo({ topic: "a".repeat(501) })).toThrow(expect.objectContaining({ code: "bad_request" }));
+    expect(s.factory.listTasks()).toHaveLength(0);
+  });
+
+  it("createVideo avec un script refusé par le linter → bad_request avec details.issues, aucune tâche créée", () => {
+    const s = setup();
+    try {
+      s.factory.createVideo({ topic: "la tontine", template: "maths", script: { hook: "Un hook bien trop long pour tenir dans les trois premières secondes de la vidéo, vraiment beaucoup trop long", beats: [{ text: "un" }], payoff: "deux" } });
+      expect.unreachable();
+    } catch (e) {
+      expect((e as { code: string }).code).toBe("bad_request");
+      expect(((e as { details: { issues: unknown[] } }).details.issues).length).toBeGreaterThan(0);
+    }
+    expect(s.factory.listTasks()).toHaveLength(0);
+  });
+
+  it("un script conforme est accepté", async () => {
+    const s = setup();
+    const task = s.factory.createVideo({ topic: "la tontine", template: "maths", script: TONTINE });
+    await s.factory.idle();
+    expect(s.factory.getTask(task.id).status).toBe("done");
+  });
+
+  it("les tâches passent une par une (file)", async () => {
+    const s = setup();
+    s.factory.createVideo({ topic: "a" });
+    s.factory.createVideo({ topic: "b" });
+    await s.factory.idle();
+    expect(s.order).toEqual(["start:a", "end:a", "start:b", "end:b"]);
+  });
+
+  it("runJob qui lève → tâche failed avec le message, événement video.failed", async () => {
+    const s = setup({
+      runJob: async () => {
+        throw new Error("Chrome introuvable");
+      },
+    });
+    const seen = events(s.factory);
+    const task = s.factory.createVideo({ topic: "a" });
+    await s.factory.idle();
+    expect(s.factory.getTask(task.id)).toMatchObject({ status: "failed", error: "Chrome introuvable" });
+    expect(seen).toEqual(["video.failed"]);
+  });
+});
+
+describe("factory : publier seulement sur OUI #ref", () => {
+  async function ready() {
+    const s = setup();
+    s.factory.createVideo({ topic: "a" });
+    s.factory.createVideo({ topic: "b" });
+    await s.factory.idle();
+    return s;
+  }
+
+  it("sans confirmation ou avec « oui » → confirmation_required", async () => {
+    const s = await ready();
+    await expect(s.factory.publish("5f8a", "")).rejects.toMatchObject({ code: "confirmation_required" });
+    await expect(s.factory.publish("5f8a", "oui")).rejects.toMatchObject({ code: "confirmation_required" });
+    expect(s.published).toEqual([]);
+  });
+
+  it("« OUI #<ref> » d'une AUTRE vidéo → confirmation_required", async () => {
+    const s = await ready();
+    await expect(s.factory.publish("5f8a", "OUI #1234")).rejects.toMatchObject({ code: "confirmation_required" });
+    expect(s.published).toEqual([]);
+  });
+
+  it("« oui #5F8A » (casse et # libres) → publie une fois, événement video.published ; une deuxième fois → conflict", async () => {
+    const s = await ready();
+    const seen = events(s.factory);
+    const r = await s.factory.publish("#5F8A", "oui #5F8A");
+    expect(r.status).toBe("published");
+    expect(r.manualText).toBe("légende");
+    expect(s.published).toEqual(["5f8a4d25"]);
+    expect(seen).toEqual(["video.published"]);
+    await expect(s.factory.publish("5f8a", "OUI #5f8a")).rejects.toMatchObject({ code: "conflict" });
+    expect(s.published).toHaveLength(1);
+  });
+});
+
+describe("factory : retrouver une vidéo", () => {
+  it("getVideo(\"#5F8A\") et getVideo(\"5f8a\") → même vidéo ; référence ambiguë → ambiguous_ref (409) avec details.matches", async () => {
+    const s = setup({}, ["ab12cdef", "ab34cdef"]);
+    s.factory.createVideo({ topic: "a" });
+    s.factory.createVideo({ topic: "b" });
+    await s.factory.idle();
+    expect(s.factory.getVideo("#AB12").id).toBe(s.factory.getVideo("ab12").id);
+    try {
+      s.factory.getVideo("ab");
+      expect.unreachable();
+    } catch (e) {
+      expect(e).toMatchObject({ code: "ambiguous_ref", status: 409 });
+      expect((e as { details: { matches: unknown[] } }).details.matches).toHaveLength(2);
+    }
+  });
+
+  it("videoFile : mp4 supprimé → not_found", async () => {
+    const s = setup();
+    s.factory.createVideo({ topic: "a" });
+    await s.factory.idle();
+    expect(existsSync(s.factory.videoFile("5f8a"))).toBe(true);
+    rmSync(join(s.home, "jobs", "5f8a4d25", "video.mp4"));
+    expect(() => s.factory.videoFile("5f8a")).toThrow(expect.objectContaining({ code: "not_found", status: 404 }));
+  });
+
+  it("reject → statut rejected, événement video.rejected ; publish après reject → conflict", async () => {
+    const s = setup();
+    s.factory.createVideo({ topic: "a" });
+    await s.factory.idle();
+    const seen = events(s.factory);
+    expect(s.factory.reject("5f8a").status).toBe("rejected");
+    expect(seen).toEqual(["video.rejected"]);
+    await expect(s.factory.publish("5f8a", "OUI #5f8a")).rejects.toMatchObject({ code: "conflict" });
+  });
+
+  it("listVideos : filtre par statut, limite par défaut 20, maximum 100", async () => {
+    const s = setup();
+    s.factory.createVideo({ topic: "a" });
+    s.factory.createVideo({ topic: "b" });
+    await s.factory.idle();
+    s.factory.reject("1234");
+    expect(s.factory.listVideos().map((v) => v.ref)).toEqual(["1234", "5f8a"]);
+    expect(s.factory.listVideos({ status: "rejected" }).map((v) => v.ref)).toEqual(["1234"]);
+    expect(s.factory.listVideos({ limit: 1 })).toHaveLength(1);
+    expect(() => s.factory.listVideos({ limit: 101 })).toThrow(expect.objectContaining({ code: "bad_request" }));
+  });
+
+  it("lessons : classe les bras par moyenne alpha/(alpha+beta) décroissante et renvoie LESSONS.md (chaîne vide si absent)", async () => {
+    const s = setup();
+    expect(s.factory.lessons().text).toBe("");
+    await s.store.updateState((st) => ({ ...st, bandit: { "story:choc": { alpha: 2, beta: 5 }, "maths:secret": { alpha: 6, beta: 2 } } }));
+    writeFileSync(join(s.home, "LESSONS.md"), "- leçon\n");
+    const l = s.factory.lessons();
+    expect(l.text).toBe("- leçon\n");
+    expect(l.arms.map((a) => a.arm)).toEqual(["maths:secret", "story:choc"]);
+    expect(l.arms[0].mean).toBeCloseTo(0.75);
+  });
+
+  it("redo : jette l'ancienne et refait le même sujet dans une nouvelle tâche", async () => {
+    const s = setup();
+    s.factory.createVideo({ topic: "la tontine" });
+    await s.factory.idle();
+    const task = s.factory.redo("5f8a");
+    expect(task.kind).toBe("redo");
+    await s.factory.idle();
+    expect(s.store.getJob("5f8a4d25")?.status).toBe("rejected");
+    expect(s.factory.getTask(task.id)).toMatchObject({ status: "done", jobId: "1234abcd" });
+  });
+});
