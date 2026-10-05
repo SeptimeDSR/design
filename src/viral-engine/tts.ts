@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { RULES } from "./checklist";
 import { estimateSpokenMs } from "./heat";
 import type { Lang } from "./types";
-import { encodeWav, wavDurationMs } from "./wav";
+import { encodeWav, normalizeSpeech, wavDurationMs } from "./wav";
 
 export type TtsEngine = "piper" | "kokoro" | "chatterbox" | "silent";
 
@@ -127,7 +127,10 @@ export async function synthesize(
     else if (engine === "kokoro") await runKokoro(text, opts.outPath, speed);
     else if (engine === "chatterbox") await runChatterbox(text, opts.lang, opts.outPath);
     if (engine !== "silent") {
-      return { path: opts.outPath, durationMs: wavDurationMs(await readFile(opts.outPath)), engine };
+      // Même niveau d'une phrase à l'autre et d'une voix à l'autre : ~ -16 dBFS, crête sous -1 dBFS.
+      const voice = normalizeSpeech(await readFile(opts.outPath));
+      await writeFile(opts.outPath, voice);
+      return { path: opts.outPath, durationMs: wavDurationMs(voice), engine };
     }
   } catch (error) {
     console.warn(`[tts] ${engine} indisponible, piste silencieuse : ${(error as Error).message}`);

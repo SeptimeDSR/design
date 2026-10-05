@@ -202,3 +202,19 @@ describe("runJob gratuit d'abord : B-roll et musique sans crédit", () => {
     expect(pickTrack(join(dir, "absent"), job.id)).toBeUndefined();
   });
 });
+
+describe("runJob : bruitages", () => {
+  it("écrit les bruitages dans le job et les cale sur la timeline (impact à 0, ding sur la réponse)", async () => {
+    const dir = home();
+    let props: { audio?: { sfx?: { src: string; startMs: number; volume: number }[] }; timeline?: { segments: { kind: string; startMs: number }[] } } = {};
+    const job = await runJob(
+      { topic: "la tontine" },
+      { ...fakeDeps([]), env: { VIRAL_HOME: dir, VIRAL_TTS: "silent" }, render: async (_j: unknown, p: typeof props, d: string) => ((props = p), join(d, "video.mp4")) },
+    );
+    const sfx = props.audio!.sfx!;
+    expect(sfx[0]).toMatchObject({ src: `viral/${job.id}/sfx/hit.wav`, startMs: 0 });
+    const payoff = props.timeline!.segments.find((s) => s.kind === "payoff")!;
+    expect(sfx.find((c) => c.src.endsWith("ding.wav"))?.startMs).toBe(payoff.startMs);
+    for (const f of ["hit.wav", "whoosh.wav", "riser.wav", "ding.wav"]) expect(existsSync(join(dir, "jobs", job.id, "sfx", f))).toBe(true);
+  });
+});

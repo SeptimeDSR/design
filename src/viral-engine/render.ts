@@ -20,7 +20,7 @@ export async function renderWithRemotion(job: Job, props: ViralProps, jobDir: st
   const publicJob = join(serveUrl, "public", "viral", job.id);
   mkdirSync(publicJob, { recursive: true });
   const music = readdirSync(jobDir).filter((f) => f.startsWith("music."));
-  for (const sub of ["voice", "ambient.wav", "broll", ...music]) {
+  for (const sub of ["voice", "ambient.wav", "broll", "sfx", ...music]) {
     if (existsSync(join(jobDir, sub))) cpSync(join(jobDir, sub), join(publicJob, sub), { recursive: true });
   }
 
@@ -32,7 +32,8 @@ export async function renderWithRemotion(job: Job, props: ViralProps, jobDir: st
     composition,
     serveUrl,
     codec: "h264",
-    crf: 23,
+    // CRF 18 : quasi sans perte visible ; la plateforme réencode de toute façon, autant lui donner la meilleure source.
+    crf: 18,
     inputProps: props,
     outputLocation,
     browserExecutable,

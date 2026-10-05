@@ -1,79 +1,118 @@
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import { AudioTracks, BrollBackground, Captions, ProgressBar, SaveBadge, emphasisOf, usePunch } from "./shared";
+import { AudioTracks, BigWord, BrollBackground, Captions, HookCard, PayoffFlash, ProgressBar, SaveBadge, outline, usePunch } from "./shared";
+import { LAYOUT, sceneFor } from "./layout";
 import { msToFrame, type ViralProps } from "./props";
 
 const PAPER = "#0f1a14";
-const CHALK = "#e8f1e4";
+const CHALK = "#eef5ea";
 const ACCENT = "#ffd54a";
 const MONO = "'JetBrains Mono Variable', ui-monospace, monospace";
+const EM = 0.6;
 
-// Maths : chaque beat ajoute un terme à l'équation. Le résultat reste « ? » jusqu'au payoff.
+// Maths : les chiffres arrivent un à un et montent depuis 0 ; la case « = ? » reste ouverte jusqu'au payoff.
 export function ViralMaths({ script, timeline, audio, broll }: ViralProps) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const { segment, index, punch } = usePunch(timeline);
-  const terms = timeline.segments
-    .slice(1, index + 1)
-    .filter((s) => s.kind === "beat")
-    .map((s, i) => emphasisOf(s.text, script.beats[i]?.emphasis))
-    .slice(-3);
+  const { segment, index, punch, startFrame } = usePunch(timeline);
+  const scene = sceneFor(script, timeline, index);
   const revealed = segment.kind === "payoff" || segment.kind === "cta";
-  const answer = emphasisOf(script.payoff);
-  // Le soulignement se dessine depuis le début de la réponse et reste tracé pendant le CTA.
-  const payoffStart = msToFrame(timeline.segments.find((s) => s.kind === "payoff")?.startMs ?? 0, fps);
+  const payoffIndex = timeline.segments.findIndex((s) => s.kind === "payoff");
+  const payoffStart = msToFrame(timeline.segments[payoffIndex]?.startMs ?? 0, fps);
+  const answer = payoffIndex >= 0 ? sceneFor(script, timeline, payoffIndex).word : "";
+  // Les chiffres déjà vus restent au tableau (les 3 derniers) : on suit le calcul sans relire.
+  const numbers = timeline.segments
+    .slice(1, Math.min(index, payoffIndex >= 0 ? payoffIndex : index))
+    .map((_, i) => sceneFor(script, timeline, i + 1).word)
+    .filter((w) => /\d/.test(w))
+    .slice(-3);
+  const isNumber = /\d/.test(scene.word);
+  const chips = LAYOUT.chips;
+  const box = LAYOUT.answerBox;
 
   return (
     <AbsoluteFill
       style={{
         backgroundColor: PAPER,
-        backgroundImage: `linear-gradient(rgba(232,241,228,0.07) 2px, transparent 2px), linear-gradient(90deg, rgba(232,241,228,0.07) 2px, transparent 2px)`,
+        backgroundImage: `linear-gradient(rgba(238,245,234,0.07) 2px, transparent 2px), linear-gradient(90deg, rgba(238,245,234,0.07) 2px, transparent 2px)`,
         backgroundSize: "90px 90px",
         backgroundPosition: `0 ${-frame * 0.6}px`,
       }}
     >
-      {/* BESOIN CREDIT: Higgsfield Seedance pour un plan de tableau filmé. Alternative gratuite: papier quadrillé Remotion. */}
+      {/* BESOIN CREDIT: Higgsfield Seedance pour un plan de tableau filmé. Alternative gratuite: B-roll ComfyUI / Pexels, sinon ce papier quadrillé Remotion. */}
       {broll?.length ? <BrollBackground broll={broll} timeline={timeline} dim={0.75} /> : null}
 
-      <AbsoluteFill style={{ top: 200, height: "auto", padding: "0 70px", alignItems: "center" }}>
-        {/* Les données s'empilent comme au tableau : pas de « + » qui ferait lire une fausse addition. */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, fontFamily: MONO, color: CHALK, fontSize: 54, minHeight: 210 }}>
-          {terms.map((t, i) => (
-            <span key={`${t}-${i}`} style={{ opacity: i === terms.length - 1 ? 1 : 0.45 }}>
-              {t}
-            </span>
-          ))}
-        </div>
+      <HookCard timeline={timeline} fontFamily={MONO} color={CHALK} accent={ACCENT} em={EM} />
+
+      {segment.kind === "beat" || segment.kind === "payoff" ? (
         <div
           style={{
-            marginTop: 40,
+            position: "absolute",
+            top: box.top,
+            left: box.left,
+            width: box.width,
+            height: box.height,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 22,
+            border: `5px solid ${ACCENT}`,
+            background: revealed ? ACCENT : "rgba(15,26,20,0.85)",
             fontFamily: MONO,
             fontWeight: 800,
-            fontSize: revealed ? 120 : 180,
-            color: revealed ? ACCENT : CHALK,
-            textAlign: "center",
-            scale: `${1 + punch * 0.12}`,
+            fontSize: 64,
+            color: revealed ? PAPER : ACCENT,
+            scale: `${1 + (revealed ? 0 : punch * 0.06)}`,
           }}
         >
-          {revealed ? `= ${answer}` : "?"}
+          {revealed ? "✓" : "= ?"}
         </div>
-        {revealed ? (
-          <svg width="760" height="40" viewBox="0 0 760 40" style={{ marginTop: 10 }}>
-            <path
-              d="M10 25 C 200 5, 520 40, 750 15"
+      ) : null}
+
+      {segment.kind === "beat" ? (
+        <BigWord word={scene.word} startFrame={startFrame} fontFamily={MONO} color={isNumber ? ACCENT : CHALK} em={EM} tilt={0} />
+      ) : null}
+
+      {segment.kind === "beat" && numbers.length ? (
+        <div style={{ position: "absolute", top: chips.top, left: chips.left, width: chips.width, height: chips.height, display: "flex", gap: 18, justifyContent: "center", alignItems: "center" }}>
+          {numbers.map((n, i) => (
+            <div key={`${n}-${i}`} style={{ padding: "14px 26px", borderRadius: 999, border: `3px solid rgba(238,245,234,0.45)`, fontFamily: MONO, fontSize: 42, fontWeight: 700, color: CHALK, background: "rgba(15,26,20,0.8)", opacity: i === numbers.length - 1 ? 1 : 0.6, whiteSpace: "nowrap" }}>
+              {n}
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {revealed ? (
+        <>
+          <BigWord word={answer} startFrame={payoffStart} fontFamily={MONO} color={ACCENT} em={EM} fit={0.72} />
+          <svg width={LAYOUT.bigWord.width} height={LAYOUT.bigWord.height} viewBox={`0 0 ${LAYOUT.bigWord.width} ${LAYOUT.bigWord.height}`} style={{ position: "absolute", top: LAYOUT.bigWord.top, left: LAYOUT.bigWord.left }}>
+            <ellipse
+              cx={LAYOUT.bigWord.width / 2}
+              cy={LAYOUT.bigWord.height / 2}
+              rx={LAYOUT.bigWord.width / 2 - 12}
+              ry={LAYOUT.bigWord.height / 2 - 40}
               stroke={ACCENT}
               strokeWidth="10"
               fill="none"
               strokeLinecap="round"
-              strokeDasharray="800"
-              strokeDashoffset={interpolate(frame - payoffStart, [0, 0.6 * fps], [800, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.bezier(0.65, 0, 0.35, 1) })}
+              strokeDasharray="2400"
+              strokeDashoffset={interpolate(frame - payoffStart, [0.4 * fps, 1.1 * fps], [2400, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.bezier(0.65, 0, 0.35, 1) })}
+              transform={`rotate(-4 ${LAYOUT.bigWord.width / 2} ${LAYOUT.bigWord.height / 2})`}
             />
           </svg>
-        ) : null}
-      </AbsoluteFill>
+        </>
+      ) : null}
 
-      <Captions timeline={timeline} fontFamily={MONO} color={CHALK} accent={ACCENT} top="62%" fontSize={76} />
-      {segment.kind === "cta" ? <SaveBadge accent={ACCENT} fontFamily={MONO} label={script.lang === "fr" ? "Garde ça" : "Save this"} /> : null}
-      <ProgressBar color={ACCENT} track="rgba(232,241,228,0.15)" />
+      {segment.kind === "cta" ? (
+        <div style={{ position: "absolute", top: LAYOUT.chips.top, left: LAYOUT.chips.left, width: LAYOUT.chips.width, textAlign: "center", fontFamily: MONO, fontSize: 46, fontWeight: 700, color: CHALK, ...outline(46) }}>
+          {script.lang === "fr" ? "Refais le calcul chez toi." : "Run the numbers yourself."}
+        </div>
+      ) : null}
+
+      <Captions timeline={timeline} fontFamily={MONO} color={CHALK} accent={ACCENT} fontSize={84} />
+      {segment.kind === "cta" ? <SaveBadge accent={ACCENT} fontFamily={MONO} label={script.lang === "fr" ? "Garde ça" : "Save this"} ink={PAPER} /> : null}
+      <PayoffFlash timeline={timeline} color={ACCENT} />
+      <ProgressBar color={ACCENT} track="rgba(238,245,234,0.15)" />
       <AudioTracks audio={audio} />
     </AbsoluteFill>
   );

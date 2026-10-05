@@ -7,6 +7,8 @@ import { loadConfig, type Env, type ViralConfig } from "./config";
 import { writeAmbient } from "./ambient";
 import { gatherBroll, type BrollResult } from "./broll";
 import { pickTrack } from "./music";
+import { SFX_FILES, writeSfx } from "./sfx";
+import { SFX_VOLUME, sfxCues } from "../remotion/viral/layout";
 import { assembleScript, generateScript, type LlmClient, type ScriptInput } from "./llm";
 import { formatFailedMessage, formatReadyMessage } from "./message";
 import { resolvePublishMode } from "./publish-plan";
@@ -93,6 +95,7 @@ export async function runJob(req: JobRequest, partial: Partial<PipelineDeps> = {
   }
   const timeline = buildTimeline(script, voices.map((v) => v.durationMs));
   await writeAmbient(join(jobDir, "ambient.wav"), Math.ceil(timeline.durationMs / 1000) + 2);
+  await writeSfx(join(jobDir, "sfx"));
 
   const job: Job = {
     id,
@@ -140,6 +143,7 @@ export async function runJob(req: JobRequest, partial: Partial<PipelineDeps> = {
       segments: timeline.segments.map((s, i) => ({ src: `viral/${id}/voice/${String(i).padStart(2, "0")}.wav`, startMs: s.startMs })),
       ambient: music ? `viral/${id}/${music}` : `viral/${id}/ambient.wav`,
       ambientVolume: music ? 0.16 : 0.08,
+      sfx: sfxCues(timeline).map((c) => ({ src: `viral/${id}/sfx/${SFX_FILES[c.kind]}`, startMs: c.atMs, volume: SFX_VOLUME[c.kind] })),
     },
     broll: broll.length ? broll.map((f) => `viral/${id}/broll/${f}`) : undefined,
   };

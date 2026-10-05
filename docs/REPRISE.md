@@ -8,9 +8,11 @@ Ce fichier contient tout ce qu'il faut pour qu'une nouvelle session Claude Code 
 
 ---
 
-## 1. Mettre le code sur GitHub (à faire une fois, par toi)
+## 1. Mettre le code sur GitHub
 
-La session précédente n'a pas pu pousser : l'app GitHub de Claude n'a pas le droit d'écrire sur `SeptimeDSR/design` (erreur 403). Le dépôt existe sur GitHub, mais il est vide.
+**Fait.** Depuis le 5 octobre, le push marche : le travail est sur `claude/keen-euler-i983wb` (poussée après chaque tâche). La procédure ci-dessous ne sert que si un nouveau compte n'a pas encore l'app GitHub de Claude.
+
+Historique : la première session n'avait pas pu pousser (403), d'où le bundle.
 
 Tu as reçu `septim-design.bundle`, qui contient tout l'historique git. Depuis ton PC (WSL, macOS ou Linux, avec git et ton propre compte GitHub) :
 
@@ -37,10 +39,10 @@ Sans ça, la session pourra lire le code mais pas pousser.
 Tu reprends le projet Septim (site qui retient + usine à vidéos virales SEPTIM-VIRAL-OS). Une session précédente a travaillé longtemps ; tout son état est dans le dépôt. Ne refais rien de ce qui est fait, ne redemande rien de ce qui est décidé.
 
 1. Mets-toi sur le bon code :
-   git fetch origin claude/happy-pascal-f10qin
-   Si ta session t'impose une autre branche : git checkout -B <ta-branche> origin/claude/happy-pascal-f10qin
-   Sinon : git checkout claude/happy-pascal-f10qin
-   Vérifie que git log contient « feat(viral): webhooks signés vers n'importe quel logiciel » (tâche 3 du plan).
+   git fetch origin claude/keen-euler-i983wb
+   Si ta session t'impose une autre branche : git checkout -B <ta-branche> origin/claude/keen-euler-i983wb
+   Sinon : git checkout claude/keen-euler-i983wb
+   Vérifie l'état exact dans docs/handoff/ledger-septim-portes.md (lignes « Task N: complete »).
 
 2. Lis, dans cet ordre, avant toute action :
    - docs/REPRISE.md (ce guide de reprise : état, règles, pièges, décisions)
@@ -54,10 +56,10 @@ Tu reprends le projet Septim (site qui retient + usine à vidéos virales SEPTIM
    cp docs/handoff/ledger-septim-portes.md .superpowers/sdd/2026-10-05-septim-portes/progress.md
    echo docs/superpowers/plans/2026-10-05-septim-portes.md > .superpowers/sdd/2026-10-05-septim-portes/plan-path
 
-4. Vérifie l'état : npm install (avec PUPPETEER_SKIP_DOWNLOAD=1), puis npm test (198 tests verts attendus), npm run typecheck, npm run lint.
+4. Vérifie l'état : npm install (avec PUPPETEER_SKIP_DOWNLOAD=1), puis npm test (tous verts), npm run typecheck, npm run lint.
    Si les skills superpowers sont absentes : /plugin install superpowers@claude-plugins-official.
 
-5. Reprends l'exécution du plan avec la skill superpowers:executing-plans (exécution inline, par toi), à partir de la tâche 4 :
+5. Reprends l'exécution du plan avec la skill superpowers:executing-plans (exécution inline, par toi), à la première tâche sans ligne « complete » dans le registre. Tâches du plan :
    P4 serveur HTTP + API REST + OpenAPI · P5 serveur MCP stdio + HTTP · P6 Studio navigateur · P7 commande septim (terminal, start, studio, mcp, connect, setup) · P8 commandes /septim-viral:*, install.sh, docs/GUIDE.md complet · P9 vérification de bout en bout, tests par sous-agents (mode d'emploi suivi par un agent neuf sur un clone propre ; GREEN des commandes), revue finale par un relecteur neuf sur le modèle le plus capable, passe de corrections.
    TDD strict : test écrit d'abord, échec observé, puis code, puis suite complète. Chaque écart au plan = une ligne « Task N: Ruling: … — pourquoi — coût si faux » dans le registre. Après chaque tâche : commit, task-done, et recopie le registre dans docs/handoff/ledger-septim-portes.md (pour qu'il survive à un nouveau changement de compte).
 
@@ -77,7 +79,7 @@ Tu reprends le projet Septim (site qui retient + usine à vidéos virales SEPTIM
 
 ## 3. État exact au moment du départ
 
-**Branche :** `claude/happy-pascal-f10qin`. Dernier commit de code : `30b0c45` (webhooks). Commit de reprise : celui qui ajoute ce fichier.
+**Branche :** `claude/keen-euler-i983wb` (repart de `claude/happy-pascal-f10qin`). L'état exact est dans le registre `docs/handoff/ledger-septim-portes.md`.
 
 **Vérifié au départ :**
 - 198 tests vitest verts ;
@@ -117,12 +119,14 @@ Tu reprends le projet Septim (site qui retient + usine à vidéos virales SEPTIM
 | P1 | ✅ `29af0fb` | `lock.ts` (verrou de fichier entre processus, écriture atomique), `store` (job corrompu ignoré, `updateState` sous verrou, `resolveRef` qui refuse l'ambiguïté, `normalizeRef`), `publishWithLedger` verrouillé et qui relit le job, WhatsApp déconnecté → le processus quitte et pm2 relance |
 | P2 | ✅ `0f8d8be` | `factory.ts`, cœur unique : tâches persistées dans `.septim-viral/tasks/`, file d'un rendu à la fois, confirmation `OUI #ref`, événements ; `errors.ts` (`FactoryError`, `STATUS`) |
 | P3 | ✅ `30b0c45` | `webhooks.ts` : HMAC-SHA256, 3 essais, `attachWebhooks(factory, env)` |
-| P4 | à faire | `src/viral-engine/server/` : `startServer`, `ROUTES`, `openapi`, garde-fous Host/Origin/token/415/413, vidéo en Range, Studio statique |
-| P5 | à faire | `mcp.ts` : `npm i @modelcontextprotocol/sdk` (1.32.x vérifié), 9 outils, 2 ressources, prompt `nouvelle_video`, stdio + HTTP sans état |
-| P6 | à faire | Studio HTML/CSS/JS dans `src/viral-engine/studio/` + test Playwright |
-| P7 | à faire | `bin/septim.mjs` + `septim.ts` + `connect.ts` + `setup.ts` ; `cli.ts` exporte `runCli` ; `septim start` = démon + serveur |
-| P8 | à faire | `plugins/septim-viral/commands/{studio,videos,publier,aide}.md`, `scripts/install.sh`, `docs/GUIDE.md`, `docs/n8n-septim.json`, `.mcp.json` racine, test `docs.test.ts` |
-| P9 | à faire | vrai rendu via l'API, MCP réel, sous-agent « mode d'emploi », GREEN des commandes, revue finale, bundle |
+| P4 | ✅ | serveur HTTP, API REST, OpenAPI, garde-fous |
+| P5 | ✅ | MCP stdio + HTTP (9 outils, 2 ressources, prompt) |
+| P6 | ✅ | Studio navigateur + test Playwright (`tests/studio/`) |
+| P7 | ✅ | commande `septim` (bin, connect, setup, start) |
+| P8 | ✅ | commandes `/septim-viral:*`, `install.sh`, `docs/GUIDE.md`, n8n, `.mcp.json` |
+| P10 | ✅ | gratuit d'abord : B-roll ComfyUI/Pexels/Pixabay, musique, voix HD Chatterbox |
+| P11 | voir registre | templates imbattables (zone sûre, hook dès 0 ms, bruitages, compteurs) |
+| P9 | voir registre | vérification de bout en bout, sous-agents, revue finale |
 
 ### Interfaces déjà livrées (à utiliser telles quelles)
 

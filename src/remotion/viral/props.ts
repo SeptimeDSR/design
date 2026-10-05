@@ -9,7 +9,13 @@ export const TAIL_FRAMES = 15;
 export type ViralProps = {
   script: ViralScript;
   timeline: Timeline;
-  audio: { segments: { src: string; startMs: number }[]; ambient?: string; ambientVolume?: number };
+  audio: {
+    segments: { src: string; startMs: number }[];
+    ambient?: string;
+    ambientVolume?: number;
+    // Bruitages générés (impact, whoosh, montée, ding), calés sur la timeline.
+    sfx?: { src: string; startMs: number; volume: number }[];
+  };
   // Plans de fond : tes clips, le B-roll gratuit (ComfyUI, Pexels, Pixabay) ou PRO (Higgsfield). Vide = fonds procéduraux.
   broll?: string[];
 };
@@ -22,8 +28,10 @@ export function durationInFrames(timeline: Timeline, fps = VIRAL_FPS): number {
 
 export type CaptionPage = { words: CaptionWord[]; startMs: number; endMs: number; segment: Segment; segmentIndex: number };
 
+// Le hook a sa propre carte (phrase entière dès la 1re image) : les sous-titres commencent au premier beat.
 export function captionPages(timeline: Timeline): CaptionPage[] {
   return timeline.segments.flatMap((segment, segmentIndex) =>
+    segment.kind === "hook" ? [] :
     pageCaptions(wordTimings(segment.text, segment.startMs, segment.endMs)).map((words) => ({
       words,
       startMs: words[0].startMs,

@@ -112,3 +112,31 @@ describe("voix HD Chatterbox (gratuite, MIT, français)", () => {
     expect(await detectEngine("fr", "auto")).not.toBe("chatterbox");
   });
 });
+
+describe("voix normalisée (niveau réseaux sociaux)", () => {
+  it("une voix trop faible ou trop forte ressort à ~ -16 dBFS RMS, crête sous -1 dBFS", async () => {
+    const { normalizeSpeech, decodeWav } = await import("../wav");
+    const tone = (amp: number) => Float32Array.from({ length: 22050 }, (_, i) => amp * Math.sin((2 * Math.PI * 220 * i) / 22050));
+    for (const amp of [0.02, 0.95]) {
+      const out = decodeWav(normalizeSpeech(encodeWav(tone(amp), 22050))).samples;
+      let peak = 0;
+      let sum = 0;
+      for (const v of out) {
+        peak = Math.max(peak, Math.abs(v));
+        sum += v * v;
+      }
+      const rmsDb = 20 * Math.log10(Math.sqrt(sum / out.length));
+      expect(peak).toBeLessThanOrEqual(0.892);
+      expect(rmsDb).toBeGreaterThan(-18);
+      expect(rmsDb).toBeLessThan(-14);
+    }
+  });
+
+  it("un silence reste un silence ; un WAV inconnu ressort tel quel", async () => {
+    const { normalizeSpeech } = await import("../wav");
+    const silent = encodeWav(new Float32Array(1000), 22050);
+    expect(normalizeSpeech(silent).equals(silent)).toBe(true);
+    const odd = Buffer.from("pas un wav");
+    expect(normalizeSpeech(odd)).toBe(odd);
+  });
+});
