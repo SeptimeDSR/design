@@ -10,7 +10,10 @@ fi
 cd "${CLAUDE_PROJECT_DIR:-$(pwd)}" || exit 0
 warn() { echo "[septim] $*" >&2; }
 
-npm install --no-audit --no-fund >/dev/null 2>&1 || warn "npm install a échoué (tests et rendus indisponibles)"
+PUPPETEER_SKIP_DOWNLOAD=1 npm install --no-audit --no-fund >/dev/null 2>&1 || warn "npm install a échoué (tests et rendus indisponibles)"
+
+# Travail en cours : registre superpowers remis en place depuis docs/handoff/ (voir docs/REPRISE.md).
+"$(dirname "$0")/restore-ledgers.sh" "$PWD"
 
 if command -v claude >/dev/null 2>&1; then
   claude plugin marketplace add "$PWD" >/dev/null 2>&1 || warn "marketplace septim non ajouté"

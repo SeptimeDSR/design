@@ -1,5 +1,7 @@
 @AGENTS.md
 
+**Travail en cours (reprise) :** lire `docs/REPRISE.md` avant toute action. Plan en cours : `docs/superpowers/plans/2026-10-05-septim-portes.md` (tâches P1 à P3 faites, reprendre à P4), registre `docs/handoff/ledger-septim-portes.md`.
+
 # Règle d'or : PRO avec crédits / FREE tout de suite
 
 Chaque effet visuel ou vidéo existe en deux versions :

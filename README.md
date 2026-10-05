@@ -1,5 +1,7 @@
 # Septim — sites et vidéos qu'on n'arrive pas à quitter
 
+> Reprendre le travail dans une nouvelle session ou un autre compte : [`docs/REPRISE.md`](docs/REPRISE.md) (prompt de reprise inclus).
+
 Ce repo contient trois choses :
 
 1. **Deux plugins Claude Code** (`plugins/`) à installer une fois pour tous tes projets :

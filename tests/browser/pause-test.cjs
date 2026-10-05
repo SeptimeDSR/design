@@ -1,0 +1,30 @@
+const { chromium } = require(process.env.PW ?? "playwright");
+const SITE = process.env.SITE_URL ?? "http://localhost:3123";
+(async () => {
+  const b = await chromium.launch({ args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"] });
+  const p = await (await b.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+  const errors = [];
+  p.on("pageerror", (e) => errors.push(e.message));
+  await p.goto(SITE, { waitUntil: "networkidle" });
+  const phone = p.locator("[data-viral-phone]").first();
+  await phone.scrollIntoViewIfNeeded();
+  await p.waitForTimeout(1500);
+  const r = { autoplay: await phone.getAttribute("data-playing") };
+  await phone.locator("button").click();
+  await p.waitForTimeout(400);
+  r.afterClick = await phone.getAttribute("data-playing");
+  r.label = await phone.locator("button").getAttribute("aria-label");
+  await p.evaluate(() => window.scrollTo(0, 0));
+  await p.waitForTimeout(800);
+  await phone.scrollIntoViewIfNeeded();
+  await p.waitForTimeout(1200);
+  r.staysPausedAfterReturn = await phone.getAttribute("data-playing");
+  await phone.locator("button").click();
+  await p.waitForTimeout(400);
+  r.resumes = await phone.getAttribute("data-playing");
+  // Rail horizontal toujours actif en mouvement normal
+  r.rail = await p.locator("#interruptions [data-rail]").count() || await p.evaluate(() => !!document.querySelector('[data-rail="on"]'));
+  r.errors = errors;
+  console.log(JSON.stringify(r));
+  await b.close();
+})();

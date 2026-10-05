@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
     ".agents/**",
     ".claude/**",
   ]),
+  // Scripts Playwright en CommonJS, lancés avec node (pas avec le bundler).
+  { files: ["tests/browser/**/*.cjs"], rules: { "@typescript-eslint/no-require-imports": "off" } },
 ]);
 
 export default eslintConfig;
