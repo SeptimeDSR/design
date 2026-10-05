@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { checkScript, cleanTopic, runJob } from "./pipeline";
-import { createNotifier } from "./notify";
+import { chooseNotifier, createNotifier, whatsappSessionExists } from "./notify";
 import { loadConfig } from "./config";
 import type { Lang, TemplateId } from "./types";
 
@@ -33,7 +33,9 @@ async function main() {
     process.exit(r.issues.length ? 1 : 0);
   }
 
-  const notifier = createNotifier(values["no-notify"] ? "console" : cfg.notifier, cfg);
+  const choice = chooseNotifier({ requested: values["no-notify"] ? "console" : cfg.notifier, sessionExists: whatsappSessionExists(cfg), interactive: false });
+  if (choice.warning) console.warn(`⚠ ${choice.warning}`);
+  const notifier = createNotifier(choice.kind, cfg);
   await notifier.start();
   const job = await runJob({ topic, template, lang, script, brollDir: values.broll }, { notify: (text, media) => notifier.send(text, media) });
 

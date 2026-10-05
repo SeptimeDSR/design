@@ -1,4 +1,4 @@
-import { statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
@@ -86,6 +86,18 @@ export function createWhatsAppNotifier(cfg: ViralConfig): Notifier {
     },
   };
 }
+
+// Le CLI ne doit jamais rester bloqué sur un QR : seul le démon (interactif) lie WhatsApp.
+export function chooseNotifier(opts: { requested: "whatsapp" | "console"; sessionExists: boolean; interactive: boolean }): {
+  kind: "whatsapp" | "console";
+  warning?: string;
+} {
+  if (opts.requested === "console") return { kind: "console" };
+  if (opts.sessionExists || opts.interactive) return { kind: "whatsapp" };
+  return { kind: "console", warning: "WhatsApp pas encore lié : lance une fois `npm run viral:daemon` et scanne le QR. Message affiché ici en attendant." };
+}
+
+export const whatsappSessionExists = (cfg: ViralConfig) => existsSync(join(cfg.home, "wa"));
 
 export function createNotifier(kind: "whatsapp" | "console", cfg: ViralConfig): Notifier {
   return kind === "whatsapp" ? createWhatsAppNotifier(cfg) : createConsoleNotifier();

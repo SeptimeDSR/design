@@ -66,3 +66,28 @@ describe("notificateur console", () => {
     await n.stop();
   });
 });
+
+describe("chooseNotifier", () => {
+  it("WhatsApp pas encore lié : la console, avec la marche à suivre (jamais bloquer sur un QR)", async () => {
+    const { chooseNotifier } = await import("../notify");
+    expect(chooseNotifier({ requested: "whatsapp", sessionExists: false, interactive: false })).toEqual({
+      kind: "console",
+      warning: expect.stringContaining("npm run viral:daemon"),
+    });
+  });
+
+  it("WhatsApp lié : WhatsApp", async () => {
+    const { chooseNotifier } = await import("../notify");
+    expect(chooseNotifier({ requested: "whatsapp", sessionExists: true, interactive: false })).toEqual({ kind: "whatsapp" });
+  });
+
+  it("le démon (interactif) peut afficher le QR pour lier WhatsApp", async () => {
+    const { chooseNotifier } = await import("../notify");
+    expect(chooseNotifier({ requested: "whatsapp", sessionExists: false, interactive: true })).toEqual({ kind: "whatsapp" });
+  });
+
+  it("console demandée : console", async () => {
+    const { chooseNotifier } = await import("../notify");
+    expect(chooseNotifier({ requested: "console", sessionExists: true, interactive: false })).toEqual({ kind: "console" });
+  });
+});
