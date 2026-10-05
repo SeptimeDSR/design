@@ -112,7 +112,7 @@ Tu reprends le projet Septim (site qui retient + usine à vidéos virales SEPTIM
   - testés par sous-agents (RED/GREEN, voir `docs/skill-tests.md`).
 - **Hook `SessionStart`** (`.claude/hooks/session-start.sh`) : installe les dépendances et les plugins dans chaque session cloud, pour éviter « commande introuvable ».
 
-### Plan 2 en cours : `docs/superpowers/plans/2026-10-05-septim-portes.md`
+### Plan 2 terminé : `docs/superpowers/plans/2026-10-05-septim-portes.md`
 
 | Tâche | État | Contenu |
 | --- | --- | --- |
@@ -125,8 +125,10 @@ Tu reprends le projet Septim (site qui retient + usine à vidéos virales SEPTIM
 | P7 | ✅ | commande `septim` (bin, connect, setup, start) |
 | P8 | ✅ | commandes `/septim-viral:*`, `install.sh`, `docs/GUIDE.md`, n8n (MCP de Claude Code branché par le hook) |
 | P10 | ✅ | gratuit d'abord : B-roll ComfyUI/Pexels/Pixabay, musique, voix HD Chatterbox |
-| P11 | voir registre | templates imbattables (zone sûre, hook dès 0 ms, bruitages, compteurs) |
-| P9 | voir registre | vérification de bout en bout, sous-agents, revue finale |
+| P11 | ✅ | templates imbattables (zone sûre, hook dès 0 ms, bruitages, compteurs, aucun débordement même avec un mot de 25 lettres) |
+| P9 | ✅ `460ccd4` | vérification de bout en bout, agent neuf sur GUIDE.md, GREEN des commandes, revue finale (8 points importants corrigés), 330 tests |
+
+Suite possible : les « minor (deferred) » du registre (lignes `Final:`), Docker et CI quand une machine avec Docker est disponible.
 
 ### Interfaces déjà livrées (à utiliser telles quelles)
 
@@ -136,8 +138,8 @@ Tu reprends le projet Septim (site qui retient + usine à vidéos virales SEPTIM
   - `lintScript(script, opts?)` ;
   - `publish(ref, confirm)`, `reject(ref)` ;
   - `doctor()`, `lessons()` ;
-  - `on(event, handler)`, où le handler reçoit `{video?, task?, error?}` (voir Ruling Task 2) ;
-  - `home`.
+  - `on(event, handler)`, où le handler reçoit `{video?, task?, error?}` (voir Ruling Task 2) ; `announce(event, ref)` pour une porte qui agit hors de la fabrique (WhatsApp) ;
+  - `home`, `store` (`store.ref(id)` donne la référence courte unique à afficher).
 - `FactoryError(code, message, details?)` porte un `.status`. Codes : `bad_request` 400, `unauthorized` 401, `forbidden` 403, `not_found` 404, `ambiguous_ref` 409, `conflict` 409, `payload_too_large` 413, `unsupported_media_type` 415, `confirmation_required` 428.
 - `attachWebhooks(factory, env, fetchImpl?)`, `webhookPayload(event, payload, publicUrl?)`, `signBody(body, secret)`.
 - `store.updateState(fn)`, `store.resolveRef(ref)`, `normalizeRef(s)`, `tryLock(path, staleMs)`, `withLock(path, fn)`, `writeJsonAtomic(path, data)`.

@@ -113,3 +113,5 @@ Final: minor (deferred): no minimum SEPTIM_TOKEN length nor rate limit; the <vid
 Final: minor (deferred): public/viral/<id> copies accumulate on disk (delete old jobs by hand, documented)
 Final: minor (deferred): the n8n Form Trigger in docs/n8n-septim.json is public by default (add n8n basic auth before exposing n8n)
 Final: minor (deferred): the 500-character topic limit counts UTF-16 units (an emoji counts 2), and an over-long topic through MCP is rejected by the schema as a protocol error rather than a readable tool error
+Task 9: complete (commits be168db..460ccd4, tests: npx vitest run →              at least ~1.29s faster with isolate: false — reuses workers across files instead of one per file)
+Final: full verification after the fix pass: 330/330 vitest, typecheck, lint, next build, 2 plugins + marketplace validate --strict, Studio browser 27/27, real CLI render through the factory queue (maths, 1 min 29 s, H.264 High 1080×1920 30 fps + AAC, contact sheet reviewed)

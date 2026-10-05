@@ -1,6 +1,6 @@
 @AGENTS.md
 
-**Travail en cours (reprise) :** lire `docs/REPRISE.md` avant toute action. Plan en cours : `docs/superpowers/plans/2026-10-05-septim-portes.md` (l'état de chaque tâche est dans le registre `docs/handoff/ledger-septim-portes.md`).
+**Reprise :** lire `docs/REPRISE.md` avant toute action. Plan `docs/superpowers/plans/2026-10-05-septim-portes.md` terminé (P1 à P11) ; décisions et mineurs restants dans le registre `docs/handoff/ledger-septim-portes.md`.
 
 # Règle d'or : FREE d'abord, PRO en second
 
