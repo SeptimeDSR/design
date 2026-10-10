@@ -41,5 +41,13 @@ if ($url) {
 } else {
   Write-Host "SEPTIM demarre encore. Regarde : docker compose logs septim"
 }
+# La commande "septim" disponible dans tous les nouveaux terminaux (une seule fois ; ne touche qu'a ton PATH utilisateur).
+$userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+if ($null -eq $userPath) { $userPath = "" }
+if (($userPath -split ";") -notcontains $PSScriptRoot) {
+  [Environment]::SetEnvironmentVariable("Path", ($userPath.TrimEnd(";") + ";" + $PSScriptRoot), "User")
+  Write-Host "La commande 'septim' est ajoutee a ton PATH : ouvre un NOUVEAU terminal, puis par exemple : septim doctor"
+}
+
 Write-Host ""
 Write-Host "Arreter : docker compose down      Relancer : LANCER.bat"

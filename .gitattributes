@@ -6,4 +6,5 @@ docker/* text eol=lf
 *.sh text eol=lf
 # Et les lanceurs Windows restent en CRLF.
 *.bat text eol=crlf
+*.cmd text eol=crlf
 *.ps1 text eol=crlf

@@ -113,3 +113,25 @@ export function writeMcpConfig(client: Exclude<McpClient, "claude-code">, o: Con
   safeWrite(c.path, `${JSON.stringify({ ...current, [key]: { ...servers, septim: entry } }, null, 2)}\n`);
   return c.path;
 }
+
+// Dans Docker : le conteneur ne voit ni claude, ni les fichiers de ton PC. On branche par l'adresse HTTP de l'usine,
+// avec le token en en-tête (le même que celui du Studio).
+export function dockerMcpConfig(client: McpClient, o: { url: string; token: string }): McpConfig {
+  const auth = `Bearer ${o.token}`;
+  const remote = { url: o.url, headers: { Authorization: auth } };
+  switch (client) {
+    case "claude-code":
+      return { path: "", content: `claude mcp add --transport http --scope user septim ${o.url} --header "Authorization: ${auth}"` };
+    case "cursor":
+      return { path: join(homedir(), ".cursor", "mcp.json"), content: JSON.stringify({ mcpServers: { septim: remote } }, null, 2) };
+    case "vscode":
+      return { path: "mcp.json (profil utilisateur de VS Code)", content: JSON.stringify({ servers: { septim: { type: "http", ...remote } } }, null, 2) };
+    case "windsurf":
+      return { path: join(homedir(), ".codeium", "windsurf", "mcp_config.json"), content: JSON.stringify({ mcpServers: { septim: { serverUrl: o.url, headers: { Authorization: auth } } } }, null, 2) };
+    case "gemini":
+      return { path: join(homedir(), ".gemini", "settings.json"), content: JSON.stringify({ mcpServers: { septim: { httpUrl: o.url, headers: { Authorization: auth } } } }, null, 2) };
+    default:
+      // Claude Desktop, Codex : pas de serveur distant avec en-tête en configuration directe ; l'adresse et l'en-tête suffisent à un pont (mcp-remote).
+      return { path: "", content: `Adresse MCP : ${o.url}\nEn-tête     : Authorization: ${auth}\nPont possible : npx mcp-remote ${o.url} --header "Authorization: ${auth}"` };
+  }
+}

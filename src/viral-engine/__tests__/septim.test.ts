@@ -406,3 +406,35 @@ describe("revue finale : septim connect ne casse jamais la config d'un autre log
     rmSync(home, { recursive: true, force: true });
   });
 });
+
+describe("Docker : septim connect branche par l'adresse HTTP (le conteneur n'a pas de claude ni de chemins utiles à l'hôte)", () => {
+  it("dockerMcpConfig : la commande claude, le JSON de Cursor et de VS Code portent l'URL et le token", async () => {
+    const { dockerMcpConfig } = await import("../connect");
+    const o = { url: "http://localhost:4321/mcp", token: "abc123" };
+    expect(dockerMcpConfig("claude-code", o).content).toBe('claude mcp add --transport http --scope user septim http://localhost:4321/mcp --header "Authorization: Bearer abc123"');
+    expect(JSON.parse(dockerMcpConfig("cursor", o).content)).toEqual({ mcpServers: { septim: { url: o.url, headers: { Authorization: "Bearer abc123" } } } });
+    expect(JSON.parse(dockerMcpConfig("vscode", o).content)).toEqual({ servers: { septim: { type: "http", url: o.url, headers: { Authorization: "Bearer abc123" } } } });
+    // Les autres : l'adresse et l'en-tête à saisir, jamais un chemin du conteneur.
+    const other = dockerMcpConfig("claude-desktop", o).content;
+    expect(other).toContain(o.url);
+    expect(other).toContain("Bearer abc123");
+    expect(other).not.toContain("septim.mjs");
+  });
+
+  it("septim connect <client> dans Docker : URL du port publié + token, code 0 ; --write refusé (le conteneur n'écrit pas chez toi)", async () => {
+    process.env.SEPTIM_IN_DOCKER = "1";
+    process.env.SEPTIM_TOKEN = "tok999";
+    process.env.SEPTIM_PUBLISHED_PORT = "4400";
+    const r = await run(["connect", "cursor"]);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("http://localhost:4400/mcp");
+    expect(r.out).toContain("Bearer tok999");
+    expect(r.out).not.toContain("septim.mjs");
+    const w = await run(["connect", "cursor", "--write"]);
+    expect(w.code).toBe(1);
+    expect(w.err + w.out).toMatch(/septim\.cmd|ton PC|hôte/);
+    const c = await run(["connect", "claude-code"]);
+    expect(c.code).toBe(0);
+    expect(c.out).toContain('claude mcp add --transport http --scope user septim http://localhost:4400/mcp');
+  });
+});

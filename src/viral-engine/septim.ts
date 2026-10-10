@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { runCli, userPath, type CliIO } from "./cli";
 import { loadDotEnv } from "./config";
-import { CLIENT_NAMES, isMcpClient, MCP_CLIENTS, mcpConfig, writeMcpConfig } from "./connect";
+import { CLIENT_NAMES, isMcpClient, MCP_CLIENTS, dockerMcpConfig, mcpConfig, writeMcpConfig } from "./connect";
 import { formatDiagnosis } from "./doctor";
 import { FactoryError } from "./errors";
 import { createFactory, type VideoDetail, type VideoSummary } from "./factory";
@@ -147,10 +147,24 @@ async function connect(args: string[], io: CliIO): Promise<number> {
     io.err.write(`${client ? `Client inconnu « ${client} ». ` : ""}Choisis parmi : ${MCP_CLIENTS.join(", ")}.\nExemple : septim connect claude-desktop --write\n`);
     return 1;
   }
+  const out = (t = "") => void io.out.write(`${t}\n`);
+  if (process.env.SEPTIM_IN_DOCKER) {
+    // Dans le conteneur : on donne l'adresse HTTP de l'usine, jamais un chemin du conteneur ni une écriture chez l'humain.
+    if (values.write) {
+      io.err.write("Dans Docker, septim ne peut pas écrire dans les fichiers de ton PC. Sous Windows : septim.cmd connect claude-code (le reste : copie le bloc affiché). --write marche avec septim installé sans Docker.\n");
+      return 1;
+    }
+    const url = `http://localhost:${process.env.SEPTIM_PUBLISHED_PORT || process.env.SEPTIM_PORT || 4321}/mcp`;
+    const d = dockerMcpConfig(client, { url, token: process.env.SEPTIM_TOKEN?.trim() ?? "" });
+    out(`${CLIENT_NAMES[client]} : l'usine tourne dans Docker, on la branche par son adresse HTTP.`);
+    if (d.path) out(`Ajoute ceci dans ${d.path} :`);
+    out("");
+    out(d.content);
+    return 0;
+  }
   const root = repoRoot();
   const o = { root, node: process.execPath };
   const c = mcpConfig(client, o);
-  const out = (t = "") => void io.out.write(`${t}\n`);
   if (client === "claude-code") {
     out(`Claude Code : ${c.content}`);
     return connectClaudeCode(root, io) ? 0 : 1;

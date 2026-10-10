@@ -140,4 +140,18 @@ describe("documentation : elle ne dérive pas du code", () => {
     expect(GUIDE).toContain("LANCER.bat");
     expect(GUIDE).toContain("Expand-Archive");
   });
+
+  it("Windows : septim.cmd relaie vers le conteneur et branche Claude Code par HTTP ; LANCER.ps1 ajoute le dossier au PATH", () => {
+    const cmd = readFileSync(join(ROOT, "septim.cmd"));
+    expect([...cmd].every((b) => b < 128), "septim.cmd en ASCII (cmd lit l'OEM, pas l'UTF-8)").toBe(true);
+    const text = cmd.toString("utf8");
+    expect(text).toContain("docker compose exec septim septim %*");
+    expect(text).toContain("claude mcp add --transport http --scope user septim");
+    expect(text).toContain("Authorization: Bearer");
+    expect(text).toMatch(/\/data\/\.token/);
+    expect(read(".gitattributes")).toMatch(/\*\.cmd[^\n]*eol=crlf|\*\.\{bat,cmd,ps1\}[^\n]*eol=crlf/);
+    expect(read("LANCER.ps1")).toContain("SetEnvironmentVariable");
+    expect(read("Dockerfile")).toContain("SEPTIM_IN_DOCKER=1");
+    expect(GUIDE).toContain("septim.cmd");
+  });
 });

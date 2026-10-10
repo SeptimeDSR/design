@@ -13,6 +13,7 @@ ENV NODE_ENV=production \
     PUPPETEER_SKIP_DOWNLOAD=1 \
     REMOTION_BROWSER_EXECUTABLE=/usr/bin/chromium \
     WHATSAPP_CHROME_PATH=/usr/bin/chromium \
+    SEPTIM_IN_DOCKER=1 \
     SEPTIM_ROOT=/app \
     VIRAL_HOME=/data \
     SEPTIM_HOST=0.0.0.0 \

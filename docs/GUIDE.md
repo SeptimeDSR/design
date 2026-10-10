@@ -587,6 +587,18 @@ cd $env:USERPROFILE\Downloads; Expand-Archive .\septim.zip .\septim -Force; .\se
 
 `LANCER.bat` construit l'image, démarre l'usine et ouvre le Studio dans ton navigateur. Docker Desktop manquant : `winget install -e --id Docker.DockerDesktop`, redémarre Windows, ouvre Docker Desktop, relance. Ubuntu et macOS : `unzip septim.zip -d septim && cd septim && docker compose up -d --build`.
 
+**La commande `septim` sous Windows** : `LANCER.bat` l'ajoute à ton PATH (ouvre un nouveau terminal ensuite). `septim.cmd` relaie chaque commande vers l'usine qui tourne dans Docker :
+
+```powershell
+septim doctor                 # état de l'usine
+septim videos                 # liste des vidéos
+septim video "la tontine à Douala"
+septim connect claude-code    # branche Claude Code (lance claude mcp add par l'adresse HTTP, avec ton token)
+septim start                  # (re)démarre l'usine si elle est arrêtée et affiche l'adresse du Studio
+```
+
+Sans l'ajout au PATH, tape `.\septim.cmd doctor` depuis le dossier. Les fichiers que tu donnes à une commande (`--script mon.json`) doivent être dans le conteneur : pour un script, colle-le plutôt dans le Studio ou passe par Claude Code.
+
 Un seul outil à installer (Docker Desktop, ou Docker Engine + le plugin Compose). L'image contient Node, Chromium, ffmpeg et Python : rien d'autre sur ta machine.
 
 ```bash
