@@ -1,0 +1,24 @@
+SEPTIM - tout lancer sur Windows (3 etapes)
+
+1. Une seule fois : installer Docker Desktop (PowerShell) puis redemarrer Windows et ouvrir Docker Desktop
+     winget install -e --id Docker.DockerDesktop
+
+2. Mettre septim.zip dans C:\Users\EG\Downloads, puis dans PowerShell :
+     cd $env:USERPROFILE\Downloads; Expand-Archive .\septim.zip .\septim -Force; .\septim\LANCER.bat
+
+   La premiere fois : 15 a 25 minutes (construction, puis modele d'ecriture et voix).
+   Le Studio s'ouvre tout seul dans le navigateur.
+
+3. Tes cles (dans un NOUVEAU terminal PowerShell) :
+     septim env init                          assistant : une question par cle, Entree = garder
+     septim env set PEXELS_API_KEY=ta_cle     ou une cle a la fois
+     septim env set POSTIZ_API_URL=http://host.docker.internal:4007/api POSTIZ_API_KEY=ta_cle
+     septim env set COMFYUI_URL=http://host.docker.internal:8188
+     septim env list                          ce qui est regle (jamais une cle affichee)
+     septim env check                         tester les cles
+
+Voir tout ce que ton ComfyUI a installe :
+     septim comfy                             modeles, LoRA, VAE... et si les plans video sont prets
+
+Reglages d'un clic : onglet "Reglages" du Studio.
+Mode d'emploi complet : docs\GUIDE.md

@@ -76,6 +76,16 @@ describe("handleReply : jamais sans accord net, jamais deux fois", () => {
     expect(s.published).toEqual(["aaaa1111"]);
   });
 
+  it("OUI #ref ambigu (deux vidéos qui commencent pareil) : rien n'est publié, l'usine demande quelques caractères de plus", async () => {
+    const s = setup([makeJob("5f8a1111", "notified", "2026-10-05T10:00:00Z"), makeJob("5f8a2222", "notified", "2026-10-05T11:00:00Z")]);
+    await handleReply("OUI #5f8a", s.deps);
+    expect(s.published).toEqual([]);
+    expect(s.sent.at(-1)).toMatch(/plusieurs vidéos/);
+    expect(s.sent.at(-1)).toContain("#5f8a11");
+    await handleReply("OUI #5f8a22", s.deps);
+    expect(s.published).toEqual(["5f8a2222"]);
+  });
+
   it("un accord ambigu ne publie pas et demande un OUI net", async () => {
     const s = setup();
     await handleReply("ok je regarde ce soir", s.deps);
@@ -195,3 +205,40 @@ describe("publishWithLedger : jamais deux fois, même entre processus", () => {
     expect(s.store.getJob("beef1234")?.status).toBe("published");
   }, 20_000);
 });
+
+describe("revue finale : WhatsApp prévient les autres logiciels et n'écrase rien", () => {
+  it("OUI publie puis appelle onPublished ; NON jette puis appelle onRejected", async () => {
+    const s = setup([makeJob("beef1234"), makeJob("cafe5678")]);
+    const events: string[] = [];
+    const deps = { ...s.deps, onPublished: (j: Job) => void events.push(`pub:${j.id}`), onRejected: (j: Job) => void events.push(`rej:${j.id}`) };
+    await handleReply("OUI #beef", deps);
+    await handleReply("NON #cafe", deps);
+    expect(events).toEqual(["pub:beef1234", "rej:cafe5678"]);
+  });
+
+  it("NON pendant une publication (verrou pris) : rien n'est écrasé, l'usine dit que c'est en cours", async () => {
+    const s = setup([makeJob("beef1234")]);
+    const { tryLock } = await import("../lock");
+    const { mkdirSync } = await import("node:fs");
+    mkdirSync(join(s.store.jobsDir, "beef1234"), { recursive: true });
+    const release = tryLock(join(s.store.jobsDir, "beef1234", "publish.lock"))!;
+    try {
+      await handleReply("NON #beef", s.deps);
+    } finally {
+      release();
+    }
+    expect(s.store.getJob("beef1234")?.status).toBe("notified");
+    expect(s.sent.at(-1)).toMatch(/en cours/);
+  });
+});
+
+describe("installation automatique au démarrage", () => {
+  it("autoInstallIds : SEPTIM_AUTO_INSTALL, sinon voix et modèle dans Docker, sinon rien ; ids inconnus ignorés", async () => {
+    const { autoInstallIds } = await import("../daemon");
+    expect(autoInstallIds({})).toEqual([]);
+    expect(autoInstallIds({ SEPTIM_IN_DOCKER: "1" })).toEqual(["voix", "ollama"]);
+    expect(autoInstallIds({ SEPTIM_IN_DOCKER: "1", SEPTIM_AUTO_INSTALL: "" })).toEqual([]);
+    expect(autoInstallIds({ SEPTIM_AUTO_INSTALL: "voix, voix-hd ,nimporte" })).toEqual(["voix", "voix-hd"]);
+  });
+});
+

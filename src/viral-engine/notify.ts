@@ -34,7 +34,8 @@ export function createConsoleNotifier(io: { input?: Readable; output?: Writable 
 }
 
 type WhatsAppLib = { lib: unknown; qrcode: { generate: (qr: string, opts: { small: boolean }) => void } };
-export type WhatsAppDeps = { load?: () => Promise<WhatsAppLib>; exit?: (code: number) => void };
+// onQr / onReady : le hub de notifications (et donc le Studio) affiche le QR et sait quand le téléphone est lié.
+export type WhatsAppDeps = { load?: () => Promise<WhatsAppLib>; exit?: (code: number) => void; onQr?: (qr: string) => void; onReady?: () => void };
 
 const loadWhatsApp = async (): Promise<WhatsAppLib> => {
   const wa = await import("whatsapp-web.js");
@@ -67,6 +68,7 @@ export function createWhatsAppNotifier(cfg: ViralConfig, deps: WhatsAppDeps = {}
       client.on("qr", (qr: string) => {
         console.log("Scanne ce QR avec WhatsApp (Appareils connectés) :");
         qrcode.generate(qr, { small: true });
+        deps.onQr?.(qr);
       });
       for (const event of ["disconnected", "auth_failure"]) {
         client.on(event, (reason: unknown) => {
@@ -77,6 +79,7 @@ export function createWhatsAppNotifier(cfg: ViralConfig, deps: WhatsAppDeps = {}
       const ready = new Promise<void>((resolve) => client.once("ready", resolve));
       await client.initialize();
       await ready;
+      deps.onReady?.();
       const self = client.info.wid._serialized as string;
       target = cfg.whatsappTo ? `${cfg.whatsappTo.replace(/\D/g, "")}@c.us` : self;
 
@@ -108,6 +111,6 @@ export function createWhatsAppNotifier(cfg: ViralConfig, deps: WhatsAppDeps = {}
   };
 }
 
-export function createNotifier(kind: "whatsapp" | "console", cfg: ViralConfig): Notifier {
-  return kind === "whatsapp" ? createWhatsAppNotifier(cfg) : createConsoleNotifier();
+export function createNotifier(kind: "whatsapp" | "console", cfg: ViralConfig, deps: WhatsAppDeps = {}): Notifier {
+  return kind === "whatsapp" ? createWhatsAppNotifier(cfg, deps) : createConsoleNotifier();
 }

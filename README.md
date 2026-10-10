@@ -10,9 +10,19 @@ Ce repo contient trois choses :
 2. **L'usine** (`src/viral-engine/`, `src/remotion/viral/`) : tendances → hook H.E.A.T → voix → MP4 9:16 → WhatsApp « je publie ? » → publication sur OUI → apprentissage.
 3. **Le site Septim** (`src/app/`) : refait selon la science de la rétention.
 
-## Installer les plugins (une fois)
+## Installer et lancer (une commande)
 
-Dans Claude Code :
+```bash
+git clone https://github.com/SeptimeDSR/design ~/septim
+bash ~/septim/scripts/install.sh --voix     # npm, commande septim, .env, Claude Code, voix, diagnostic
+septim studio                               # http://127.0.0.1:4321 : fabriquer, regarder, publier avec OUI
+```
+
+Toutes les portes de l'usine : navigateur (`septim studio`), terminal (`septim video "sujet"`), Claude Code (`/septim-viral:viral`, `:videos`, `:publier`, `:studio`, `:aide`), assistants MCP (`septim connect claude-desktop --write`, cursor, vscode, windsurf, codex, gemini), API REST + OpenAPI (n8n, Make, Zapier), webhooks signés, WhatsApp (`septim start`).
+
+**Mode d'emploi complet : [`docs/GUIDE.md`](docs/GUIDE.md).**
+
+Plugins Claude Code à la main (si tu n'utilises pas `install.sh`) :
 
 ```
 /plugin marketplace add SeptimeDSR/design
@@ -20,26 +30,7 @@ Dans Claude Code :
 /plugin install septim-viral@septim
 ```
 
-Puis, dans n'importe quel projet :
-
-```
-/septim-design:septim-design                  → il lit le projet, résume, pose une question
-/septim-design:septim-design refais le hero   → il attaque directement
-/septim-viral:viral "je veux une histoire sur la tontine"
-```
-
-Dans une session cloud sur ce repo, le hook `.claude/hooks/session-start.sh` installe les deux plugins tout seul.
-
-## Lancer l'usine chez toi (WSL)
-
-```bash
-npm install
-npm run viral:doctor                      # ce qui tourne, ce qui manque, avec les commandes
-npm run viral -- "je veux une histoire sur la tontine" --template maths
-npm i -g pm2 && pm2 start ecosystem.config.cjs   # le démon : une vidéo toutes les 6 h, WhatsApp pour valider
-```
-
-Sans aucune clé, tout tourne en FREE : rendu Remotion, lit lo-fi généré, publication manuelle (légende prête à coller). Guide complet : `plugins/septim-viral/skills/viral/references/setup.md`.
+Dans une session cloud sur ce repo, le hook `.claude/hooks/session-start.sh` installe les deux plugins tout seul. Sans aucune clé, tout tourne en FREE : rendu Remotion, lit lo-fi généré, publication manuelle (légende prête à coller).
 
 ## Lancer le site
 

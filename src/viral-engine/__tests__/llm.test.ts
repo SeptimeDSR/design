@@ -62,3 +62,33 @@ describe("robustesse des réponses du LLM", () => {
     expect(s?.beats[1].emphasis).toBeUndefined();
   });
 });
+
+describe("Ollama absent : message clair", () => {
+  it("« fetch failed » devient « Ollama absent … script de secours »", async () => {
+    const { generateScript } = await import("../llm");
+    const { loadConfig } = await import("../config");
+    const warns: string[] = [];
+    const orig = console.warn;
+    console.warn = (m: string) => void warns.push(m);
+    try {
+      const r = await generateScript({ topic: "la tontine", lang: "fr", template: "story", formula: "question" }, loadConfig({}), { chat: async () => { throw new TypeError("fetch failed"); } });
+      expect(r.source).toBe("fallback");
+    } finally {
+      console.warn = orig;
+    }
+    expect(warns.join(" ")).toMatch(/Ollama absent \(http:\/\/127\.0\.0\.1:11434\).*script de secours/);
+  });
+});
+
+describe("interrupteur « écrivain de scripts » du Studio", () => {
+  it("VIRAL_OLLAMA=off : le LLM n'est jamais appelé, script de secours sans avertissement", async () => {
+    let calls = 0;
+    const off = loadConfig({ VIRAL_OLLAMA: "off" });
+    expect(off.ollama.enabled).toBe(false);
+    expect(cfg.ollama.enabled).toBe(true);
+    const r = await generateScript(input, off, { chat: async () => (calls++, GOOD) });
+    expect(r.source).toBe("fallback");
+    expect(calls).toBe(0);
+  });
+});
+

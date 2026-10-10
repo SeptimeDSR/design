@@ -1,7 +1,7 @@
-import { existsSync } from "node:fs";
-import { spawnSync } from "node:child_process";
-import { join } from "node:path";
+import { existsSync, readdirSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { loadConfig, loadDotEnv, type ViralConfig } from "./config";
+import { pythonPackageInstalled } from "./features";
 
 export type Probes = {
   ollama: boolean;
@@ -12,17 +12,40 @@ export type Probes = {
   whatsappSession: boolean;
   youtubeKey: boolean;
   apify: boolean;
+  // Gratuit d'abord (D22–D26)
+  comfyui: boolean;
+  pexels: boolean;
+  pixabay: boolean;
+  musicTracks: number;
+  chatterbox: boolean;
+  ttsPref: string;
 };
 
 export type Fix = { id: string; label: string; commands: string[] };
 
-export function diagnose(p: Probes) {
+// Les commandes « >> .env » visent le .env de l'usine : septim se tape depuis n'importe quel dossier.
+// Dans Docker, les commandes de l'hôte (sudo, >> .env, septim setup) ne servent à rien : tout se règle dans Studio > Réglages.
+const SETTINGS_WHERE: Record<string, string> = {
+  voice: "Voix française (Piper) : Installer",
+  llm: "Écrivain de scripts (Ollama) : Installer",
+  whatsapp: "WhatsApp : scanne le QR code",
+  chrome: "WhatsApp : l'image Docker contient déjà Chromium",
+  postiz: "Publication automatique (Postiz) : clé et adresse, puis Tester",
+  youtube: "Tendances YouTube : colle la clé",
+  apify: "Tendances TikTok (Apify) : colle le token",
+  broll: "Vrais plans vidéo (Pexels, Pixabay) : colle une clé gratuite, ou Vidéo IA locale (ComfyUI)",
+  music: "Musique sous la voix : dépose des pistes dans le dossier musique",
+  "voice-hd": "Voix HD (Chatterbox) : coche et installe",
+};
+
+export function diagnose(p: Probes, opts: { envFile?: string; docker?: boolean } = {}) {
   const fixes: Fix[] = [];
+  const env = `'${(opts.envFile ?? ".env").replace(/'/g, "'\\''")}'`;
   if (!p.piperVoice)
     fixes.push({
       id: "voice",
       label: "Voix française gratuite (sinon piste silencieuse)",
-      commands: ["pip install piper-tts", "python3 -m piper.download_voices fr_FR-tom-medium --data-dir .septim-viral/voices"],
+      commands: ["septim setup --voix   # Piper (gratuit, local) dans .septim-viral/venv + voix fr_FR-tom-medium"],
     });
   if (!p.ollama)
     fixes.push({
@@ -30,20 +53,41 @@ export function diagnose(p: Probes) {
       label: "LLM local pour le démon (sinon script de secours ; en interactif, Claude écrit le script)",
       commands: ["curl -fsSL https://ollama.com/install.sh | sh", "ollama pull qwen2.5:7b"],
     });
-  if (!p.whatsappSession) fixes.push({ id: "whatsapp", label: "Lier WhatsApp (une fois)", commands: ["npm run viral:daemon   # scanne le QR avec WhatsApp > Appareils connectés"] });
+  if (!p.whatsappSession) fixes.push({ id: "whatsapp", label: "Lier WhatsApp (une fois)", commands: ["septim start   # scanne le QR avec WhatsApp > Appareils connectés"] });
   if (!p.chrome)
     fixes.push({
       id: "chrome",
       label: "Envoyer de vraies vidéos WhatsApp (sinon envoi en document)",
-      commands: ["wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb", "sudo apt install ./google-chrome-stable_current_amd64.deb", "echo WHATSAPP_CHROME_PATH=/usr/bin/google-chrome >> .env"],
+      commands: ["wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb", "sudo apt install ./google-chrome-stable_current_amd64.deb", `echo WHATSAPP_CHROME_PATH=/usr/bin/google-chrome >> ${env}`],
     });
   if (!p.postiz) fixes.push({ id: "postiz", label: "Publication automatique (sinon légende à coller)", commands: ["npm i -g postiz", "postiz auth:login"] });
-  if (!p.youtubeKey) fixes.push({ id: "youtube", label: "Tendances YouTube du Cameroun (clé gratuite)", commands: ["echo YOUTUBE_API_KEY=ta_cle >> .env"] });
-  if (!p.apify) fixes.push({ id: "apify", label: "Tendances TikTok Creative Center (optionnel, offre gratuite)", commands: ["echo APIFY_TOKEN=ton_token >> .env"] });
+  if (!p.youtubeKey) fixes.push({ id: "youtube", label: "Tendances YouTube du Cameroun (clé gratuite)", commands: [`echo YOUTUBE_API_KEY=ta_cle >> ${env}`] });
+  if (!p.apify) fixes.push({ id: "apify", label: "Tendances TikTok Creative Center (optionnel, offre gratuite)", commands: [`echo APIFY_TOKEN=ton_token >> ${env}`] });
+  if (!p.comfyui && !p.pexels && !p.pixabay)
+    fixes.push({
+      id: "broll",
+      label: "Vrais plans vidéo en rapport avec le sujet, gratuits (sinon fonds animés)",
+      commands: [
+        `echo PEXELS_API_KEY=ta_cle >> ${env}   # clé gratuite en 1 minute : https://www.pexels.com/api/`,
+        "# avec une carte NVIDIA 8 Go+ : IA locale ComfyUI + Wan 2.2, voir docs/GUIDE.md « Gratuit d'abord »",
+      ],
+    });
+  if (!p.musicTracks)
+    fixes.push({
+      id: "music",
+      label: "Ta musique sous la voix (optionnel ; sinon nappe lo-fi générée)",
+      commands: [`mkdir -p ~/septim-musique && echo VIRAL_MUSIC_DIR=$HOME/septim-musique >> ${env}   # pistes libres de droits ou générées avec ACE-Step`],
+    });
+  if (!p.chatterbox) fixes.push({ id: "voice-hd", label: "Voix HD expressive et clonage de ta voix (optionnel, GPU conseillé)", commands: ["septim setup --voix-hd   # Chatterbox Multilingual, licence MIT, puis VIRAL_TTS=chatterbox"] });
+
+  if (opts.docker) for (const f of fixes) f.commands = [`Studio > Réglages > ${SETTINGS_WHERE[f.id] ?? f.label}`];
 
   return {
     canRender: true,
-    voice: p.piperVoice ? ("piper" as const) : p.kokoro ? ("kokoro" as const) : ("silent" as const),
+    // Voix coupée dans les Réglages (VIRAL_TTS=silent) : la vidéo est muette même si une voix est installée.
+    voice: p.ttsPref === "silent" ? ("silent" as const) : p.chatterbox && p.ttsPref === "chatterbox" ? ("chatterbox" as const) : p.piperVoice ? ("piper" as const) : p.kokoro ? ("kokoro" as const) : ("silent" as const),
+    broll: p.comfyui ? ("comfyui" as const) : p.pexels ? ("pexels" as const) : p.pixabay ? ("pixabay" as const) : ("procedural" as const),
+    music: p.musicTracks > 0 ? ("pistes" as const) : ("procedural" as const),
     llm: p.ollama ? ("ollama" as const) : ("secours" as const),
     publishMode: p.postiz ? ("postiz" as const) : ("manual" as const),
     notify: p.whatsappSession ? ("whatsapp" as const) : ("console" as const),
@@ -59,6 +103,8 @@ export function formatDiagnosis(d: ReturnType<typeof diagnose>): string {
     `Script auto : ${d.llm === "ollama" ? "Ollama" : "script de secours (Ollama absent)"}`,
     `Publication : ${d.publishMode === "postiz" ? "Postiz" : "manuelle (légende prête à coller)"}`,
     `Messages    : ${d.notify === "whatsapp" ? "WhatsApp" : "console (WhatsApp pas encore lié)"}`,
+    `Plans       : ${{ comfyui: "IA locale ComfyUI (gratuit)", pexels: "Pexels (gratuit)", pixabay: "Pixabay (gratuit)", procedural: "fonds animés générés" }[d.broll]}`,
+    `Musique     : ${d.music === "pistes" ? "tes pistes" : "nappe lo-fi générée"}`,
   ];
   for (const f of d.fixes) lines.push("", `À faire : ${f.label}`, ...f.commands.map((c) => `  ${c}`));
   return lines.join("\n");
@@ -74,18 +120,26 @@ export async function probe(cfg: ViralConfig, env: Record<string, string | undef
   const { hasPostizCredentials } = await import("./publish");
   return {
     ollama,
-    piperVoice: existsSync(join(voiceDir, `${voice}.onnx`)) && spawnSync("python3", ["-c", "import piper"], { stdio: "ignore" }).status === 0,
+    // Sans lancer Python : importer torch ou piper prend des secondes et bloquerait le serveur.
+    piperVoice: existsSync(join(voiceDir, `${voice}.onnx`)) && pythonPackageInstalled(cfg.home, "piper"),
     kokoro,
     chrome: !!env.WHATSAPP_CHROME_PATH && existsSync(env.WHATSAPP_CHROME_PATH),
-    postiz: !!env.POSTIZ_API_KEY || hasPostizCredentials(),
-    whatsappSession: existsSync(join(cfg.home, "wa")),
+    // Coupés dans les Réglages (mode manuel, console) : ils ne comptent plus, même avec la clé ou la session présentes.
+    postiz: env.VIRAL_PUBLISH_MODE !== "manual" && (!!env.POSTIZ_API_KEY || hasPostizCredentials()),
+    whatsappSession: env.VIRAL_NOTIFIER !== "console" && existsSync(join(cfg.home, "wa")),
     youtubeKey: !!env.YOUTUBE_API_KEY,
     apify: !!env.APIFY_TOKEN,
+    comfyui: !!env.COMFYUI_URL && (await fetch(`${env.COMFYUI_URL.replace(/\/+$/, "")}/system_stats`, { signal: AbortSignal.timeout(2000) }).then((r) => r.ok).catch(() => false)),
+    pexels: !!env.PEXELS_API_KEY?.trim(),
+    pixabay: !!env.PIXABAY_API_KEY?.trim(),
+    musicTracks: env.VIRAL_MUSIC_DIR && existsSync(env.VIRAL_MUSIC_DIR) ? readdirSync(env.VIRAL_MUSIC_DIR).filter((f) => /\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(f)).length : 0,
+    chatterbox: pythonPackageInstalled(cfg.home, "chatterbox"),
+    ttsPref: env.VIRAL_TTS ?? "auto",
   };
 }
 
 if (process.argv[1]?.endsWith("doctor.ts")) {
   loadDotEnv();
   const cfg = loadConfig();
-  probe(cfg).then((p) => console.log(formatDiagnosis(diagnose(p))));
+  probe(cfg).then((p) => console.log(formatDiagnosis(diagnose(p, { envFile: resolve(".env") }))));
 }

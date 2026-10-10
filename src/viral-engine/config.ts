@@ -9,7 +9,7 @@ export type ViralConfig = {
   lang: Lang;
   regions: string[];
   platforms: Platform[];
-  ollama: { host: string; model: string; timeoutMs: number };
+  ollama: { host: string; model: string; timeoutMs: number; enabled: boolean };
   tts: string;
   youtubeApiKey?: string;
   apify?: { token: string; actor: string; input: Record<string, unknown> };
@@ -43,6 +43,8 @@ export function loadConfig(env: Env = process.env): ViralConfig {
       host: env.OLLAMA_HOST ?? "http://127.0.0.1:11434",
       model: env.VIRAL_OLLAMA_MODEL ?? "qwen2.5:7b",
       timeoutMs: Number(env.VIRAL_OLLAMA_TIMEOUT_MS ?? 120_000),
+      // « off » : l'interrupteur du Studio coupe l'écrivain de scripts, le script de secours prend le relais.
+      enabled: env.VIRAL_OLLAMA !== "off",
     },
     tts: env.VIRAL_TTS ?? "auto",
     youtubeApiKey: env.YOUTUBE_API_KEY,

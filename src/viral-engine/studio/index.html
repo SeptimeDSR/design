@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#121640" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Studio Septim</title>
+    <link rel="icon" href="/studio/icon.svg" type="image/svg+xml" />
+    <link rel="preload" href="/studio/fonts/anybody.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/studio/studio.css" />
+    <script src="/studio/studio.js" defer></script>
+  </head>
+  <body>
+    <a class="skip" href="#videos">Aller aux vidéos</a>
+
+    <header class="masthead">
+      <p class="brand"><span class="brand-name">Septim</span> <span class="brand-room">Studio</span></p>
+      <dl class="state" id="state" aria-label="État de l'usine" aria-busy="true">
+        <div><dt>Voix</dt><dd data-state="voice">…</dd></div>
+        <div><dt>Script</dt><dd data-state="llm">…</dd></div>
+        <div><dt>Publication</dt><dd data-state="publishMode">…</dd></div>
+        <div><dt>Messages</dt><dd data-state="notify">…</dd></div>
+        <div><dt>Plans</dt><dd data-state="broll">…</dd></div>
+      </dl>
+      <nav class="views" aria-label="Sections">
+        <button type="button" class="view-tab" data-view="atelier" aria-current="page">Atelier</button>
+        <button type="button" class="view-tab" data-view="settings">Réglages <span class="badge" id="settings-badge" hidden></span></button>
+      </nav>
+      <details class="fixes" id="fixes" hidden>
+        <summary id="fixes-summary"></summary>
+        <ul id="fixes-list"></ul>
+      </details>
+    </header>
+
+    <main class="layout">
+      <section class="panel make" aria-labelledby="make-title">
+        <h2 id="make-title">Fabriquer</h2>
+        <form id="make-form" novalidate>
+          <div class="field">
+            <label for="topic">Sujet</label>
+            <input id="topic" name="topic" type="text" maxlength="500" autocomplete="off" placeholder="la tontine à Douala" aria-describedby="topic-hint" />
+            <p class="hint" id="topic-hint">Laisse vide pour la tendance du jour.</p>
+          </div>
+
+          <fieldset class="choice">
+            <legend>Template</legend>
+            <label><input type="radio" name="template" value="" checked /> <span>Au choix</span></label>
+            <label><input type="radio" name="template" value="story" /> <span>Histoire</span></label>
+            <label><input type="radio" name="template" value="maths" /> <span>Maths</span></label>
+            <label><input type="radio" name="template" value="film" /> <span>Film</span></label>
+          </fieldset>
+
+          <fieldset class="choice">
+            <legend>Langue</legend>
+            <label><input type="radio" name="lang" value="fr" checked /> <span>Français</span></label>
+            <label><input type="radio" name="lang" value="en" /> <span>English</span></label>
+          </fieldset>
+
+          <details class="script-box" id="script-box">
+            <summary>J'ai déjà un script</summary>
+            <div class="field">
+              <label for="script">Script H.E.A.T, en JSON</label>
+              <textarea id="script" name="script" rows="9" spellcheck="false" autocomplete="off" aria-describedby="script-hint"></textarea>
+              <p class="hint" id="script-hint">hook, beats, payoff, caption, hashtags. Le linter dit ce qu'il faut corriger avant le rendu.</p>
+            </div>
+            <button type="button" class="button quiet" id="lint">Vérifier le script</button>
+            <div class="lint-result" id="lint-result" aria-live="polite"></div>
+          </details>
+
+          <button type="submit" class="button primary" id="make-submit">Fabriquer la vidéo</button>
+        </form>
+      </section>
+
+      <section class="panel tasks" aria-labelledby="tasks-title">
+        <h2 id="tasks-title">En fabrication</h2>
+        <ol class="task-list" id="tasks"></ol>
+        <p class="empty" id="tasks-empty">Rien en cours. Un rendu prend environ deux minutes ; tu peux fermer la page, il continue.</p>
+      </section>
+
+      <section class="videos" id="videos" aria-labelledby="videos-title" tabindex="-1">
+        <div class="videos-head">
+          <h2 id="videos-title">Vidéos</h2>
+          <div class="filters" role="group" aria-label="Filtrer les vidéos" id="filters">
+            <button type="button" data-filter="all" aria-pressed="true">Toutes <span class="count" data-count="all"></span></button>
+            <button type="button" data-filter="notified" aria-pressed="false">À valider <span class="count" data-count="notified"></span></button>
+            <button type="button" data-filter="published" aria-pressed="false">Publiées <span class="count" data-count="published"></span></button>
+            <button type="button" data-filter="rejected" aria-pressed="false">Jetées <span class="count" data-count="rejected"></span></button>
+          </div>
+        </div>
+        <ul class="video-list" id="video-list"></ul>
+        <p class="empty" id="videos-empty" hidden></p>
+      </section>
+
+      <section class="panel lessons" aria-labelledby="lessons-title">
+        <h2 id="lessons-title">Ce qui marche</h2>
+        <ol class="arms" id="arms"></ol>
+        <p class="empty" id="lessons-empty">Rien d'appris pour l'instant. L'usine lit les vues 48 heures après chaque publication, puis classe ici les templates et les formules de hook.</p>
+        <details class="lessons-text" id="lessons-text-box" hidden>
+          <summary>Journal des leçons</summary>
+          <pre id="lessons-text"></pre>
+        </details>
+      </section>
+
+      <section class="panel connect" aria-labelledby="connect-title">
+        <h2 id="connect-title">Brancher</h2>
+        <dl class="endpoints">
+          <div><dt>API</dt><dd><code id="api-url"></code> <a id="openapi-link" href="/api/v1/openapi.json">contrat OpenAPI</a></dd></div>
+          <div><dt>MCP</dt><dd><code id="mcp-url"></code></dd></div>
+          <div><dt>Accès</dt><dd id="access">…</dd></div>
+        </dl>
+        <form class="token-form" id="token-form">
+          <label for="token">Token de l'usine</label>
+          <div class="inline">
+            <input id="token" type="password" autocomplete="off" spellcheck="false" placeholder="SEPTIM_TOKEN" />
+            <button type="submit" class="button quiet">Enregistrer</button>
+            <button type="button" class="button quiet" id="token-forget">Oublier</button>
+          </div>
+          <p class="hint">Seulement si l'usine est ouverte au réseau. Le token reste sur cet appareil.</p>
+        </form>
+        <h3>Brancher un assistant (MCP)</h3>
+        <ul class="commands" id="commands"></ul>
+      </section>
+    </main>
+
+    <main class="settings" id="settings" aria-labelledby="settings-title" hidden>
+      <header class="settings-head">
+        <h2 id="settings-title">Réglages</h2>
+        <p>Chaque ligne est une fonction de l'usine. Coche pour l'activer, décoche pour la couper. Sans rien régler, tout le gratuit tourne déjà. Les clés que tu écris dans <code>.env</code> sont reconnues, et celles collées ici restent dans l'usine, jamais affichées.</p>
+      </header>
+      <div id="settings-groups" aria-busy="true"></div>
+      <p class="empty" id="settings-empty" hidden>Impossible de lire les réglages.</p>
+    </main>
+
+    <p class="announce" id="announce" role="status" aria-live="polite"></p>
+  </body>
+</html>

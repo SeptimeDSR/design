@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { ViralProps } from "../remotion/viral/props";
 import type { Job } from "./store";
@@ -19,22 +19,26 @@ export async function renderWithRemotion(job: Job, props: ViralProps, jobDir: st
   const serveUrl = await getBundle();
   const publicJob = join(serveUrl, "public", "viral", job.id);
   mkdirSync(publicJob, { recursive: true });
-  for (const sub of ["voice", "ambient.wav", "broll"]) {
+  const music = readdirSync(jobDir).filter((f) => f.startsWith("music."));
+  for (const sub of ["voice", "ambient.wav", "broll", "sfx", ...music]) {
     if (existsSync(join(jobDir, sub))) cpSync(join(jobDir, sub), join(publicJob, sub), { recursive: true });
   }
 
   const browserExecutable = process.env.REMOTION_BROWSER_EXECUTABLE || null;
   const id = `viral-${job.script.template}`;
-  const composition = await selectComposition({ serveUrl, id, inputProps: props, browserExecutable });
+  // logLevel error : pas de bruit (« Detected differing memory amounts… ») dans le terminal de l'utilisateur.
+  const composition = await selectComposition({ serveUrl, id, inputProps: props, browserExecutable, logLevel: "error" });
   const outputLocation = join(jobDir, "video.mp4");
   await renderMedia({
     composition,
     serveUrl,
     codec: "h264",
-    crf: 23,
+    // CRF 18 : quasi sans perte visible ; la plateforme réencode de toute façon, autant lui donner la meilleure source.
+    crf: 18,
     inputProps: props,
     outputLocation,
     browserExecutable,
+    logLevel: "error",
     concurrency: Number(process.env.VIRAL_RENDER_CONCURRENCY ?? 2),
   });
   return outputLocation;

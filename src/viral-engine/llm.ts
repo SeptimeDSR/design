@@ -26,11 +26,13 @@ export function assembleScript(input: ScriptInput, raw: Partial<ViralScript>): V
   if (typeof raw.hook !== "string" || !Array.isArray(raw.beats) || typeof raw.payoff !== "string") return null;
   const beats: Beat[] = (raw.beats as unknown[])
     .map((b) => (typeof b === "string" ? { text: b } : b))
-    .filter((b): b is { text: string; emphasis?: unknown } => !!b && typeof (b as Beat).text === "string" && (b as Beat).text.trim().length > 0)
+    .filter((b): b is { text: string; emphasis?: unknown; visual?: unknown } => !!b && typeof (b as Beat).text === "string" && (b as Beat).text.trim().length > 0)
     .map((b) => {
       // Un LLM renvoie parfois une emphase numérique : le rendu attend du texte.
       const emphasis = typeof b.emphasis === "string" ? b.emphasis : typeof b.emphasis === "number" ? String(b.emphasis) : undefined;
-      return emphasis ? { text: b.text, emphasis } : { text: b.text };
+      // visual : le plan à chercher ou générer pour ce beat (B-roll gratuit).
+      const visual = typeof b.visual === "string" && b.visual.trim() ? b.visual.trim() : undefined;
+      return { text: b.text, ...(emphasis ? { emphasis } : {}), ...(visual ? { visual } : {}) };
     });
   return {
     topic: input.topic,
@@ -53,7 +55,7 @@ export async function generateScript(
   client: LlmClient = ollamaClient(cfg),
 ): Promise<{ script: ViralScript; source: "ollama" | "fallback"; attempts: number }> {
   let prompt = buildHeatPrompt(input);
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  for (let attempt = 1; attempt <= 3 && cfg.ollama.enabled; attempt++) {
     try {
       const parsed = parseHeatResponse(await client.chat(prompt));
       const script = parsed && assembleScript(input, parsed);
@@ -63,7 +65,8 @@ export async function generateScript(
         prompt = `${buildHeatPrompt(input)}\n\nTa réponse précédente viole ces règles, corrige-les :\n${issues.map((i) => `- ${i.rule} : ${i.message}`).join("\n")}`;
       }
     } catch (error) {
-      console.warn(`[llm] essai ${attempt} : ${(error as Error).message}`);
+      const message = (error as Error).message;
+      console.warn(/fetch failed|ECONNREFUSED|ENOTFOUND/i.test(message) ? `[llm] Ollama absent (${cfg.ollama.host}) : script de secours. Pour un vrai script : Claude Code, ou ollama pull ${cfg.ollama.model}.` : `[llm] essai ${attempt} : ${message}`);
       break;
     }
   }
