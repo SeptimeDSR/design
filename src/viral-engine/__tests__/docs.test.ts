@@ -120,4 +120,24 @@ describe("documentation : elle ne dérive pas du code", () => {
     const example = read(".env.example");
     for (const v of ["SEPTIM_BIND", "SEPTIM_OLLAMA_HOST"]) expect(example, v).toContain(v);
   });
+
+  it("Windows : LANCER.bat et LANCER.ps1 lancent tout avec Docker, .gitattributes protège les fins de ligne", () => {
+    for (const f of ["LANCER.bat", "LANCER.ps1", ".gitattributes"]) expect(existsSync(join(ROOT, f)), f).toBe(true);
+    const ps1 = readFileSync(join(ROOT, "LANCER.ps1"));
+    // Windows PowerShell 5.1 lit un .ps1 sans BOM en ANSI : tout accent casserait le script.
+    expect([...ps1].every((b) => b < 128), "LANCER.ps1 en ASCII").toBe(true);
+    const text = ps1.toString("utf8");
+    expect(text).toContain("docker compose up -d --build");
+    expect(text).toContain("winget install -e --id Docker.DockerDesktop");
+    expect(text).toContain("Start-Process");
+    expect(text).not.toMatch(/ErrorActionPreference\s*=\s*["']Stop/);
+    expect(read("LANCER.bat")).toMatch(/powershell .*-ExecutionPolicy Bypass .*-File .*LANCER\.ps1/);
+    // Un script shell copié par git sous Windows en CRLF ferait planter le conteneur (« /bin/sh^M »).
+    const attrs = read(".gitattributes");
+    expect(attrs).toMatch(/docker\/\*\s+text eol=lf/);
+    expect(attrs).toMatch(/Dockerfile\s+text eol=lf/);
+    expect(attrs).toMatch(/\*\.(bat|ps1)[^\n]*eol=crlf|\*\.\{bat,ps1\}[^\n]*eol=crlf/);
+    expect(GUIDE).toContain("LANCER.bat");
+    expect(GUIDE).toContain("Expand-Archive");
+  });
 });

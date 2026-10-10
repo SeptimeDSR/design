@@ -579,6 +579,14 @@ Les lignes vides du `.env` (clés, numéros) sont sans effet. Les variables « a
 
 ## Docker
 
+**Windows, une seule commande** (le zip dans `C:\Users\EG\Downloads`, Docker Desktop installé et ouvert) : dans PowerShell,
+
+```powershell
+cd $env:USERPROFILE\Downloads; Expand-Archive .\septim.zip .\septim -Force; .\septim\LANCER.bat
+```
+
+`LANCER.bat` construit l'image, démarre l'usine et ouvre le Studio dans ton navigateur. Docker Desktop manquant : `winget install -e --id Docker.DockerDesktop`, redémarre Windows, ouvre Docker Desktop, relance. Ubuntu et macOS : `unzip septim.zip -d septim && cd septim && docker compose up -d --build`.
+
 Un seul outil à installer (Docker Desktop, ou Docker Engine + le plugin Compose). L'image contient Node, Chromium, ffmpeg et Python : rien d'autre sur ta machine.
 
 ```bash

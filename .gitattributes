@@ -1,0 +1,9 @@
+# Windows : git ne doit jamais mettre de CRLF dans ce qui s'execute dans le conteneur Linux.
+Dockerfile text eol=lf
+compose.yaml text eol=lf
+.dockerignore text eol=lf
+docker/* text eol=lf
+*.sh text eol=lf
+# Et les lanceurs Windows restent en CRLF.
+*.bat text eol=crlf
+*.ps1 text eol=crlf
