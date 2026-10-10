@@ -438,3 +438,121 @@ describe("Docker : septim connect branche par l'adresse HTTP (le conteneur n'a p
     expect(c.out).toContain('claude mcp add --transport http --scope user septim http://localhost:4400/mcp');
   });
 });
+
+describe("septim env : régler .env depuis le terminal", () => {
+  async function workspace(extra = "") {
+    const { copyFileSync, mkdtempSync: mk, writeFileSync: wf } = await import("node:fs");
+    const root = mk(join(tmpdir(), "septim-envcli-"));
+    copyFileSync(join(ROOT, ".env.example"), join(root, ".env.example"));
+    if (extra !== null) wf(join(root, ".env"), extra);
+    process.env.SEPTIM_ROOT = root;
+    tempHome();
+    return { root, file: join(root, ".env") };
+  }
+  const runWithInput = async (argv: string[], input: string) => {
+    const { Readable } = await import("node:stream");
+    const out = capture();
+    const err = capture();
+    const code = await main(argv, { out: out.stream, err: err.stream, input: Readable.from([input]) });
+    return { code, out: out.text, err: err.text };
+  };
+
+  it("env set CLE=valeur écrit la ligne sans jamais répéter la clé ; la forme « CLE valeur » marche aussi", async () => {
+    const { file } = await workspace("VIRAL_LANG=fr\n");
+    const a = await run(["env", "set", "PEXELS_API_KEY=abc123secret"]);
+    expect(a.code).toBe(0);
+    expect(a.out).toContain("PEXELS_API_KEY");
+    expect(a.out).toMatch(/enregistrée/);
+    expect(a.out + a.err).not.toContain("abc123secret");
+    expect(readFileSync(file, "utf8")).toContain("PEXELS_API_KEY=abc123secret");
+    expect(readFileSync(file, "utf8")).toContain("VIRAL_LANG=fr");
+    const b = await run(["env", "set", "COMFYUI_URL", "http://host.docker.internal:8188", "POSTIZ_API_URL=http://host.docker.internal:4007/api"]);
+    expect(b.code).toBe(0);
+    const text = readFileSync(file, "utf8");
+    expect(text).toContain("COMFYUI_URL=http://host.docker.internal:8188");
+    expect(text).toContain("POSTIZ_API_URL=http://host.docker.internal:4007/api");
+  });
+
+  it("le .env absent est créé avec un en-tête (pas la copie de .env.example : ses valeurs écraseraient les défauts de Docker)", async () => {
+    const { file } = await workspace(null as never);
+    expect((await run(["env", "set", "YOUTUBE_API_KEY=yt"])).code).toBe(0);
+    const text = readFileSync(file, "utf8");
+    expect(text).toContain("YOUTUBE_API_KEY=yt");
+    expect(text).not.toMatch(/^VIRAL_NOTIFIER=/m);
+  });
+
+  it("nom inconnu ou mal écrit → code 1 avec la suggestion, rien n'est écrit", async () => {
+    const { file } = await workspace("A=1\n");
+    const r = await run(["env", "set", "PEXEL_API_KEY=x"]);
+    expect(r.code).toBe(1);
+    expect(r.err).toMatch(/PEXELS_API_KEY/);
+    expect(readFileSync(file, "utf8")).toBe("A=1\n");
+    expect((await run(["env", "set", "pexels=x"])).code).toBe(1);
+    expect((await run(["env", "set", "PEXELS_API_KEY"])).err).toMatch(/valeur/);
+    expect((await run(["env", "set"])).code).toBe(1);
+  });
+
+  it("env unset retire la ligne ; env list montre réglé / vide, jamais une clé", async () => {
+    const { file } = await workspace("PEXELS_API_KEY=supersecret99\n");
+    const list = await run(["env", "list"]);
+    expect(list.code).toBe(0);
+    expect(list.out).toMatch(/PEXELS_API_KEY\s+réglé\s+•••• \(13 caractères\)/);
+    expect(list.out).toMatch(/YOUTUBE_API_KEY\s+vide/);
+    expect(list.out).not.toContain("supersecret99");
+    expect((await run(["env"])).out).toMatch(/PEXELS_API_KEY\s+réglé/);
+    expect((await run(["env", "unset", "PEXELS_API_KEY"])).code).toBe(0);
+    expect(readFileSync(file, "utf8")).not.toContain("PEXELS_API_KEY=");
+    const again = await run(["env", "unset", "PEXELS_API_KEY"]);
+    expect(again.out + again.err).toMatch(/déjà vide|pas réglée/);
+  });
+
+  it("env init : l'assistant pose les questions, Entrée garde, une réponse règle ; WhatsApp en o/N", async () => {
+    const { file } = await workspace("PEXELS_API_KEY=ancienne\n");
+    // Pexels : Entrée (garde) ; Pixabay : réglée ; YouTube, Apify, Postiz URL, Postiz clé : Entrée ; ComfyUI : réglée ; WhatsApp : o
+    const answers = ["", "pix-key", "", "", "http://host.docker.internal:4007/api", "pz-key", "http://host.docker.internal:8188", "o"].join("\n") + "\n";
+    const r = await runWithInput(["env", "init"], answers);
+    expect(r.code).toBe(0);
+    const text = readFileSync(file, "utf8");
+    expect(text).toContain("PEXELS_API_KEY=ancienne");
+    expect(text).toContain("PIXABAY_API_KEY=pix-key");
+    expect(text).toContain("POSTIZ_API_URL=http://host.docker.internal:4007/api");
+    expect(text).toContain("POSTIZ_API_KEY=pz-key");
+    expect(text).toContain("COMFYUI_URL=http://host.docker.internal:8188");
+    expect(text).toContain("VIRAL_NOTIFIER=whatsapp");
+    expect(r.out).toMatch(/5 valeurs? enregistrée/);
+    expect(r.out).not.toContain("pix-key");
+    expect(r.out).toContain("septim env check");
+  });
+
+  it("env init sans réponse (fin d'entrée) ne casse rien", async () => {
+    const { file } = await workspace("A=1\n");
+    const r = await runWithInput(["env", "init"], "");
+    expect(r.code).toBe(0);
+    expect(readFileSync(file, "utf8")).toBe("A=1\n");
+    expect(r.out).toMatch(/Rien à changer/);
+  });
+
+  it("dans Docker : dit comment appliquer ; hors Docker : relancer septim", async () => {
+    await workspace("");
+    process.env.SEPTIM_IN_DOCKER = "1";
+    expect((await run(["env", "set", "YOUTUBE_API_KEY=k"])).out).toMatch(/docker compose up -d/);
+    delete process.env.SEPTIM_IN_DOCKER;
+    expect((await run(["env", "set", "YOUTUBE_API_KEY=k2"])).out).toMatch(/septim studio|septim start/);
+  });
+
+  it("env check sans aucune clé : le dit et renvoie vers env init (aucun appel réseau)", async () => {
+    await workspace("");
+    for (const k of ["PEXELS_API_KEY", "PIXABAY_API_KEY", "YOUTUBE_API_KEY", "APIFY_TOKEN", "POSTIZ_API_KEY", "COMFYUI_URL"]) delete process.env[k];
+    const r = await run(["env", "check"]);
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/Aucune clé/);
+    expect(r.out).toContain("septim env init");
+  });
+
+  it("septim aide cite env ; sous-commande inconnue → aide de env", async () => {
+    expect((await run(["aide"])).out).toMatch(/septim env/);
+    const r = await run(["env", "nimporte"]);
+    expect(r.code).toBe(1);
+    expect(r.err).toMatch(/set|list|init|check/);
+  });
+});

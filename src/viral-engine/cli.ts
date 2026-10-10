@@ -11,7 +11,8 @@ import { attachWebhooks, flushWebhooks } from "./webhooks";
 import type { Job } from "./store";
 import { TEMPLATES, type Lang, type TemplateId } from "./types";
 
-export type CliIO = { out: Writable; err: Writable };
+// input : seulement pour les assistants interactifs (septim env init) ; par défaut le clavier.
+export type CliIO = { out: Writable; err: Writable; input?: NodeJS.ReadableStream };
 
 // Un chemin tapé par l'humain se lit depuis le dossier où il a tapé la commande, pas depuis le repo.
 export const userPath = (p: string) => resolve(process.env.SEPTIM_CWD ?? process.env.INIT_CWD ?? process.cwd(), p);

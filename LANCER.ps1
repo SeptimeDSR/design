@@ -18,6 +18,12 @@ if ($LASTEXITCODE -ne 0) {
   exit 1
 }
 
+# Le fichier .env des cles : cree vide (un simple en-tete), jamais copie depuis .env.example dont les valeurs ecraseraient les defauts.
+if (-not (Test-Path ".env")) {
+  Set-Content -Path ".env" -Value "# Reglages SEPTIM : septim env init (assistant), septim env set CLE=valeur" -Encoding ascii
+  Write-Host "Fichier .env cree. Pour tes cles : septim env init (dans un NOUVEAU terminal), ou l'onglet Reglages du Studio."
+}
+
 Write-Host ""
 Write-Host "Construction et demarrage de SEPTIM (5 a 10 minutes la premiere fois)..."
 docker compose up -d --build

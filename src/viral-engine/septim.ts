@@ -5,6 +5,8 @@ import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { runCli, userPath, type CliIO } from "./cli";
 import { loadDotEnv } from "./config";
+import { createInterface } from "node:readline";
+import { envCatalog, formatEnvList, readEnv, setEnvVars, unsetEnvVar, validateEnvName } from "./envfile";
 import { CLIENT_NAMES, isMcpClient, MCP_CLIENTS, dockerMcpConfig, mcpConfig, writeMcpConfig } from "./connect";
 import { formatDiagnosis } from "./doctor";
 import { FactoryError } from "./errors";
@@ -35,6 +37,7 @@ Ouvrir les portes
 
 Installer et réparer
   septim setup [--sans-claude] [--voix] [--voix-hd]   .env, Claude Code, voix gratuite (HD : Chatterbox), diagnostic
+  septim env [list|set CLE=valeur|unset CLE|init|check]   régler le fichier .env (clés, adresses) depuis le terminal et tester les clés
   septim doctor                       ce qui tourne, et les commandes pour le reste
   septim design init [dossier]        installer septim-design dans un autre projet
   septim version
@@ -54,7 +57,7 @@ const ALIASES: Record<string, string> = {
   "--version": "version",
   "-v": "version",
 };
-const COMMANDS = ["video", "lint", "videos", "voir", "publier", "jeter", "studio", "start", "mcp", "doctor", "connect", "setup", "design", "aide", "version"];
+const COMMANDS = ["video", "lint", "videos", "voir", "publier", "jeter", "studio", "start", "mcp", "doctor", "env", "connect", "setup", "design", "aide", "version"];
 
 const STATUS_FR: Record<JobStatus, string> = { rendered: "Rendue", notified: "À valider", publishing: "En publication", published: "Publiée", rejected: "Jetée", failed: "Ratée" };
 const STATUS_ARG: Record<string, JobStatus> = { "a-valider": "notified", prete: "notified", publiee: "published", jetee: "rejected", ratee: "failed" };
@@ -183,6 +186,133 @@ async function connect(args: string[], io: CliIO): Promise<number> {
   return 0;
 }
 
+// ---------- septim env : le fichier .env depuis le terminal ----------
+
+const ENV_USAGE = `Usage : septim env list [--all]            les variables, réglées ou vides (les clés ne s'affichent jamais)
+        septim env set CLE=valeur [CLE=valeur…]   écrire (ou remplacer) une valeur dans .env
+        septim env unset CLE               retirer une valeur
+        septim env init                    assistant : pose les questions une à une (Entrée = garder)
+        septim env check                   tester les clés réglées (Pexels, YouTube, Postiz, ComfyUI…)`;
+
+const INIT_QUESTIONS: { name: string; question: string; hint?: string }[] = [
+  { name: "PEXELS_API_KEY", question: "Clé Pexels (vrais plans vidéo, gratuite : https://www.pexels.com/api/)" },
+  { name: "PIXABAY_API_KEY", question: "Clé Pixabay (deuxième banque de plans, gratuite)" },
+  { name: "YOUTUBE_API_KEY", question: "Clé YouTube (tendances du Cameroun, gratuite)" },
+  { name: "APIFY_TOKEN", question: "Token Apify (tendances TikTok, offre gratuite)" },
+  { name: "POSTIZ_API_URL", question: "Adresse de ton Postiz", hint: "depuis Docker : http://host.docker.internal:4007/api si ton Postiz est sur le port 4007" },
+  { name: "POSTIZ_API_KEY", question: "Clé API de ton Postiz (Postiz > Paramètres > Développeurs)" },
+  { name: "COMFYUI_URL", question: "Adresse de ton ComfyUI", hint: "depuis Docker : http://host.docker.internal:8188 (8000 pour l'application Desktop)" },
+];
+
+async function envCommand(args: string[], io: CliIO): Promise<number> {
+  const out = (t = "") => void io.out.write(`${t}\n`);
+  const root = repoRoot();
+  const file = join(root, ".env");
+  const example = join(root, ".env.example");
+  const catalog = envCatalog(example);
+  const sub = args[0] ?? "list";
+  const apply = () => out(process.env.SEPTIM_IN_DOCKER ? "Pour appliquer : docker compose up -d (septim.cmd le fait pour toi sous Windows)." : "Pour appliquer : relance septim studio ou septim start.");
+
+  if (sub === "list") {
+    out(formatEnvList(catalog, readEnv(file), { all: args.includes("--all") }));
+    out("");
+    out("Régler : septim env set CLE=valeur   ·   Assistant : septim env init   ·   Tester : septim env check");
+    return 0;
+  }
+
+  if (sub === "set") {
+    const pairs: Record<string, string> = {};
+    const rest = args.slice(1);
+    for (let i = 0; i < rest.length; i++) {
+      const eq = rest[i].indexOf("=");
+      if (eq > 0) pairs[rest[i].slice(0, eq)] = rest[i].slice(eq + 1);
+      else if (i + 1 < rest.length && !rest[i + 1].includes("=")) pairs[rest[i]] = rest[++i];
+      else throw new FactoryError("bad_request", `Il manque la valeur de « ${rest[i]} » : septim env set ${rest[i]}=valeur`);
+    }
+    if (!Object.keys(pairs).length) throw new FactoryError("bad_request", ENV_USAGE);
+    for (const name of Object.keys(pairs)) {
+      const problem = validateEnvName(name, catalog);
+      if (problem) throw new FactoryError("bad_request", problem);
+    }
+    setEnvVars(file, pairs);
+    for (const name of Object.keys(pairs)) out(`✓ ${name} enregistrée dans .env`);
+    apply();
+    return 0;
+  }
+
+  if (sub === "unset") {
+    const name = args[1];
+    if (!name) throw new FactoryError("bad_request", "Il manque le nom : septim env unset CLE");
+    const problem = validateEnvName(name, catalog);
+    if (problem) throw new FactoryError("bad_request", problem);
+    out(unsetEnvVar(file, name) ? `✓ ${name} retirée de .env` : `${name} n'était pas réglée (déjà vide).`);
+    apply();
+    return 0;
+  }
+
+  if (sub === "init") {
+    const current = readEnv(file);
+    const rl = createInterface({ input: (io.input ?? process.stdin) as NodeJS.ReadableStream, terminal: false });
+    const lines = rl[Symbol.asyncIterator]();
+    const ask = async (question: string): Promise<string> => {
+      io.out.write(question);
+      const next = await lines.next();
+      return next.done ? "" : String(next.value).trim();
+    };
+    out("Assistant .env : Entrée garde la valeur actuelle. Rien n'est affiché en retour, ni envoyé nulle part.");
+    out("");
+    const updates: Record<string, string> = {};
+    for (const q of INIT_QUESTIONS) {
+      if (q.hint) out(`  (${q.hint})`);
+      const state = current[q.name] ? " [déjà réglée]" : "";
+      const answer = await ask(`${q.question}${state} : `);
+      if (answer) updates[q.name] = answer;
+    }
+    const wa = (await ask(`Lier WhatsApp (QR code à scanner) ? o/N${current.VIRAL_NOTIFIER === "whatsapp" ? " [déjà activé]" : ""} : `)).toLowerCase();
+    if (["o", "oui", "y", "yes"].includes(wa)) updates.VIRAL_NOTIFIER = "whatsapp";
+    rl.close();
+    const names = Object.keys(updates);
+    if (!names.length) {
+      out("");
+      out("Rien à changer.");
+      return 0;
+    }
+    setEnvVars(file, updates);
+    out("");
+    out(`✓ ${names.length} ${names.length > 1 ? "valeurs enregistrées" : "valeur enregistrée"} dans .env : ${names.join(", ")}`);
+    out("Tester les clés : septim env check");
+    apply();
+    return 0;
+  }
+
+  if (sub === "check") {
+    const targets: [string, string, string][] = [
+      ["PEXELS_API_KEY", "pexels", "Pexels"],
+      ["PIXABAY_API_KEY", "pixabay", "Pixabay"],
+      ["YOUTUBE_API_KEY", "youtube", "YouTube"],
+      ["APIFY_TOKEN", "apify", "Apify"],
+      ["POSTIZ_API_KEY", "publication", "Postiz"],
+      ["COMFYUI_URL", "comfyui", "ComfyUI"],
+    ];
+    const set = targets.filter(([name]) => (process.env[name] ?? readEnv(file)[name] ?? "").trim());
+    if (!set.length) {
+      out("Aucune clé réglée pour l'instant : septim env init (assistant) ou septim env set PEXELS_API_KEY=ta_cle");
+      return 0;
+    }
+    const factory = createFactory();
+    let ok = true;
+    for (const [, id, label] of set) {
+      const r = await factory.settings.test(id);
+      out(`${r.ok ? "✓" : "✗"} ${label} : ${r.message.split("\n")[0]}`);
+      ok = ok && r.ok;
+    }
+    return ok ? 0 : 1;
+  }
+
+  io.err.write(`Sous-commande inconnue « ${sub} ».\n${ENV_USAGE}\n`);
+  return 1;
+}
+
 async function dispatch(command: string, args: string[], io: CliIO): Promise<number | "running"> {
   const out = (t = "") => void io.out.write(`${t}\n`);
   const needRef = (verb: string) => {
@@ -233,6 +363,8 @@ async function dispatch(command: string, args: string[], io: CliIO): Promise<num
     case "doctor":
       out(formatDiagnosis(await createFactory().doctor()));
       return 0;
+    case "env":
+      return envCommand(args, io);
     case "studio":
       return studio(args, io, { daemon: false });
     case "start": {

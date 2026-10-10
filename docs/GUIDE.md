@@ -210,6 +210,7 @@ Dans le Studio, l'onglet **Réglages** liste les 11 fonctions de l'usine. Chacun
 | `septim mcp` | serveur MCP stdio (pour les assistants) |
 | `septim connect <client> [--write]` | brancher un assistant MCP (sans client : la liste) |
 | `septim setup [--sans-claude] [--voix] [--voix-hd]` | `.env`, Claude Code, voix (HD : Chatterbox), diagnostic |
+| `septim env [list\|set CLE=valeur\|unset CLE\|init\|check]` | régler le fichier `.env` depuis le terminal et tester les clés (voir ci-dessous) |
 | `septim doctor` | état de l'usine et commandes pour le reste |
 | `septim design init [dossier]` | installer septim-design dans un autre projet Next.js |
 | `septim version` | version de l'usine |
@@ -226,6 +227,22 @@ Une référence, c'est le début de l'identifiant de la vidéo : `5f8a`, `#5F8A`
 Templates : `story` = Histoire, `maths` = Maths, `film` = Film. Jeter une vidéo ne supprime pas son MP4 : les fichiers sont dans `.septim-viral/jobs/<id>/` ; supprime le dossier d'une vidéo jetée pour libérer la place.
 
 Alias anglais : `create`, `list`, `show`, `publish`, `reject`. Les anciens scripts restent : `npm run viral -- "sujet"`, `npm run viral:doctor`, `npm run viral:daemon` (depuis le dossier du repo).
+
+### Régler le `.env` depuis le terminal
+
+Tes clés vont dans le fichier `.env` (à côté de `compose.yaml`). Tu peux l'éditer à la main, ou laisser `septim env` le faire sans rien abîmer (commentaires et autres lignes gardés, aucune clé jamais réaffichée) :
+
+```powershell
+septim env init                       # assistant : une question par clé, Entrée = garder la valeur actuelle
+septim env set PEXELS_API_KEY=ta_cle  # une valeur ; plusieurs d'un coup : septim env set A=1 B=2
+septim env set POSTIZ_API_URL=http://host.docker.internal:4007/api POSTIZ_API_KEY=ta_cle_postiz
+septim env set COMFYUI_URL=http://host.docker.internal:8188
+septim env list                       # réglé ou vide pour chaque variable (septim env list --all : toutes)
+septim env check                      # teste chaque clé réglée auprès du service (Pexels, YouTube, Apify, Postiz, ComfyUI)
+septim env unset PEXELS_API_KEY       # retirer une valeur
+```
+
+L'assistant demande, dans l'ordre : Pexels, Pixabay, YouTube, Apify, l'adresse puis la clé de ton Postiz, l'adresse de ton ComfyUI, puis « Lier WhatsApp ? o/N ». Un nom de variable inconnu ou mal écrit est refusé avec la bonne suggestion (`PEXEL_API_KEY` → `PEXELS_API_KEY`). Sous Windows, `septim.cmd` crée `.env` s'il manque, monte ce fichier dans l'usine le temps de la commande, puis **recrée l'usine qui tourne** pour qu'elle relise `.env` (Docker ne relit `.env` qu'à la création du conteneur). Sous Linux ou macOS, avec Docker : `docker compose run --rm --no-deps -u "$(id -u):$(id -g)" -v "$PWD/.env:/app/.env" septim env init`, puis `docker compose up -d`. Sans Docker, `septim env …` écrit le `.env` du dossier de l'usine ; relance `septim studio` ou `septim start`. Les mêmes clés se règlent aussi d'un clic dans l'onglet **Réglages** du Studio (sans redémarrage).
 
 ---
 

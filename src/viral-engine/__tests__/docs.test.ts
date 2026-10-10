@@ -159,6 +159,15 @@ describe("documentation : elle ne dérive pas du code", () => {
     expect(text).toMatch(/\/data\/\.token/);
     expect(read(".gitattributes")).toMatch(/\*\.cmd[^\n]*eol=crlf|\*\.\{bat,cmd,ps1\}[^\n]*eol=crlf/);
     expect(read("LANCER.ps1")).toContain("SetEnvironmentVariable");
+    // septim env : le .env de l'hôte est monté le temps de la commande (jamais créé en dossier par Docker), puis l'usine est recréée.
+    expect(text).toContain("docker compose run --rm --no-deps -v");
+    expect(text).toContain("/app/.env");
+    expect(text).toMatch(/if not exist "%~dp0\.env"/);
+    expect(text).toMatch(/docker compose up -d/);
+    const lancer = read("LANCER.ps1");
+    expect(lancer).toMatch(/Test-Path \.?\\?"?\.env"?/);
+    expect(lancer).not.toMatch(/Copy-Item[^\n]*\.env\.example/);
+    for (const cmd of ["septim env init", "septim env set", "septim env list", "septim env check"]) expect(GUIDE, cmd).toContain(cmd);
     expect(read("Dockerfile")).toContain("SEPTIM_IN_DOCKER=1");
     expect(GUIDE).toContain("septim.cmd");
   });
