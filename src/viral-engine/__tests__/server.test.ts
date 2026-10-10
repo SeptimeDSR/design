@@ -373,3 +373,47 @@ describe("serveur : Studio, contrat, routes", () => {
     expect(doc.info.version).toBe(VERSION);
   });
 });
+
+describe("serveur : réglages (les interrupteurs du Studio)", () => {
+  it("GET /api/v1/settings → les 11 fonctions, jamais une clé ; POST /settings/:id règle, coupe, et la liste le reflète", async () => {
+    const t = await boot();
+    const list = (await (await t.get("/api/v1/settings")).json()) as { features: { id: string; status: string; fields: { source: string | null }[] }[] };
+    expect(list.features).toHaveLength(11);
+    const pexels = list.features.find((f) => f.id === "pexels")!;
+    expect(pexels.status).toBe("cle-manquante");
+    const set = await t.post("/api/v1/settings/pexels", { values: { PEXELS_API_KEY: "tres-secrete-123" } });
+    expect(set.status).toBe(200);
+    const view = (await set.json()) as { status: string; fields: { source: string }[] };
+    expect(view.status).toBe("actif");
+    expect(view.fields[0].source).toBe("studio");
+    expect(JSON.stringify(await (await t.get("/api/v1/settings")).json())).not.toContain("tres-secrete-123");
+    const off = (await (await t.post("/api/v1/settings/pexels", { enabled: false })).json()) as { status: string };
+    expect(off.status).toBe("coupe");
+  });
+
+  it("réglage refusé : id inconnu 404, variable étrangère 400, enabled pas booléen 400", async () => {
+    const t = await boot();
+    expect((await t.post("/api/v1/settings/nope", { enabled: true })).status).toBe(404);
+    expect((await t.post("/api/v1/settings/pexels", { values: { OLLAMA_HOST: "x" } })).status).toBe(400);
+    expect((await t.post("/api/v1/settings/pexels", { enabled: "oui" })).status).toBe(400);
+    expect((await t.post("/api/v1/settings/pexels", { values: "x" })).status).toBe(400);
+  });
+
+  it("POST /settings/:id/install → 202 avec l'état ; une clé ne s'installe pas → 400 ; POST /settings/:id/test → {ok, message}", async () => {
+    const t = await boot();
+    const inst = await t.post("/api/v1/settings/voix/install");
+    expect(inst.status).toBe(202);
+    expect(((await inst.json()) as { install: { status: string } }).install.status).toMatch(/running|done/);
+    expect((await t.post("/api/v1/settings/pexels/install")).status).toBe(400);
+    const test = (await (await t.post("/api/v1/settings/pexels/test")).json()) as { ok: boolean; message: string };
+    expect(test.ok).toBe(false);
+    expect(test.message).toMatch(/clé/i);
+  });
+
+  it("protégé par le token comme le reste de l'API", async () => {
+    const t = await boot({ token: "tok" });
+    const res = await fetch(t.srv.url + "/api/v1/settings");
+    expect(res.status).toBe(401);
+  });
+});
+

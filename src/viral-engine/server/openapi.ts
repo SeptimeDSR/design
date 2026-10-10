@@ -11,6 +11,13 @@ const refParam = {
   description: "Référence de la vidéo : les 4 premiers caractères suffisent (« 5f8a », « #5F8A » encodé en %235F8A).",
   schema: { type: "string" },
 };
+const featureParam = {
+  name: "id",
+  in: "path",
+  required: true,
+  description: "Identifiant de la fonction : ollama, voix, voix-hd, whatsapp, publication, youtube, apify, pexels, pixabay, comfyui, musique.",
+  schema: { type: "string" },
+};
 const common = {
   "401": error("Token absent ou faux (Authorization: Bearer <SEPTIM_TOKEN>)."),
   "403": error("Hôte ou origine refusés (protection DNS rebinding et CSRF)."),
@@ -143,6 +150,38 @@ export const openapi = {
         responses: { "200": json(ref("LintResult"), "Résultat (ok:false liste les règles enfreintes)."), "400": error("script n'est pas un objet."), ...common },
       },
     },
+    "/api/v1/settings": {
+      get: {
+        operationId: "listSettings",
+        summary: "Les fonctions de l'usine (voix, WhatsApp, clés, ComfyUI…) : interrupteur, état, champs. Jamais la valeur d'une clé.",
+        responses: { "200": json({ type: "object", properties: { features: { type: "array", items: ref("Feature") } }, required: ["features"] }, "Fonctions."), ...common },
+      },
+    },
+    "/api/v1/settings/{id}": {
+      post: {
+        operationId: "updateSetting",
+        summary: "Coche ou décoche une fonction, ou règle ses champs (clé, adresse, dossier, plateformes). Cocher une fonction non installée l'installe.",
+        parameters: [featureParam],
+        requestBody: body({ type: "object", properties: { enabled: { type: "boolean" }, values: { type: "object", additionalProperties: { type: "string" }, description: "VARIABLE → valeur ; vide efface la valeur du Studio." } } }),
+        responses: { "200": json(ref("Feature"), "La fonction mise à jour."), "400": error("Variable étrangère à cette fonction, valeur invalide."), "404": error("Fonction inconnue."), ...common },
+      },
+    },
+    "/api/v1/settings/{id}/install": {
+      post: {
+        operationId: "installSetting",
+        summary: "Installe ce qui manque (voix Piper, voix HD, modèle Ollama) ; l'état se suit dans GET /settings (install.status, install.log).",
+        parameters: [featureParam],
+        responses: { "202": json(ref("Feature"), "Installation lancée."), "400": error("Rien à installer pour cette fonction."), "404": error("Fonction inconnue."), ...common },
+      },
+    },
+    "/api/v1/settings/{id}/test": {
+      post: {
+        operationId: "testSetting",
+        summary: "Teste la clé ou l'adresse sans jamais la montrer : Pexels, Pixabay, YouTube, Apify, Postiz, ComfyUI, Ollama.",
+        parameters: [featureParam],
+        responses: { "200": json({ type: "object", properties: { ok: { type: "boolean" }, message: { type: "string" } }, required: ["ok", "message"] }, "Résultat du test."), "404": error("Fonction inconnue."), ...common },
+      },
+    },
     "/api/v1/lessons": {
       get: { operationId: "lessons", summary: "Ce qui marche : LESSONS.md et classement des couples template × formule.", responses: { "200": json(ref("Lessons"), "Leçons."), ...common } },
     },
@@ -263,6 +302,27 @@ export const openapi = {
           notify: { type: "string" },
           fixes: { type: "array", items: { type: "object", properties: { id: { type: "string" }, label: { type: "string" }, commands: { type: "array", items: { type: "string" } } } } },
         },
+      },
+      Feature: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          title: { type: "string" },
+          help: { type: "string" },
+          group: { type: "string" },
+          enabled: { type: "boolean", description: "L'interrupteur." },
+          ready: { type: "boolean", description: "Techniquement prête (installée, clé présente, serveur joignable)." },
+          status: { type: "string", enum: ["actif", "coupe", "a-installer", "installation", "echec", "cle-manquante", "adresse-manquante", "a-lier", "injoignable", "dossier-vide", "modeles-manquants"] },
+          needs: { type: "string", enum: ["install", "key", "url", "link", "folder"] },
+          fields: { type: "array", items: { type: "object", properties: { var: { type: "string" }, label: { type: "string" }, secret: { type: "boolean" }, source: { type: ["string", "null"], enum: ["studio", "env", null] }, value: { type: "string", description: "Seulement pour les champs non secrets." } } } },
+          choices: { type: "array", items: { type: "object" } },
+          detail: { type: "string" },
+          install: { type: "object", description: "État de l'installation : status, step, progress, log, error." },
+          link: { type: "object", description: "WhatsApp : state (off, starting, qr, ready, error) et qr (image data URL)." },
+          comfy: { type: "object", description: "ComfyUI : profile, gpu, vramGb, detected (modèles installés), missing." },
+          suggestion: { type: "string", description: "Adresse de ComfyUI trouvée automatiquement." },
+        },
+        required: ["id", "title", "enabled", "ready", "status", "needs", "fields"],
       },
       Lessons: {
         type: "object",

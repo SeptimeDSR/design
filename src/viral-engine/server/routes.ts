@@ -151,6 +151,19 @@ const API: Route[] = [
     },
   },
   { method: "GET", path: "/api/v1/lessons", handle: (c) => ({ json: c.factory.lessons() }) },
+  { method: "GET", path: "/api/v1/settings", handle: async (c) => ({ json: { features: await c.factory.settings.list() } }) },
+  {
+    method: "POST",
+    path: "/api/v1/settings/:id",
+    handle: async (c) => {
+      const { enabled, values } = c.body;
+      if (enabled !== undefined && typeof enabled !== "boolean") throw bad("enabled doit valoir true ou false.");
+      if (values !== undefined && (typeof values !== "object" || values === null || Array.isArray(values))) throw bad("values doit être un objet {VARIABLE: \"valeur\"}.");
+      return { json: await c.factory.settings.update(c.params.id, { enabled, values: values as Record<string, unknown> | undefined }) };
+    },
+  },
+  { method: "POST", path: "/api/v1/settings/:id/install", handle: async (c) => ({ status: 202, json: await c.factory.settings.install(c.params.id) }) },
+  { method: "POST", path: "/api/v1/settings/:id/test", handle: async (c) => ({ json: await c.factory.settings.test(c.params.id) }) },
 ];
 
 // La table du routeur, exportée pour vérifier qu'elle et le contrat OpenAPI disent la même chose.

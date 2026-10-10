@@ -65,42 +65,63 @@ export function setup(root: string, io: IO, opts: { withClaude: boolean; claudeP
 type Run = (cmd: string, args: string[]) => number;
 const inherit: Run = (cmd, args) => spawnSync(cmd, args, { stdio: "inherit" }).status ?? 1;
 
-// septim setup --voix : Piper (voix gratuite, locale) dans un venv de l'usine, puis la voix française.
+// Une étape d'installation : la même liste sert à `septim setup` (terminal) et aux boutons du Studio.
+export type InstallStep = { label: string; cmd: string; args: string[]; hint: string };
+
+const venvPython = (home: string) => join(home, "venv", process.platform === "win32" ? "Scripts/python.exe" : "bin/python");
+
 // pip --user est refusé par Ubuntu 23+ et Debian 12 (PEP 668) : un venv marche partout, sans sudo.
+const venvStep = (home: string, flag: string): InstallStep => ({
+  label: "Environnement Python",
+  cmd: "python3",
+  args: ["-m", "venv", join(home, "venv")],
+  hint: `Impossible de créer le venv Python. Sur Ubuntu/WSL : sudo apt install python3-venv, puis relance septim setup ${flag}.`,
+});
+
+// Piper : voix gratuite, locale, dans un venv de l'usine, puis la voix française.
+export function voiceSteps(home: string, voice = process.env.VIRAL_PIPER_VOICE ?? "fr_FR-tom-medium"): InstallStep[] {
+  const py = venvPython(home);
+  return [
+    venvStep(home, "--voix"),
+    { label: "Piper (voix gratuite)", cmd: py, args: ["-m", "pip", "install", "--upgrade", "piper-tts"], hint: "pip n'a pas pu installer piper-tts (réseau ?). Relance l'installation." },
+    { label: `Voix ${voice}`, cmd: py, args: ["-m", "piper.download_voices", voice, "--data-dir", join(home, "voices")], hint: `Téléchargement de la voix ${voice} raté (réseau ?). Relance l'installation.` },
+  ];
+}
+
+// Chatterbox Multilingual (licence MIT, français, clonage de ta voix) dans le même venv.
+export function voiceHdSteps(home: string): InstallStep[] {
+  return [
+    venvStep(home, "--voix-hd"),
+    {
+      label: "Chatterbox (voix HD)",
+      cmd: venvPython(home),
+      args: ["-m", "pip", "install", "--upgrade", "chatterbox-tts"],
+      hint: "pip n'a pas pu installer chatterbox-tts (plusieurs Go avec torch : réseau, ou place disque ?). Relance l'installation.",
+    },
+  ];
+}
+
+function runSteps(steps: InstallStep[], io: IO, run: Run): boolean {
+  for (const step of steps) {
+    if (run(step.cmd, step.args) !== 0) {
+      io.err.write(`✗ ${step.hint.replace(/Relance l'installation\./, "Relance septim setup.")}\n`);
+      return false;
+    }
+  }
+  return true;
+}
+
+// septim setup --voix
 export function installVoice(home: string, io: IO, opts: { voice?: string; run?: Run } = {}): boolean {
-  const run = opts.run ?? inherit;
   const voice = opts.voice ?? process.env.VIRAL_PIPER_VOICE ?? "fr_FR-tom-medium";
-  const venv = join(home, "venv");
-  const py = join(venv, process.platform === "win32" ? "Scripts/python.exe" : "bin/python");
-  if (run("python3", ["-m", "venv", venv]) !== 0) {
-    io.err.write("✗ Impossible de créer le venv Python. Sur Ubuntu/WSL : sudo apt install python3-venv, puis relance septim setup --voix.\n");
-    return false;
-  }
-  if (run(py, ["-m", "pip", "install", "--upgrade", "piper-tts"]) !== 0) {
-    io.err.write("✗ pip n'a pas pu installer piper-tts (réseau ?). Relance septim setup --voix.\n");
-    return false;
-  }
-  if (run(py, ["-m", "piper.download_voices", voice, "--data-dir", join(home, "voices")]) !== 0) {
-    io.err.write(`✗ Téléchargement de la voix ${voice} raté. Relance septim setup --voix.\n`);
-    return false;
-  }
+  if (!runSteps(voiceSteps(home, voice), io, opts.run ?? inherit)) return false;
   say(io, `✓ Voix ${voice} installée (Piper, gratuite) : les prochaines vidéos parlent.`);
   return true;
 }
 
-// septim setup --voix-hd : Chatterbox Multilingual (licence MIT, français, clonage de ta voix) dans le même venv.
+// septim setup --voix-hd
 export function installVoiceHd(home: string, io: IO, opts: { run?: Run } = {}): boolean {
-  const run = opts.run ?? inherit;
-  const venv = join(home, "venv");
-  const py = join(venv, process.platform === "win32" ? "Scripts/python.exe" : "bin/python");
-  if (run("python3", ["-m", "venv", venv]) !== 0) {
-    io.err.write("✗ Impossible de créer le venv Python. Sur Ubuntu/WSL : sudo apt install python3-venv, puis relance septim setup --voix-hd.\n");
-    return false;
-  }
-  if (run(py, ["-m", "pip", "install", "--upgrade", "chatterbox-tts"]) !== 0) {
-    io.err.write("✗ pip n'a pas pu installer chatterbox-tts (plusieurs Go avec torch : réseau, ou place disque ?). Relance septim setup --voix-hd.\n");
-    return false;
-  }
+  if (!runSteps(voiceHdSteps(home), io, opts.run ?? inherit)) return false;
   say(io, "✓ Voix HD installée (Chatterbox Multilingual, gratuite). Active-la : echo VIRAL_TTS=chatterbox >> .env");
   say(io, "  Ta propre voix : enregistre 10 s propres en WAV, puis echo VIRAL_CHATTERBOX_VOICE=/chemin/voix.wav >> .env");
   return true;

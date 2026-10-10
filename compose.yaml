@@ -23,8 +23,14 @@ services:
       VIRAL_NOTIFIER: ${VIRAL_NOTIFIER:-console}
       REMOTION_BROWSER_EXECUTABLE: /usr/bin/chromium
       WHATSAPP_CHROME_PATH: /usr/bin/chromium
-      # Ollama sur ta machine (ou profil « ia » ci-dessous avec SEPTIM_OLLAMA_HOST=http://ollama:11434).
-      OLLAMA_HOST: ${SEPTIM_OLLAMA_HOST:-http://host.docker.internal:11434}
+      # Ollama du compose (gratuit, local). Celui de ton PC : SEPTIM_OLLAMA_HOST=http://host.docker.internal:11434 dans .env.
+      OLLAMA_HOST: ${SEPTIM_OLLAMA_HOST:-http://ollama:11434}
+      VIRAL_OLLAMA_MODEL: ${VIRAL_OLLAMA_MODEL:-qwen2.5:3b}
+      # Ta musique : dépose des mp3 ou wav dans le dossier « musique » à côté de compose.yaml.
+      VIRAL_MUSIC_DIR: /data/music
+    depends_on:
+      ollama:
+        condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
@@ -33,6 +39,7 @@ services:
     volumes:
       # Volume Docker par défaut ; SEPTIM_DATA=./septim-data pour voir les fichiers dans ton dossier.
       - ${SEPTIM_DATA:-septim-data}:/data
+      - ${SEPTIM_MUSIC:-./musique}:/data/music:ro
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4321/api/v1/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
       interval: 30s
@@ -40,9 +47,8 @@ services:
       start_period: 40s
       retries: 3
 
-  # Écrivain de scripts local et gratuit : docker compose --profile ia up -d
+  # Écrivain de scripts local et gratuit. Le modèle (≈ 2 à 5 Go) se télécharge une fois, depuis Réglages (ou tout seul au premier démarrage).
   ollama:
-    profiles: [ia]
     image: ollama/ollama:latest
     restart: unless-stopped
     volumes:
@@ -60,18 +66,6 @@ services:
     #         - driver: nvidia
     #           count: all
     #           capabilities: [gpu]
-
-  # Télécharge le modèle une fois (≈ 4,7 Go pour qwen2.5:7b), puis s'arrête.
-  ollama-pull:
-    profiles: [ia]
-    image: ollama/ollama:latest
-    depends_on:
-      ollama:
-        condition: service_healthy
-    environment:
-      OLLAMA_HOST: http://ollama:11434
-    entrypoint: ["sh", "-c", "ollama pull ${VIRAL_OLLAMA_MODEL:-qwen2.5:7b}"]
-    restart: "no"
 
 volumes:
   septim-data:

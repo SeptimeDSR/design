@@ -164,6 +164,35 @@ Ouvre cette adresse une fois : le Studio garde le token sur l'appareil et le ret
 
 ---
 
+## Réglages : tout cocher, décocher, installer
+
+Dans le Studio, l'onglet **Réglages** liste les 11 fonctions de l'usine. Chacune a un interrupteur (clavier compris : Espace), un état en mots (`Actif`, `Clé manquante`, `À installer`, `À lier`…) et ce qu'il faut pour la faire marcher. **Coché** : l'usine s'en sert. **Décoché** : elle l'ignore, même si la clé est dans `.env`. Cocher une fonction qui n'est pas installée l'installe.
+
+| Fonction | Ce que ça change dans tes vidéos | Pour la faire marcher |
+| --- | --- | --- |
+| Écrivain de scripts (Ollama) | un vrai script écrit pour ton sujet (sinon script de secours générique) | bouton **Installer** : télécharge le modèle |
+| Voix française (Piper) | la vidéo parle (sinon muette avec sous-titres) | bouton **Installer** |
+| Voix HD (Chatterbox) | voix plus expressive, plus lente à produire | bouton **Installer** (plusieurs Go) |
+| WhatsApp | « vidéo prête », réponse `OUI #ref` | un **QR code** s'affiche dans la page : scanne-le (WhatsApp > Appareils connectés) |
+| Publication automatique (Postiz) | publie sur tes comptes après ton `OUI #ref` | clé API + adresse de ton Postiz ; cases TikTok, YouTube, Instagram, Facebook |
+| Tendances YouTube | sujets qui montent au Cameroun | clé gratuite |
+| Tendances TikTok (Apify) | Creative Center de TikTok | token gratuit |
+| Vrais plans vidéo (Pexels, Pixabay) | de vrais plans en rapport avec le sujet (sinon fonds animés) | clé gratuite |
+| Vidéo IA locale (ComfyUI) | les plans sont générés par ta carte NVIDIA | adresse de ton ComfyUI (détectée) |
+| Musique sous la voix | tes pistes (sinon nappe lo-fi générée) | dossier de musique |
+
+**Les clés** : tu peux les écrire dans `.env` (l'usine les reconnaît : « Clé trouvée dans le fichier .env ») ou les coller dans le Studio. Celles du Studio sont gardées dans `settings.json` du dossier de données (droits 0600) ; aucune clé n'est jamais renvoyée ni affichée. **Tester** vérifie la clé auprès du service et répond en une phrase, sans la montrer.
+
+**Ton Postiz auto-hébergé** : dans Postiz, Paramètres > Développeurs > clé API publique. Dans Réglages > Publication : colle la clé et l'adresse. Depuis Docker, ton PC s'appelle `host.docker.internal`, et un Postiz auto-hébergé répond sous `/api` : par exemple `http://host.docker.internal:4007/api` si ton Postiz est publié sur le port 4007. **Tester** liste les chaînes reliées (TikTok, YouTube…). Avec un Postiz auto-hébergé, TikTok et YouTube publient en privé tant que tes applications ne sont pas validées par ces plateformes (c'est leur règle, pas celle de l'usine).
+
+**Ton ComfyUI** : l'usine l'interroge elle-même (aucun fichier à lui montrer). Elle cherche sur les ports 8188 (version portable) et 8000 (application Desktop), propose l'adresse trouvée, puis lit les modèles installés. Elle en tire le profil qui marche : **Wan 2.2 5B** (`wan2.2_ti2v_5B_fp16`, `umt5_xxl_fp8_e4m3fn_scaled`, `wan2.2_vae`) ou **Wan 2.1 texte vers vidéo** (`wan2.1_t2v_1.3B` ou 14B). La liste de tout ce que ton ComfyUI a installé s'affiche, et s'il manque quelque chose, l'usine dit quel fichier mettre dans quel dossier (dans ComfyUI, le menu Modèles > « Wan2.2 5B » les télécharge pour toi). ComfyUI doit écouter sur `0.0.0.0` pour qu'un conteneur l'atteigne : option `--listen` (portable) ou Paramètres > Configuration du serveur > Hôte `0.0.0.0` (Desktop). Un autre modèle (LTX, Hunyuan…) : ton workflow exporté en format API dans `COMFYUI_WORKFLOW`, avec `{{prompt}}`, `{{seed}}`, `{{frames}}`, `{{width}}`, `{{height}}`.
+
+**WhatsApp** se lie depuis l'usine qui tourne en continu (Docker, ou `septim start`). Cocher WhatsApp démarre la liaison sans redémarrer l'usine : le QR apparaît en quelques secondes ; tant que le téléphone n'est pas lié, les messages vont à la console.
+
+**La musique** : en Docker, dépose tes pistes dans le dossier `musique` à côté de `compose.yaml` (ou règle `SEPTIM_MUSIC`).
+
+---
+
 ## Terminal : la commande septim
 
 `septim` marche depuis n'importe quel dossier : elle se place dans le repo pour lire `.env` et `.septim-viral/`, et lit les chemins que tu tapes (`--script`, `--broll`) depuis le dossier où tu es.
@@ -358,10 +387,14 @@ Dans les exemples, `U=http://127.0.0.1:4321/api/v1` et `A="Authorization: Bearer
 | `POST /api/v1/videos/:ref/publish` | publier avec `{"confirm":"OUI #5f8a"}` | `curl -H "$A" -H 'Content-Type: application/json' -d '{"confirm":"OUI #5f8a"}' $U/videos/5f8a/publish` |
 | `POST /api/v1/videos/:ref/reject` | jeter | `curl -H "$A" -X POST $U/videos/5f8a/reject` |
 | `POST /api/v1/videos/:ref/redo` | jeter et refaire → 202 + tâche | `curl -H "$A" -X POST $U/videos/5f8a/redo` |
-| `GET /api/v1/tasks` | les tâches lancées par le Studio, l'API et le MCP (pas celles de `septim video`, qui rend directement) | `curl -H "$A" $U/tasks` |
+| `GET /api/v1/tasks` | les tâches de toutes les portes (Studio, API, MCP, terminal) | `curl -H "$A" $U/tasks` |
 | `GET /api/v1/tasks/:id` | suivre une tâche | `curl -H "$A" $U/tasks/3fa9c1d2` |
 | `POST /api/v1/lint` | vérifier un script | `curl -H "$A" -H 'Content-Type: application/json' -d @lint.json $U/lint` (`{"script": {...}, "template": "maths"}`) |
 | `GET /api/v1/lessons` | ce qui marche (vide tant qu'aucune vidéo publiée n'a 48 h de vues) | `curl -H "$A" $U/lessons` |
+| `GET /api/v1/settings` | les 11 fonctions des Réglages : interrupteur, état, champs (jamais une clé) | `curl -H "$A" $U/settings` |
+| `POST /api/v1/settings/:id` | cocher, décocher, régler un champ (`{"enabled": false}`, `{"values": {"PEXELS_API_KEY": "…"}}`) | `curl -H "$A" -H 'Content-Type: application/json' -d '{"enabled":false}' $U/settings/pexels` |
+| `POST /api/v1/settings/:id/install` | installer la voix, la voix HD ou le modèle Ollama → 202 | `curl -H "$A" -X POST $U/settings/voix/install` |
+| `POST /api/v1/settings/:id/test` | tester une clé ou une adresse (réponse `{ok, message}`) | `curl -H "$A" -X POST $U/settings/publication/test` |
 
 Une référence avec `#` s'encode : `%235f8a`. Le plus simple : `5f8a`.
 
@@ -631,11 +664,17 @@ docker compose down                                            # arrêter (les v
 | `SEPTIM_TOKEN` | généré | impose ton propre token |
 | `SEPTIM_DATA` | volume `septim-data` | `./septim-data` pour un dossier visible |
 | `VIRAL_NOTIFIER` | `console` | `whatsapp` : message « prêt », réponse `OUI #ref` ; scanne le QR dans `docker compose logs -f septim` (un `.env` copié de `.env.example` contient déjà `whatsapp`) |
-| `SEPTIM_OLLAMA_HOST` | `http://host.docker.internal:11434` | l'Ollama de ta machine ; `http://ollama:11434` avec le profil `ia` |
+| `SEPTIM_OLLAMA_HOST` | `http://ollama:11434` | l'Ollama du compose ; `http://host.docker.internal:11434` pour celui de ton PC |
+| `SEPTIM_MUSIC` | `./musique` | dossier de tes pistes, lu en lecture seule |
+| `SEPTIM_AUTO_INSTALL` | `voix,ollama` | ce qui s'installe tout seul au démarrage |
 
-**Écrivain de scripts gratuit (Ollama)** : `SEPTIM_OLLAMA_HOST=http://ollama:11434 docker compose --profile ia up -d` démarre Ollama et télécharge le modèle (≈ 4,7 Go, une fois). Sans GPU, mets `VIRAL_OLLAMA_MODEL=qwen2.5:3b`. Pour un GPU NVIDIA, décommente le bloc `deploy` du service `ollama` dans `compose.yaml`.
+**Écrivain de scripts gratuit (Ollama)** : il est dans le compose et le modèle (`qwen2.5:3b`, ≈ 2 Go, une fois) se télécharge tout seul au premier démarrage ; la barre d'avancement est dans Réglages. Une machine plus puissante : `VIRAL_OLLAMA_MODEL=qwen2.5:7b` dans `.env`. Pour un GPU NVIDIA, décommente le bloc `deploy` du service `ollama` dans `compose.yaml`. Tu as déjà Ollama sur ton PC : `SEPTIM_OLLAMA_HOST=http://host.docker.internal:11434` dans `.env`.
 
-**ComfyUI** (vidéo IA locale) tourne sur ta machine, hors du conteneur : `COMFYUI_URL=http://host.docker.internal:8188` (dans le conteneur, `127.0.0.1` est le conteneur lui-même).
+**Voix** : la voix française (Piper) s'installe aussi toute seule au premier démarrage (`SEPTIM_AUTO_INSTALL`, vide pour désactiver). La voix HD se coche dans Réglages.
+
+**ComfyUI** (vidéo IA locale) tourne sur ta machine, hors du conteneur : Réglages le trouve (`host.docker.internal`, ports 8188 et 8000) ; à la main : `COMFYUI_URL=http://host.docker.internal:8188` (dans le conteneur, `127.0.0.1` est le conteneur lui-même).
+
+**Postiz** : le CLI Postiz est dans l'image ; ton Postiz tourne chez toi (voir Réglages).
 
 **Sécurité** : le port n'est publié que sur `127.0.0.1` par défaut, le conteneur tourne sans droits root, et `.env`, les vidéos et la session WhatsApp ne sont jamais copiés dans l'image (`.dockerignore`). Mettre à jour : `git pull && docker compose up -d --build`.
 

@@ -231,3 +231,14 @@ describe("revue finale : WhatsApp prévient les autres logiciels et n'écrase ri
     expect(s.sent.at(-1)).toMatch(/en cours/);
   });
 });
+
+describe("installation automatique au démarrage", () => {
+  it("autoInstallIds : SEPTIM_AUTO_INSTALL, sinon voix et modèle dans Docker, sinon rien ; ids inconnus ignorés", async () => {
+    const { autoInstallIds } = await import("../daemon");
+    expect(autoInstallIds({})).toEqual([]);
+    expect(autoInstallIds({ SEPTIM_IN_DOCKER: "1" })).toEqual(["voix", "ollama"]);
+    expect(autoInstallIds({ SEPTIM_IN_DOCKER: "1", SEPTIM_AUTO_INSTALL: "" })).toEqual([]);
+    expect(autoInstallIds({ SEPTIM_AUTO_INSTALL: "voix, voix-hd ,nimporte" })).toEqual(["voix", "voix-hd"]);
+  });
+});
+

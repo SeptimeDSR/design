@@ -79,3 +79,16 @@ describe("Ollama absent : message clair", () => {
     expect(warns.join(" ")).toMatch(/Ollama absent \(http:\/\/127\.0\.0\.1:11434\).*script de secours/);
   });
 });
+
+describe("interrupteur « écrivain de scripts » du Studio", () => {
+  it("VIRAL_OLLAMA=off : le LLM n'est jamais appelé, script de secours sans avertissement", async () => {
+    let calls = 0;
+    const off = loadConfig({ VIRAL_OLLAMA: "off" });
+    expect(off.ollama.enabled).toBe(false);
+    expect(cfg.ollama.enabled).toBe(true);
+    const r = await generateScript(input, off, { chat: async () => (calls++, GOOD) });
+    expect(r.source).toBe("fallback");
+    expect(calls).toBe(0);
+  });
+});
+

@@ -24,6 +24,10 @@
         <div><dt>Messages</dt><dd data-state="notify">…</dd></div>
         <div><dt>Plans</dt><dd data-state="broll">…</dd></div>
       </dl>
+      <nav class="views" aria-label="Sections">
+        <button type="button" class="view-tab" data-view="atelier" aria-current="page">Atelier</button>
+        <button type="button" class="view-tab" data-view="settings">Réglages <span class="badge" id="settings-badge" hidden></span></button>
+      </nav>
       <details class="fixes" id="fixes" hidden>
         <summary id="fixes-summary"></summary>
         <ul id="fixes-list"></ul>
@@ -118,6 +122,15 @@
         <h3>Brancher un assistant (MCP)</h3>
         <ul class="commands" id="commands"></ul>
       </section>
+    </main>
+
+    <main class="settings" id="settings" aria-labelledby="settings-title" hidden>
+      <header class="settings-head">
+        <h2 id="settings-title">Réglages</h2>
+        <p>Chaque ligne est une fonction de l'usine. Coche pour l'activer, décoche pour la couper. Sans rien régler, tout le gratuit tourne déjà. Les clés que tu écris dans <code>.env</code> sont reconnues, et celles collées ici restent dans l'usine, jamais affichées.</p>
+      </header>
+      <div id="settings-groups" aria-busy="true"></div>
+      <p class="empty" id="settings-empty" hidden>Impossible de lire les réglages.</p>
     </main>
 
     <p class="announce" id="announce" role="status" aria-live="polite"></p>

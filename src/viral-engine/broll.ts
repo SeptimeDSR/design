@@ -108,11 +108,17 @@ export type ComfyWorkflow = Record<string, ComfyNode>;
 
 const NEGATIVE = "blurry, low quality, distorted, deformed hands, extra fingers, text, subtitles, watermark, logo, frame, static image, jpeg artifacts";
 
-// Wan 2.2 TI2V 5B (Apache 2.0, ~8 Go de VRAM en natif ComfyUI), vertical 704×1280, 24 i/s.
+// Deux profils intégrés, choisis d'après ce que ton ComfyUI a installé (voir comfy.ts) :
+//  - wan22-5b : Wan 2.2 TI2V 5B (Apache 2.0, ~8 Go de VRAM), vertical 704×1280, 24 i/s ;
+//  - wan21-t2v : Wan 2.1 texte→vidéo (1.3B ou 14B), vertical 480×832, 16 i/s.
 // COMFYUI_WORKFLOW = ton propre workflow « API » (LTX-2, HunyuanVideo…) avec {{prompt}}, {{negative}}, {{seed}}, {{frames}}, {{width}}, {{height}}.
 export function comfyWorkflow(shot: { prompt: string; seconds: number; seed: number }, opts: { template?: string; env?: Env }): ComfyWorkflow {
-  const frames = Math.min(121, 4 * Math.ceil((shot.seconds * 24) / 4) + 1);
-  const values: Record<string, string | number> = { prompt: shot.prompt, negative: NEGATIVE, seed: shot.seed, frames, width: 704, height: 1280 };
+  const env = opts.env ?? {};
+  const wan21 = env.COMFYUI_PROFILE === "wan21-t2v";
+  const fps = wan21 ? 16 : 24;
+  const [width, height] = wan21 ? [480, 832] : [704, 1280];
+  const frames = Math.min(wan21 ? 81 : 121, 4 * Math.ceil((shot.seconds * fps) / 4) + 1);
+  const values: Record<string, string | number> = { prompt: shot.prompt, negative: NEGATIVE, seed: shot.seed, frames, width, height };
   if (opts.template) {
     const fill = (v: unknown): unknown => {
       if (typeof v === "string") {
@@ -126,18 +132,22 @@ export function comfyWorkflow(shot: { prompt: string; seconds: number; seed: num
     };
     return fill(JSON.parse(opts.template)) as ComfyWorkflow;
   }
-  const env = opts.env ?? {};
+  const unet = env.COMFYUI_WAN_MODEL || (wan21 ? "wan2.1_t2v_1.3B_fp16.safetensors" : "wan2.2_ti2v_5B_fp16.safetensors");
+  const clip = env.COMFYUI_WAN_CLIP || "umt5_xxl_fp8_e4m3fn_scaled.safetensors";
+  const vae = env.COMFYUI_WAN_VAE || (wan21 ? "wan_2.1_vae.safetensors" : "wan2.2_vae.safetensors");
   return {
-    "1": { class_type: "UNETLoader", inputs: { unet_name: env.COMFYUI_WAN_MODEL || "wan2.2_ti2v_5B_fp16.safetensors", weight_dtype: "default" } },
-    "2": { class_type: "CLIPLoader", inputs: { clip_name: "umt5_xxl_fp8_e4m3fn_scaled.safetensors", type: "wan", device: "default" } },
-    "3": { class_type: "VAELoader", inputs: { vae_name: "wan2.2_vae.safetensors" } },
+    "1": { class_type: "UNETLoader", inputs: { unet_name: unet, weight_dtype: "default" } },
+    "2": { class_type: "CLIPLoader", inputs: { clip_name: clip, type: "wan", device: "default" } },
+    "3": { class_type: "VAELoader", inputs: { vae_name: vae } },
     "4": { class_type: "ModelSamplingSD3", inputs: { model: ["1", 0], shift: 8 } },
     "5": { class_type: "CLIPTextEncode", inputs: { clip: ["2", 0], text: `${shot.prompt}, vertical 9:16 shot, cinematic, natural light, shallow depth of field, smooth camera motion` } },
     "6": { class_type: "CLIPTextEncode", inputs: { clip: ["2", 0], text: NEGATIVE } },
-    "7": { class_type: "Wan22ImageToVideoLatent", inputs: { vae: ["3", 0], width: 704, height: 1280, length: frames, batch_size: 1 } },
-    "8": { class_type: "KSampler", inputs: { model: ["4", 0], positive: ["5", 0], negative: ["6", 0], latent_image: ["7", 0], seed: shot.seed, steps: 20, cfg: 5, sampler_name: "uni_pc", scheduler: "simple", denoise: 1 } },
+    "7": wan21
+      ? { class_type: "EmptyHunyuanLatentVideo", inputs: { width, height, length: frames, batch_size: 1 } }
+      : { class_type: "Wan22ImageToVideoLatent", inputs: { vae: ["3", 0], width, height, length: frames, batch_size: 1 } },
+    "8": { class_type: "KSampler", inputs: { model: ["4", 0], positive: ["5", 0], negative: ["6", 0], latent_image: ["7", 0], seed: shot.seed, steps: wan21 ? 30 : 20, cfg: wan21 ? 6 : 5, sampler_name: "uni_pc", scheduler: "simple", denoise: 1 } },
     "9": { class_type: "VAEDecode", inputs: { samples: ["8", 0], vae: ["3", 0] } },
-    "10": { class_type: "CreateVideo", inputs: { images: ["9", 0], fps: 24 } },
+    "10": { class_type: "CreateVideo", inputs: { images: ["9", 0], fps } },
     "11": { class_type: "SaveVideo", inputs: { video: ["10", 0], filename_prefix: "septim/broll", format: "mp4", codec: "h264" } },
   };
 }

@@ -3,6 +3,9 @@ import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve as resolvePath } from "node:path";
 import { loadConfig, type Env } from "./config";
 import { publishWithLedger } from "./daemon";
+import { createFeatures, type FeatureView } from "./features";
+import { createInstalls, type StepRunner } from "./installs";
+import type { NotifierHub } from "./notifier-hub";
 import { diagnose, probe as realProbe, type Probes } from "./doctor";
 import { FactoryError } from "./errors";
 import { tryLock, writeJsonAtomic } from "./lock";
@@ -69,6 +72,9 @@ export type FactoryDeps = {
   publish: (job: Job) => Promise<PublishResult>;
   notify: (text: string, media?: string) => Promise<void>;
   probe: () => Promise<Probes>;
+  // Réglages du Studio : installations (pip) et sondes réseau, remplaçables dans les tests.
+  installRun?: StepRunner;
+  fetchImpl?: typeof fetch;
 };
 
 const MAX_TOPIC = 500;
@@ -85,7 +91,16 @@ export function createFactory(partial: Partial<FactoryDeps> = {}) {
   mkdirSync(tasksDir, { recursive: true });
   const notify = partial.notify ?? (async (text: string) => void process.stderr.write(`${text}\n`));
   const runJob = partial.runJob ?? realRunJob;
-  const publishImpl = partial.publish ?? ((job: Job) => publishJob(job, resolveModeFromEnv(env), cfg.platforms, cfg.tiktokMethod));
+  // Mode et plateformes relus à chaque publication : un interrupteur du Studio compte tout de suite.
+  const publishImpl =
+    partial.publish ??
+    ((job: Job) => {
+      const live = loadConfig(env);
+      return publishJob(job, resolveModeFromEnv(env), live.platforms, live.tiktokMethod);
+    });
+  const installs = createInstalls({ home: cfg.home, env, run: partial.installRun, fetchImpl: partial.fetchImpl });
+  let hub: NotifierHub | undefined;
+  const features = createFeatures({ home: cfg.home, env, installs, fetchImpl: partial.fetchImpl, hub: () => hub?.state() });
   const handlers = new Map<FactoryEvent, Set<(p: EventPayload) => void>>();
   let chain: Promise<unknown> = Promise.resolve();
 
@@ -227,6 +242,21 @@ export function createFactory(partial: Partial<FactoryDeps> = {}) {
   return {
     home: cfg.home,
     store,
+    // Les fonctions que l'humain règle d'un clic (voix, WhatsApp, clés, ComfyUI…) : les mêmes pour toutes les portes.
+    settings: {
+      list: () => features.list(),
+      update: (id: string, patch: { enabled?: boolean; values?: Record<string, unknown> }) => features.update(id, patch),
+      test: (id: string) => features.test(id),
+      async install(id: string): Promise<FeatureView> {
+        features.install(id);
+        return (await features.list()).find((f) => f.id === id)!;
+      },
+      autoInstall: (ids: string[]) => features.autoInstall(ids),
+    },
+    attachHub(h: NotifierHub) {
+      hub = h;
+    },
+    onSettingsChange: (handler: () => void) => features.onChange(handler),
     createVideo: (req: VideoRequest): Task => enqueue("create", validate(req)),
     redo(input: string): Task {
       const job = rejectUnderLock(resolve(input));
@@ -313,7 +343,7 @@ export function createFactory(partial: Partial<FactoryDeps> = {}) {
     announce(event: FactoryEvent, input: string): void {
       emit(event, { video: detail(resolve(input)) });
     },
-    doctor: async () => diagnose(await (partial.probe ?? (() => realProbe(cfg, env)))(), { envFile: resolvePath(env.SEPTIM_ROOT ?? process.cwd(), ".env") }),
+    doctor: async () => diagnose(await (partial.probe ?? (() => realProbe(cfg, env)))(), { docker: !!env.SEPTIM_IN_DOCKER, envFile: resolvePath(env.SEPTIM_ROOT ?? process.cwd(), ".env") }),
     lessons() {
       const path = join(cfg.home, "LESSONS.md");
       const arms = Object.entries(store.loadState().bandit ?? {})

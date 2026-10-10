@@ -48,3 +48,59 @@ describe("doctor", () => {
     for (const c of appends) expect(c, c).toContain(">> '/home/ana/mon septim/.env'");
   });
 });
+
+describe("doctor : suit les interrupteurs des Réglages", () => {
+  it("voix coupée (VIRAL_TTS=silent) → « silent » même si Piper est installé", () => {
+    expect(diagnose({ ...allMissing, piperVoice: true, ttsPref: "silent" }).voice).toBe("silent");
+    expect(diagnose({ ...allMissing, piperVoice: true, ttsPref: "auto" }).voice).toBe("piper");
+    expect(diagnose({ ...allMissing, kokoro: true, ttsPref: "silent" }).voice).toBe("silent");
+  });
+
+  it("dans Docker, aucune commande de l'hôte : chaque correction renvoie vers Studio > Réglages > la fonction", () => {
+    const d = diagnose(allMissing, { docker: true });
+    for (const f of d.fixes) {
+      const text = f.commands.join(" ");
+      expect(text, f.id).toMatch(/Réglages/);
+      expect(text, f.id).not.toMatch(/>> |sudo |curl |septim setup|npm i /);
+    }
+    expect(d.fixes.find((f) => f.id === "broll")?.commands.join(" ")).toMatch(/Pexels/);
+    expect(d.fixes.find((f) => f.id === "postiz")?.commands.join(" ")).toMatch(/Publication/);
+    expect(d.fixes.find((f) => f.id === "whatsapp")?.commands.join(" ")).toMatch(/QR/);
+  });
+
+  it("probe : publication coupée ou WhatsApp coupé ne comptent pas, même avec clé et session présentes", async () => {
+    const { probe } = await import("../doctor");
+    const { loadConfig } = await import("../config");
+    const { mkdirSync, mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const home = mkdtempSync(join(tmpdir(), "septim-doc-"));
+    mkdirSync(join(home, "wa"));
+    const env = { VIRAL_HOME: home, OLLAMA_HOST: "http://127.0.0.1:9", POSTIZ_API_KEY: "k", VIRAL_PUBLISH_MODE: "manual", VIRAL_NOTIFIER: "console" };
+    const p = await probe(loadConfig(env), env);
+    expect(p.postiz).toBe(false);
+    expect(p.whatsappSession).toBe(false);
+    const on = await probe(loadConfig({ ...env, VIRAL_PUBLISH_MODE: undefined, VIRAL_NOTIFIER: "whatsapp" }), { ...env, VIRAL_PUBLISH_MODE: undefined, VIRAL_NOTIFIER: "whatsapp" });
+    expect(on.postiz).toBe(true);
+    expect(on.whatsappSession).toBe(true);
+  });
+
+  it("probe : Piper et Chatterbox se reconnaissent aux fichiers, sans lancer Python (importer torch prend des secondes)", async () => {
+    const { probe } = await import("../doctor");
+    const { loadConfig } = await import("../config");
+    const { mkdirSync, mkdtempSync, writeFileSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const home = mkdtempSync(join(tmpdir(), "septim-doc-"));
+    const env = { VIRAL_HOME: home, OLLAMA_HOST: "http://127.0.0.1:9", VIRAL_PYTHON: "/chemin/qui/n/existe/pas" };
+    expect((await probe(loadConfig(env), env)).chatterbox).toBe(false);
+    mkdirSync(join(home, "venv", "lib", "python3.12", "site-packages", "chatterbox"), { recursive: true });
+    mkdirSync(join(home, "venv", "lib", "python3.12", "site-packages", "piper"), { recursive: true });
+    mkdirSync(join(home, "voices"), { recursive: true });
+    writeFileSync(join(home, "voices", "fr_FR-tom-medium.onnx"), "");
+    const p = await probe(loadConfig(env), env);
+    expect(p.chatterbox).toBe(true);
+    expect(p.piperVoice).toBe(true);
+  });
+});
+

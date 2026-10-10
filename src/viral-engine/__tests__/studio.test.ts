@@ -31,4 +31,18 @@ describe("Studio : contrat avec le serveur", () => {
     }
     expect(html).toMatch(/<html lang="fr">/);
   });
+
+  it("Réglages : onglet, section, interrupteurs accessibles, QR en <img>, mêmes 4 routes que l'API", () => {
+    expect(html).toMatch(/data-view="atelier"/);
+    expect(html).toMatch(/data-view="settings"/);
+    expect(html).toMatch(/<main[^>]*id="settings"[^>]*hidden/);
+    expect(html).toMatch(/id="settings-groups"/);
+    // Un vrai interrupteur (role=switch sur une case à cocher), jamais un <div> cliquable.
+    expect(js).toMatch(/type: "checkbox"[^)]*role: "switch"|role: "switch"[^)]*type: "checkbox"/);
+    expect(js).toMatch(/alt: "QR code WhatsApp/);
+    for (const route of ["GET /api/v1/settings", "POST /api/v1/settings/:id", "POST /api/v1/settings/:id/install", "POST /api/v1/settings/:id/test"]) expect(js, route).toContain(`"${route}"`);
+    // Chaque état renvoyé par le serveur a son libellé français.
+    for (const status of ["actif", "coupe", "a-installer", "installation", "echec", "cle-manquante", "adresse-manquante", "a-lier", "injoignable", "dossier-vide", "modeles-manquants"]) expect(js, status).toMatch(new RegExp(`"?${status}"?:`));
+  });
 });
+

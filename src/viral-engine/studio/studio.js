@@ -18,6 +18,21 @@ const CLIENTS = [
   ["codex", "Codex"],
   ["gemini", "Gemini CLI"],
 ];
+// Réglages : un libellé français par état renvoyé par le serveur (jamais la couleur seule : le texte dit l'état).
+const FEATURE_STATUS = {
+  actif: "Actif",
+  coupe: "Coupé",
+  "a-installer": "À installer",
+  installation: "Installation…",
+  echec: "Installation ratée",
+  "cle-manquante": "Clé manquante",
+  "adresse-manquante": "Adresse manquante",
+  "a-lier": "À lier",
+  injoignable: "Injoignable",
+  "dossier-vide": "Aucune piste",
+  "modeles-manquants": "Modèles manquants",
+};
+const FEATURE_PROBLEMS = new Set(["a-installer", "echec", "cle-manquante", "adresse-manquante", "a-lier", "injoignable", "modeles-manquants"]);
 const FILTER_EMPTY = {
   all: "Aucune vidéo pour l'instant. Donne un sujet dans Fabriquer et lance le rendu.",
   notified: "Aucune vidéo à valider.",
@@ -37,6 +52,8 @@ const state = {
   tasks: new Map(),
   armed: null,
   publishMode: "manual",
+  view: "atelier",
+  rows: new Map(),
 };
 
 // ---------- Outils ----------
@@ -175,9 +192,10 @@ async function loadDoctor() {
     for (const [key, text] of Object.entries(values)) box.querySelector(`[data-state="${key}"]`).textContent = text;
     const fixes = $("fixes");
     $("fixes-list").replaceChildren(
+      h("li", {}, h("p", {}, "Chaque fonction se règle d'un clic : ", h("a", { href: "#reglages", text: "ouvre les Réglages" }), ".")),
       ...d.fixes.map((f) => h("li", {}, h("p", { text: f.label }), ...f.commands.map((c) => h("code", { text: c })))),
     );
-    $("fixes-summary").textContent = d.fixes.length === 1 ? "1 chose à installer pour aller plus loin" : `${d.fixes.length} choses à installer pour aller plus loin`;
+    $("fixes-summary").textContent = d.fixes.length === 1 ? "1 chose à régler pour aller plus loin" : `${d.fixes.length} choses à régler pour aller plus loin`;
     fixes.hidden = d.fixes.length === 0;
   } catch (error) {
     if (error.status !== 401) for (const dd of box.querySelectorAll("dd")) dd.textContent = "inconnu";
@@ -563,6 +581,357 @@ async function loadLessons() {
   $("lessons-text-box").hidden = !text.trim();
 }
 
+
+// ---------- Réglages ----------
+// Une ligne par fonction : interrupteur, état, champs, boutons. Les lignes sont construites une fois puis mises à jour en place,
+// pour qu'une saisie en cours ne soit jamais effacée par l'actualisation.
+
+function showView(view, focus = false) {
+  state.view = view;
+  const settingsView = view === "settings";
+  document.querySelector("main.layout").hidden = settingsView;
+  $("settings").hidden = !settingsView;
+  for (const tab of document.querySelectorAll(".view-tab")) {
+    if (tab.dataset.view === view) tab.setAttribute("aria-current", "page");
+    else tab.removeAttribute("aria-current");
+  }
+  const hash = settingsView ? "#reglages" : "";
+  if (location.hash !== hash && (settingsView || location.hash === "#reglages")) history.replaceState(null, "", `${location.pathname}${location.search}${hash}`);
+  if (settingsView) {
+    if (focus) {
+      $("settings-title").setAttribute("tabindex", "-1");
+      $("settings-title").focus();
+    }
+    void loadSettings();
+  } else clearTimeout(settingsTimer);
+}
+
+let settingsTimer;
+
+async function loadSettings() {
+  clearTimeout(settingsTimer);
+  let list;
+  try {
+    ({ features: list } = await api("GET /api/v1/settings"));
+  } catch (error) {
+    $("settings-empty").hidden = false;
+    $("settings-groups").setAttribute("aria-busy", "false");
+    if (error.status !== 401) announce(error.message, "error");
+    return;
+  }
+  $("settings-empty").hidden = true;
+  renderSettings(list);
+  const problems = list.filter((f) => f.enabled && FEATURE_PROBLEMS.has(f.status)).length;
+  $("settings-badge").hidden = problems === 0;
+  $("settings-badge").textContent = String(problems);
+  $("settings-badge").setAttribute("aria-label", `${problems} à régler`);
+  $("settings-groups").setAttribute("aria-busy", "false");
+  if (state.view !== "settings") return;
+  const busy = list.some((f) => f.status === "installation" || (f.id === "whatsapp" && f.enabled && ["starting", "qr"].includes(f.link?.state)));
+  settingsTimer = setTimeout(loadSettings, busy ? 2000 : 8000);
+}
+
+function renderSettings(list) {
+  const root = $("settings-groups");
+  const groups = [];
+  for (const f of list) {
+    let group = groups.find((g) => g.name === f.group);
+    if (!group) groups.push((group = { name: f.group, items: [] }));
+    group.items.push(f);
+  }
+  if (!state.rows.size) {
+    root.replaceChildren(
+      ...groups.map((g, i) =>
+        h(
+          "section",
+          { class: "feature-group", "aria-labelledby": `group-${i}` },
+          h("h3", { id: `group-${i}`, text: g.name }),
+          h("ul", { class: "features" }, g.items.map((f) => buildRow(f))),
+        ),
+      ),
+    );
+  }
+  for (const f of list) updateRow(state.rows.get(f.id), f);
+}
+
+async function saveFeature(id, patch, row) {
+  try {
+    const f = await api("POST /api/v1/settings/:id", { params: { id }, body: patch });
+    updateRow(row, f);
+    void refreshBadgeAndDoctor();
+    return f;
+  } catch (error) {
+    announce(error.message, "error");
+    throw error;
+  }
+}
+
+// L'en-tête (Voix, Plans…) et le badge suivent les réglages sans recharger la page.
+async function refreshBadgeAndDoctor() {
+  await Promise.allSettled([loadDoctor(), state.view === "settings" ? loadSettings() : Promise.resolve()]);
+}
+
+function buildRow(f) {
+  const row = { id: f.id, data: f, fields: new Map(), choices: new Map() };
+  const input = h("input", {
+    type: "checkbox",
+    role: "switch",
+    class: "switch",
+    id: `switch-${f.id}`,
+    // Jamais « disabled » pendant l'envoi : un champ désactivé perd le focus clavier. Un second clic attend la réponse.
+    onchange: async () => {
+      const wanted = input.checked;
+      if (row.busy) {
+        input.checked = !wanted;
+        return;
+      }
+      row.busy = true;
+      input.setAttribute("aria-busy", "true");
+      try {
+        await saveFeature(f.id, { enabled: wanted }, row);
+      } catch {
+        input.checked = !wanted;
+      } finally {
+        row.busy = false;
+        input.removeAttribute("aria-busy");
+      }
+    },
+  });
+  row.input = input;
+  row.pill = h("span", { class: "pill" });
+  row.detail = h("p", { class: "feature-detail" });
+  row.test = h("p", { class: "test-result", role: "status" });
+
+  // Champs : clé (jamais relue), adresse, dossier, modèle.
+  const fields = f.fields.map((fd) => {
+    const fid = `field-${f.id}-${fd.var}`;
+    const el = h("input", {
+      id: fid,
+      type: fd.secret ? "password" : "text",
+      autocomplete: "off",
+      spellcheck: "false",
+      placeholder: fd.placeholder || (fd.secret ? "Colle la clé ici" : ""),
+      maxlength: "500",
+      oninput: () => (el.dataset.dirty = "1"),
+    });
+    const hint = h("p", { class: "hint field-hint" });
+    const save = h("button", {
+      type: "button",
+      class: "button quiet",
+      text: "Enregistrer",
+      onclick: async () => {
+        save.disabled = true;
+        try {
+          await saveFeature(f.id, { values: { [fd.var]: el.value.trim() } }, row);
+          el.dataset.dirty = "";
+          if (fd.secret) el.value = "";
+          announce(el.value.trim() || fd.secret ? `${fd.label} enregistrée.` : `${fd.label} effacée.`);
+        } catch {
+          // déjà annoncé
+        } finally {
+          save.disabled = false;
+        }
+      },
+    });
+    row.fields.set(fd.var, { el, hint, def: fd });
+    return h("div", { class: "field feature-field" }, h("label", { for: fid, text: fd.label }), h("div", { class: "inline" }, el, save), hint);
+  });
+  row.fieldsBox = h("div", { class: "feature-fields" }, fields);
+
+  // Plateformes : cases à cocher, enregistrées à chaque clic.
+  row.choicesBox = h(
+    "div",
+    { class: "feature-choices" },
+    (f.choices ?? []).map((c) => {
+      const boxes = c.options.map((opt) => {
+        const cb = h("input", {
+          type: "checkbox",
+          value: opt.value,
+          onchange: async () => {
+            const all = [...row.choices.get(c.var).boxes.values()];
+            const chosen = all.filter((b) => b.checked).map((b) => b.value);
+            if (!chosen.length) {
+              cb.checked = true;
+              announce("Garde au moins une plateforme.", "error");
+              return;
+            }
+            try {
+              await saveFeature(f.id, { values: { [c.var]: chosen.join(",") } }, row);
+            } catch {
+              cb.checked = !cb.checked;
+            }
+          },
+        });
+        return [opt.value, cb, opt.label];
+      });
+      row.choices.set(c.var, { boxes: new Map(boxes.map(([v, cb]) => [v, cb])) });
+      return h("fieldset", { class: "choice" }, h("legend", { text: c.label }), boxes.map(([, cb, label]) => h("label", {}, cb, " ", h("span", { text: label }))));
+    }),
+  );
+
+  // Boutons : installer, tester, utiliser l'adresse trouvée.
+  row.installBtn = h("button", {
+    type: "button",
+    class: "button primary",
+    text: "Installer",
+    onclick: async () => {
+      row.installBtn.disabled = true;
+      try {
+        const next = await api("POST /api/v1/settings/:id/install", { params: { id: f.id } });
+        updateRow(row, next);
+        announce("Installation lancée : tu peux suivre l'avancement ici.");
+        void loadSettings();
+      } catch (error) {
+        announce(error.message, "error");
+      } finally {
+        row.installBtn.disabled = false;
+      }
+    },
+  });
+  row.testBtn = h("button", {
+    type: "button",
+    class: "button quiet",
+    text: "Tester",
+    onclick: async () => {
+      row.testBtn.disabled = true;
+      row.test.dataset.tone = "";
+      row.test.textContent = "Test en cours…";
+      try {
+        const r = await api("POST /api/v1/settings/:id/test", { params: { id: f.id } });
+        row.test.dataset.tone = r.ok ? "ok" : "error";
+        row.test.textContent = r.message;
+      } catch (error) {
+        row.test.dataset.tone = "error";
+        row.test.textContent = error.message;
+      } finally {
+        row.testBtn.disabled = false;
+      }
+    },
+  });
+  row.suggestBtn = h("button", { type: "button", class: "button primary", hidden: true });
+  row.actions = h("div", { class: "feature-actions" }, row.suggestBtn, row.installBtn, row.testBtn);
+
+  // Installation en cours : barre, étape, journal.
+  row.progress = h("progress", { max: "100", value: "0", "aria-label": `Installation : ${f.title}` });
+  row.step = h("p", { class: "install-step" });
+  row.log = h("pre", { class: "install-log" });
+  row.installError = h("p", { class: "install-error" });
+  row.installBox = h("div", { class: "feature-install" }, row.progress, row.step, row.installError, h("details", {}, h("summary", { text: "Journal" }), row.log));
+
+  // WhatsApp : le QR code à scanner.
+  row.qr = h("img", { class: "qr", alt: "QR code WhatsApp à scanner avec le téléphone", width: "232", height: "232" });
+  row.linkText = h("p", { class: "link-text" });
+  row.linkBox = h(
+    "div",
+    { class: "feature-link" },
+    row.qr,
+    h("div", {}, row.linkText, h("ol", { class: "steps" }, h("li", { text: "Ouvre WhatsApp sur ton téléphone." }), h("li", { text: "Réglages, puis Appareils connectés." }), h("li", { text: "Connecter un appareil, puis scanne ce code." }))),
+  );
+
+  // ComfyUI : ce que ton PC a installé.
+  row.comfyBox = h("div", { class: "feature-comfy" });
+
+  row.el = h(
+    "li",
+    { class: "feature", id: `feature-${f.id}` },
+    h("div", { class: "feature-head" }, h("label", { class: "feature-title", for: `switch-${f.id}` }, input, h("span", { class: "switch-ui", "aria-hidden": "true" }), h("span", { class: "feature-name", text: f.title })), row.pill),
+    h("p", { class: "hint feature-help", text: f.help }),
+    row.detail,
+    row.fieldsBox,
+    row.choicesBox,
+    row.linkBox,
+    row.comfyBox,
+    row.installBox,
+    row.actions,
+    row.test,
+  );
+  state.rows.set(f.id, row);
+  return row.el;
+}
+
+const GO = (n) => (typeof n === "number" ? `${n} Go` : "");
+
+function updateRow(row, f) {
+  if (!row) return;
+  row.data = f;
+  row.el.dataset.status = f.status;
+  row.input.checked = f.enabled;
+  row.pill.textContent = FEATURE_STATUS[f.status] ?? f.status;
+  row.pill.dataset.status = f.status;
+  row.detail.textContent = f.detail ?? "";
+  row.detail.hidden = !f.detail;
+
+  for (const fd of f.fields) {
+    const slot = row.fields.get(fd.var);
+    if (!slot) continue;
+    const { el, hint } = slot;
+    // La saisie en cours n'est jamais écrasée ; la clé n'est jamais renvoyée par le serveur.
+    if (!fd.secret && document.activeElement !== el && !el.dataset.dirty) el.value = fd.value ?? "";
+    hint.textContent = fd.source === "studio" ? (fd.secret ? "Clé enregistrée dans le Studio." : "Réglé dans le Studio.") : fd.source === "env" ? (fd.secret ? "Clé trouvée dans le fichier .env." : "Réglé dans le fichier .env.") : "";
+    hint.hidden = !hint.textContent;
+  }
+  row.fieldsBox.hidden = f.fields.length === 0;
+
+  for (const c of f.choices ?? []) {
+    const slot = row.choices.get(c.var);
+    for (const opt of c.options) slot.boxes.get(opt.value).checked = opt.checked;
+  }
+  row.choicesBox.hidden = !f.choices;
+
+  const canInstall = f.needs === "install";
+  const running = f.install?.status === "running";
+  row.installBtn.hidden = !canInstall || f.status === "actif" || running;
+  row.installBtn.textContent = f.status === "echec" ? "Relancer l'installation" : "Installer";
+  row.installBox.hidden = !f.install;
+  if (f.install) {
+    const p = Math.round((f.install.progress ?? 0) * 100);
+    row.progress.value = p;
+    row.progress.hidden = f.install.status !== "running";
+    row.step.textContent = f.install.status === "running" ? `${f.install.step ?? "En cours"} · ${p} %` : f.install.status === "done" ? "Installation terminée." : "";
+    row.installError.textContent = f.install.status === "failed" ? f.install.error ?? "L'installation a échoué." : "";
+    row.installError.hidden = !row.installError.textContent;
+    row.log.textContent = (f.install.log ?? []).join("\n");
+  }
+
+  const link = f.link;
+  row.linkBox.hidden = !(f.id === "whatsapp" && f.enabled && link && link.state !== "ready");
+  if (!row.linkBox.hidden) {
+    const texts = {
+      off: "WhatsApp se lie depuis l'usine qui tourne en continu (septim start, ou Docker).",
+      starting: "WhatsApp démarre : le QR code arrive dans quelques secondes.",
+      qr: "Scanne ce code avec ton téléphone pour lier WhatsApp.",
+      error: link.error ? `WhatsApp n'a pas démarré : ${link.error}` : "WhatsApp n'a pas démarré.",
+    };
+    row.linkText.textContent = texts[link.state] ?? "";
+    row.qr.hidden = link.state !== "qr";
+    if (link.state === "qr" && row.qr.getAttribute("src") !== link.qr) row.qr.setAttribute("src", link.qr);
+    row.linkBox.firstChild.hidden = link.state !== "qr";
+    row.linkBox.querySelector("ol").hidden = link.state !== "qr";
+  }
+
+  renderComfy(row, f);
+  if (f.id === "comfyui") {
+    row.suggestBtn.hidden = !f.suggestion || !f.enabled || !!row.fields.get("COMFYUI_URL")?.el.value;
+    if (f.suggestion) {
+      row.suggestBtn.textContent = `Utiliser ${f.suggestion}`;
+      row.suggestBtn.onclick = () => saveFeature("comfyui", { values: { COMFYUI_URL: f.suggestion } }, row).then(() => announce("Adresse de ComfyUI enregistrée.")).catch(() => undefined);
+    }
+  }
+}
+
+function renderComfy(row, f) {
+  const c = f.comfy;
+  row.comfyBox.hidden = !c;
+  if (!c) return;
+  const list = (title, names) => (names.length ? h("details", {}, h("summary", { text: `${title} (${names.length})` }), h("ul", { class: "models" }, names.map((n) => h("li", {}, h("code", { text: n }))))) : null);
+  fill(
+    row.comfyBox,
+    c.profile ? h("p", { class: "comfy-ok", text: `Ton ComfyUI sait faire les plans vidéo : ${c.profile === "wan22-5b" ? "Wan 2.2 5B" : "Wan 2.1 texte vers vidéo"} détecté${c.gpu ? `, carte ${c.gpu}` : ""}${GO(c.vramGb) ? ` (${GO(c.vramGb)})` : ""}.` }) : null,
+    c.missing.length ? h("div", { class: "comfy-missing" }, h("p", { text: "Il manque :" }), h("ul", {}, c.missing.map((m) => h("li", { text: m }))), h("p", { class: "hint", text: "Dans ComfyUI, le menu Modèles propose « Wan2.2 5B » : il télécharge ces fichiers pour toi." })) : null,
+    h("div", { class: "comfy-found" }, list("Modèles vidéo installés", c.detected.diffusion), list("Encodeurs de texte", c.detected.textEncoders), list("VAE", c.detected.vae), list("Checkpoints", c.detected.checkpoints)),
+  );
+}
+
 // ---------- Brancher ----------
 
 function renderAccess() {
@@ -615,6 +984,8 @@ function init() {
     state.token = readToken();
   }
 
+  for (const tab of document.querySelectorAll(".view-tab")) tab.addEventListener("click", () => showView(tab.dataset.view, tab.dataset.view === "settings"));
+  window.addEventListener("hashchange", () => showView(location.hash === "#reglages" ? "settings" : "atelier"));
   $("make-form").addEventListener("submit", make);
   $("lint").addEventListener("click", lint);
   $("filters").addEventListener("click", (event) => {
@@ -649,6 +1020,9 @@ function init() {
   renderConnect();
   renderTasks();
   void refreshAll();
+  // Le badge des Réglages (ce qui reste à régler) se remplit dès l'ouverture, même sur l'Atelier.
+  if (location.hash === "#reglages") showView("settings");
+  else void loadSettings();
 }
 
 init();

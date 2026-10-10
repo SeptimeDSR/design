@@ -278,3 +278,31 @@ describe("revue finale : mineurs corrigés", () => {
     expect(f.published).toEqual([]);
   });
 });
+
+describe("réglages dans le cœur", () => {
+  it("settings.list / update / test / install passent par les mêmes fonctions que le Studio, l'API et le terminal", async () => {
+    const f = sharedFakeFactory();
+    expect((await f.factory.settings.list()).map((x) => x.id)).toContain("voix");
+    const v = await f.factory.settings.update("pexels", { values: { PEXELS_API_KEY: "k" } });
+    expect(v.status).toBe("actif");
+    expect(f.env.PEXELS_API_KEY).toBe("k");
+    expect((await f.factory.settings.test("pexels")).ok).toBe(false);
+    expect((await f.factory.settings.install("voix")).install?.status).toMatch(/running|done/);
+  });
+
+  it("attachHub : l'état de WhatsApp et son QR apparaissent dans la fonction WhatsApp", async () => {
+    const f = sharedFakeFactory({}, undefined);
+    f.factory.attachHub({ state: () => ({ state: "qr", qr: "data:image/svg+xml;base64,QQ" }) } as never);
+    const w = (await f.factory.settings.list()).find((x) => x.id === "whatsapp")!;
+    expect(w.link).toEqual({ state: "qr", qr: "data:image/svg+xml;base64,QQ" });
+  });
+
+  it("onSettingsChange : prévient quand une fonction change (le démon bascule WhatsApp)", async () => {
+    const f = sharedFakeFactory();
+    let n = 0;
+    f.factory.onSettingsChange(() => void n++);
+    await f.factory.settings.update("pexels", { enabled: false });
+    expect(n).toBeGreaterThan(0);
+  });
+});
+

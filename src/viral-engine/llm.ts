@@ -55,7 +55,7 @@ export async function generateScript(
   client: LlmClient = ollamaClient(cfg),
 ): Promise<{ script: ViralScript; source: "ollama" | "fallback"; attempts: number }> {
   let prompt = buildHeatPrompt(input);
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  for (let attempt = 1; attempt <= 3 && cfg.ollama.enabled; attempt++) {
     try {
       const parsed = parseHeatResponse(await client.chat(prompt));
       const script = parsed && assembleScript(input, parsed);

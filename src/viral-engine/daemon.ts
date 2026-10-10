@@ -12,6 +12,12 @@ import type { PublishResult } from "./publish";
 
 export type { PublishResult };
 
+// Ce que l'usine installe toute seule au démarrage : dans Docker, la voix et le modèle d'écriture (visibles dans Réglages).
+export function autoInstallIds(env: Record<string, string | undefined>): string[] {
+  const raw = env.SEPTIM_AUTO_INSTALL ?? (env.SEPTIM_IN_DOCKER ? "voix,ollama" : "");
+  return raw.split(",").map((x) => x.trim()).filter((x) => ["voix", "voix-hd", "ollama"].includes(x));
+}
+
 export type DaemonDeps = {
   store: Store;
   mode: PublishMode;
@@ -226,7 +232,7 @@ export async function runDaemon(): Promise<void> {
   loadDotEnv();
   const cron = (await import("node-cron")).default;
   const { createStore } = await import("./store");
-  const { createNotifier } = await import("./notify");
+  const { createNotifierHub } = await import("./notifier-hub");
   const { publishJob, fetchJobViews } = await import("./publish");
   const { resolveModeFromEnv } = await import("./publish-mode");
   const { flushOutbox } = await import("./outbox");
@@ -235,11 +241,12 @@ export async function runDaemon(): Promise<void> {
 
   const cfg = loadConfig();
   const store = createStore(cfg.home);
-  const notifier = createNotifier(cfg.notifier, cfg);
-  const mode = resolveModeFromEnv();
-  const notify = (t: string, m?: string) => notifier.send(t, m);
+  // Un seul interlocuteur, changeable à chaud depuis le Studio (WhatsApp, avec son QR, ou la console).
+  const hub = createNotifierHub({ cfg: () => loadConfig(process.env) });
+  const notify = (t: string, m?: string) => hub.send(t, m);
   // Toutes les portes (cycle, REFAIS, Studio, API, MCP) passent par la même file de la fabrique : un rendu à la fois.
   const factory = createFactory({ notify });
+  factory.attachHub(hub);
   attachWebhooks(factory);
   const render = async (req: JobRequest): Promise<Job> => {
     const task = factory.createVideo({ topic: req.topic, template: req.template, lang: req.lang, script: req.script });
@@ -252,18 +259,29 @@ export async function runDaemon(): Promise<void> {
   const runner = createCycleRunner(render, notify);
   const deps: DaemonDeps = {
     store,
-    mode,
-    platforms: cfg.platforms,
+    // Mode et plateformes relus à chaque publication : un interrupteur du Studio compte tout de suite.
+    get mode() {
+      return resolveModeFromEnv(process.env);
+    },
+    get platforms() {
+      return loadConfig(process.env).platforms;
+    },
     notify,
-    publish: (job) => publishJob(job, mode, cfg.platforms, cfg.tiktokMethod),
+    publish: (job) => {
+      const live = loadConfig(process.env);
+      return publishJob(job, resolveModeFromEnv(process.env), live.platforms, live.tiktokMethod);
+    },
     runJob: runner,
     views: (job) => fetchJobViews(job),
     onPublished: (j) => factory.announce("video.published", j.id),
     onRejected: (j) => factory.announce("video.rejected", j.id),
   };
 
-  await notifier.start();
-  notifier.onMessage((text, meta) => void handleReply(text, deps, { quoted: meta?.quoted }).catch((e) => console.error("[réponse]", e)));
+  hub.onMessage((text, meta) => void handleReply(text, deps, { quoted: meta?.quoted }).catch((e) => console.error("[réponse]", e)));
+  await hub.start();
+  // Les réglages du Studio (settings.json) sont déjà appliqués par la fabrique : on relit le mode, pas l'ancien cfg.
+  await hub.use(loadConfig(process.env).notifier);
+  factory.onSettingsChange(() => void hub.use(loadConfig(process.env).notifier).catch((e) => console.error("[messages]", e)));
   // Le CLI dépose ses messages dans la boîte d'envoi : le démon est le seul à parler à WhatsApp.
   const drain = () => void flushOutbox(store.home, notify).catch((e) => console.error("[boîte d'envoi]", e));
   drain();
@@ -272,7 +290,7 @@ export async function runDaemon(): Promise<void> {
     if (runner.pending === 0) void runner({}).catch((e) => console.error("[cycle]", e));
   });
   cron.schedule("0 9 * * *", () => void collectRewards(deps).catch((e) => console.error("[analytics]", e)));
-  console.log(`SEPTIM-VIRAL-OS en marche · cycle « ${cfg.cron} » · publication ${mode} · notifications ${cfg.notifier}`);
+  console.log(`SEPTIM-VIRAL-OS en marche · cycle « ${cfg.cron} » · publication ${resolveModeFromEnv(process.env)} · notifications ${loadConfig(process.env).notifier}`);
 
   const port = Number(process.env.SEPTIM_PORT || 4321);
   if (port !== 0) {
@@ -287,6 +305,8 @@ export async function runDaemon(): Promise<void> {
       console.error(`[serveur] ${(error as Error).message}`);
     }
   }
+  // Voix et modèle d'écriture : installés d'eux-mêmes (on suit l'avancement dans Réglages).
+  factory.settings.autoInstall(autoInstallIds(process.env));
   if (process.argv.includes("--now")) await runner({});
 }
 

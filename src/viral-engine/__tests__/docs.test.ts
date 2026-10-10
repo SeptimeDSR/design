@@ -106,16 +106,24 @@ describe("documentation : elle ne dérive pas du code", () => {
     expect(compose).toContain("VIRAL_HOME: /data");
     expect(compose).toContain("healthcheck");
     expect(compose).toContain("shm_size");
-    expect(compose).toMatch(/profiles:\s*\[ia\]/);
+    // Tout tourne d'un seul `docker compose up` : Ollama inclus (le modèle se télécharge depuis les Réglages), la musique en lecture seule.
+    expect(compose).not.toMatch(/profiles:/);
+    expect(compose).toMatch(/ollama:\s*\n\s+image: ollama\/ollama/);
+    expect(compose).toMatch(/condition: service_healthy/);
+    expect(compose).toContain("VIRAL_MUSIC_DIR: /data/music");
+    expect(compose).toMatch(/:\/data\/music:ro/);
+    expect(compose).not.toContain("ollama-pull");
     const docker = read("Dockerfile");
     expect(docker).toContain("PUPPETEER_SKIP_DOWNLOAD=1");
     expect(docker).toMatch(/chromium/);
     expect(docker).toMatch(/ffmpeg/);
+    // La publication passe par le CLI Postiz : sans lui dans l'image, « Publier » échouerait.
+    expect(docker).toMatch(/npm install -g postiz/);
     expect(docker).toMatch(/fonts-noto-color-emoji/);
     const ignore = read(".dockerignore");
     for (const secret of [".env", ".septim-viral", "node_modules"]) expect(ignore, secret).toMatch(new RegExp(`^${secret.replace(".", "\\.")}$`, "m"));
     const dockerSection = GUIDE.slice(GUIDE.search(/^##+ .*Docker/m));
-    for (const cmd of ["docker compose up", "docker compose run --rm septim", "docker compose --profile ia", "docker compose logs", "docker compose down"]) expect(dockerSection, cmd).toContain(cmd);
+    for (const cmd of ["docker compose up", "docker compose run --rm septim", "docker compose logs", "docker compose down"]) expect(dockerSection, cmd).toContain(cmd);
     // Variables propres au compose : documentées dans .env.example.
     const example = read(".env.example");
     for (const v of ["SEPTIM_BIND", "SEPTIM_OLLAMA_HOST"]) expect(example, v).toContain(v);

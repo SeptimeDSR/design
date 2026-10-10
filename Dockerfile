@@ -20,6 +20,10 @@ ENV NODE_ENV=production \
     SEPTIM_PORT=4321 \
     HOME=/home/node
 
+# CLI Postiz : l'usine publie par lui (clé et adresse réglées dans le Studio ou dans .env).
+# (HOME=/root : le cache de root ne doit pas se retrouver dans /home/node, sinon npm ci échoue plus bas.)
+RUN HOME=/root npm install -g postiz --no-audit --no-fund && HOME=/root npm cache clean --force
+
 # /data : vidéos, tâches, leçons, voix, session WhatsApp (un volume, jamais dans l'image).
 RUN mkdir -p /data /app && chown node:node /data /app
 WORKDIR /app

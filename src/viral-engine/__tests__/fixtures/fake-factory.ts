@@ -54,7 +54,7 @@ export function seedJob(store: Store, id: string, req: JobRequest = {}, createdA
 // Fabrique branchée sur un VIRAL_HOME temporaire, sans rendu ni publication réels.
 export function fakeFactory(over: Partial<FactoryDeps> = {}, ids = ["5f8a4d25", "1234abcd", "9999aaaa"]) {
   const home = mkdtempSync(join(tmpdir(), "septim-fake-"));
-  const env = { VIRAL_HOME: home, VIRAL_PUBLISH_MODE: "manual" };
+  const env: Record<string, string | undefined> = { VIRAL_HOME: home, VIRAL_PUBLISH_MODE: "manual" };
   const store = createStore(home);
   const published: string[] = [];
   let n = 0;
@@ -67,6 +67,9 @@ export function fakeFactory(over: Partial<FactoryDeps> = {}, ids = ["5f8a4d25", 
     published.push(job.id);
     return { posted: {}, missing: [], failed: [], manualText: "légende prête" };
   };
-  const factory = createFactory({ env, runJob, publish, notify: async () => undefined, probe: async () => FAKE_PROBES, ...over });
+  // Pas de vrai pip ni de vrai réseau dans les tests : les installations et les sondes de réglages sont factices.
+  const installRun = async () => 0;
+  const fetchImpl = (async () => new Response("{}", { status: 404 })) as unknown as typeof fetch;
+  const factory = createFactory({ env, runJob, publish, notify: async () => undefined, probe: async () => FAKE_PROBES, installRun, fetchImpl, ...over });
   return { factory, store, home, env, published };
 }

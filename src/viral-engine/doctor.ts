@@ -1,8 +1,7 @@
 import { existsSync, readdirSync } from "node:fs";
-import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
 import { loadConfig, loadDotEnv, type ViralConfig } from "./config";
-import { pythonBin } from "./tts";
+import { pythonPackageInstalled } from "./features";
 
 export type Probes = {
   ollama: boolean;
@@ -25,7 +24,21 @@ export type Probes = {
 export type Fix = { id: string; label: string; commands: string[] };
 
 // Les commandes « >> .env » visent le .env de l'usine : septim se tape depuis n'importe quel dossier.
-export function diagnose(p: Probes, opts: { envFile?: string } = {}) {
+// Dans Docker, les commandes de l'hôte (sudo, >> .env, septim setup) ne servent à rien : tout se règle dans Studio > Réglages.
+const SETTINGS_WHERE: Record<string, string> = {
+  voice: "Voix française (Piper) : Installer",
+  llm: "Écrivain de scripts (Ollama) : Installer",
+  whatsapp: "WhatsApp : scanne le QR code",
+  chrome: "WhatsApp : l'image Docker contient déjà Chromium",
+  postiz: "Publication automatique (Postiz) : clé et adresse, puis Tester",
+  youtube: "Tendances YouTube : colle la clé",
+  apify: "Tendances TikTok (Apify) : colle le token",
+  broll: "Vrais plans vidéo (Pexels, Pixabay) : colle une clé gratuite, ou Vidéo IA locale (ComfyUI)",
+  music: "Musique sous la voix : dépose des pistes dans le dossier musique",
+  "voice-hd": "Voix HD (Chatterbox) : coche et installe",
+};
+
+export function diagnose(p: Probes, opts: { envFile?: string; docker?: boolean } = {}) {
   const fixes: Fix[] = [];
   const env = `'${(opts.envFile ?? ".env").replace(/'/g, "'\\''")}'`;
   if (!p.piperVoice)
@@ -67,9 +80,12 @@ export function diagnose(p: Probes, opts: { envFile?: string } = {}) {
     });
   if (!p.chatterbox) fixes.push({ id: "voice-hd", label: "Voix HD expressive et clonage de ta voix (optionnel, GPU conseillé)", commands: ["septim setup --voix-hd   # Chatterbox Multilingual, licence MIT, puis VIRAL_TTS=chatterbox"] });
 
+  if (opts.docker) for (const f of fixes) f.commands = [`Studio > Réglages > ${SETTINGS_WHERE[f.id] ?? f.label}`];
+
   return {
     canRender: true,
-    voice: p.chatterbox && p.ttsPref === "chatterbox" ? ("chatterbox" as const) : p.piperVoice ? ("piper" as const) : p.kokoro ? ("kokoro" as const) : ("silent" as const),
+    // Voix coupée dans les Réglages (VIRAL_TTS=silent) : la vidéo est muette même si une voix est installée.
+    voice: p.ttsPref === "silent" ? ("silent" as const) : p.chatterbox && p.ttsPref === "chatterbox" ? ("chatterbox" as const) : p.piperVoice ? ("piper" as const) : p.kokoro ? ("kokoro" as const) : ("silent" as const),
     broll: p.comfyui ? ("comfyui" as const) : p.pexels ? ("pexels" as const) : p.pixabay ? ("pixabay" as const) : ("procedural" as const),
     music: p.musicTracks > 0 ? ("pistes" as const) : ("procedural" as const),
     llm: p.ollama ? ("ollama" as const) : ("secours" as const),
@@ -104,18 +120,20 @@ export async function probe(cfg: ViralConfig, env: Record<string, string | undef
   const { hasPostizCredentials } = await import("./publish");
   return {
     ollama,
-    piperVoice: existsSync(join(voiceDir, `${voice}.onnx`)) && spawnSync(pythonBin({ ...env, VIRAL_HOME: cfg.home }), ["-c", "import piper"], { stdio: "ignore" }).status === 0,
+    // Sans lancer Python : importer torch ou piper prend des secondes et bloquerait le serveur.
+    piperVoice: existsSync(join(voiceDir, `${voice}.onnx`)) && pythonPackageInstalled(cfg.home, "piper"),
     kokoro,
     chrome: !!env.WHATSAPP_CHROME_PATH && existsSync(env.WHATSAPP_CHROME_PATH),
-    postiz: !!env.POSTIZ_API_KEY || hasPostizCredentials(),
-    whatsappSession: existsSync(join(cfg.home, "wa")),
+    // Coupés dans les Réglages (mode manuel, console) : ils ne comptent plus, même avec la clé ou la session présentes.
+    postiz: env.VIRAL_PUBLISH_MODE !== "manual" && (!!env.POSTIZ_API_KEY || hasPostizCredentials()),
+    whatsappSession: env.VIRAL_NOTIFIER !== "console" && existsSync(join(cfg.home, "wa")),
     youtubeKey: !!env.YOUTUBE_API_KEY,
     apify: !!env.APIFY_TOKEN,
     comfyui: !!env.COMFYUI_URL && (await fetch(`${env.COMFYUI_URL.replace(/\/+$/, "")}/system_stats`, { signal: AbortSignal.timeout(2000) }).then((r) => r.ok).catch(() => false)),
     pexels: !!env.PEXELS_API_KEY?.trim(),
     pixabay: !!env.PIXABAY_API_KEY?.trim(),
     musicTracks: env.VIRAL_MUSIC_DIR && existsSync(env.VIRAL_MUSIC_DIR) ? readdirSync(env.VIRAL_MUSIC_DIR).filter((f) => /\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(f)).length : 0,
-    chatterbox: spawnSync(pythonBin({ ...env, VIRAL_HOME: cfg.home }), ["-c", "import chatterbox"], { stdio: "ignore" }).status === 0,
+    chatterbox: pythonPackageInstalled(cfg.home, "chatterbox"),
     ttsPref: env.VIRAL_TTS ?? "auto",
   };
 }
