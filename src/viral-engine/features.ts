@@ -90,6 +90,8 @@ export type FeatureView = {
   // ComfyUI : ce que ton PC a installé, lu par l'usine ; l'adresse trouvée quand aucune n'est réglée.
   comfy?: { profile?: ComfyProfile; gpu?: string; vramGb?: number; version?: string; detected: ComfyInfo["models"]; missing: string[] };
   suggestion?: string;
+  // Ollama : les modèles installés sur ton PC, à choisir d'un clic (les modèles « cloud » passent par ton compte Ollama).
+  ollamaModels?: { name: string; cloud: boolean }[];
 };
 
 type Settings = { enabled: Partial<Record<FeatureId, boolean>>; values: Record<string, string> };
@@ -216,16 +218,16 @@ export function createFeatures(o: { home: string; env: Env; installs: Installs; 
   const ollamaHost = () => trimUrl(env.OLLAMA_HOST ?? "http://127.0.0.1:11434");
   const ollamaModel = (s: Settings) => value(s, "VIRAL_OLLAMA_MODEL") ?? "qwen2.5:7b";
 
-  async function ollamaState(s: Settings): Promise<{ reachable: boolean; present: boolean }> {
+  async function ollamaState(s: Settings): Promise<{ reachable: boolean; present: boolean; names: string[] }> {
     return cached("ollama", async () => {
       try {
         const res = await doFetch(`${ollamaHost()}/api/tags`, { signal: AbortSignal.timeout(2500) });
-        if (!res.ok) return { reachable: false, present: false };
+        if (!res.ok) return { reachable: false, present: false, names: [] };
         const names = ((await res.json()) as { models?: { name: string }[] }).models?.map((m) => m.name) ?? [];
         const want = ollamaModel(s);
-        return { reachable: true, present: names.some((n) => n === want || n === `${want}:latest`) };
+        return { reachable: true, present: names.some((n) => n === want || n === `${want}:latest`), names };
       } catch {
-        return { reachable: false, present: false };
+        return { reachable: false, present: false, names: [] };
       }
     });
   }
@@ -260,12 +262,15 @@ export function createFeatures(o: { home: string; env: Env; installs: Installs; 
     let comfy: FeatureView["comfy"];
     let suggestion: string | undefined;
     let modelsMissing = false;
+    let ollamaModels: FeatureView["ollamaModels"];
     switch (id) {
       case "ollama": {
         const st = await ollamaState(s);
         ready = st.present;
         unreachable = !st.reachable;
-        detail = st.present ? `Modèle ${ollamaModel(s)} prêt` : st.reachable ? `Modèle ${ollamaModel(s)} à télécharger` : `Pas de réponse sur ${ollamaHost()}`;
+        const count = st.names.length ? ` · ${st.names.length} ${st.names.length > 1 ? "modèles installés" : "modèle installé"}` : "";
+        ollamaModels = [...st.names.filter((n) => !/cloud/i.test(n)), ...st.names.filter((n) => /cloud/i.test(n))].map((name) => ({ name, cloud: /cloud/i.test(name) }));
+        detail = st.present ? `Modèle ${ollamaModel(s)} prêt${count}` : st.reachable ? `Modèle ${ollamaModel(s)} à télécharger${count}` : `Pas de réponse sur ${ollamaHost()}`;
         break;
       }
       case "voix":
@@ -343,6 +348,7 @@ export function createFeatures(o: { home: string; env: Env; installs: Installs; 
       ...(link ? { link } : {}),
       ...(comfy ? { comfy } : {}),
       ...(suggestion ? { suggestion } : {}),
+      ...(ollamaModels?.length ? { ollamaModels } : {}),
     };
   }
 

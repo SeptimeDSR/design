@@ -6,6 +6,7 @@ import { parseArgs } from "node:util";
 import { runCli, userPath, type CliIO } from "./cli";
 import { loadDotEnv } from "./config";
 import { createInterface } from "node:readline";
+import { detectComfy, discoverComfy, formatComfy } from "./comfy";
 import { envCatalog, formatEnvList, readEnv, setEnvVars, unsetEnvVar, validateEnvName } from "./envfile";
 import { CLIENT_NAMES, isMcpClient, MCP_CLIENTS, dockerMcpConfig, mcpConfig, writeMcpConfig } from "./connect";
 import { formatDiagnosis } from "./doctor";
@@ -38,6 +39,7 @@ Ouvrir les portes
 Installer et réparer
   septim setup [--sans-claude] [--voix] [--voix-hd]   .env, Claude Code, voix gratuite (HD : Chatterbox), diagnostic
   septim env [list|set CLE=valeur|unset CLE|init|check]   régler le fichier .env (clés, adresses) depuis le terminal et tester les clés
+  septim comfy [adresse]              tout ce que ton ComfyUI a installé (modèles, LoRA…) et s'il sait faire les plans vidéo
   septim doctor                       ce qui tourne, et les commandes pour le reste
   septim design init [dossier]        installer septim-design dans un autre projet
   septim version
@@ -57,7 +59,7 @@ const ALIASES: Record<string, string> = {
   "--version": "version",
   "-v": "version",
 };
-const COMMANDS = ["video", "lint", "videos", "voir", "publier", "jeter", "studio", "start", "mcp", "doctor", "env", "connect", "setup", "design", "aide", "version"];
+const COMMANDS = ["video", "lint", "videos", "voir", "publier", "jeter", "studio", "start", "mcp", "doctor", "env", "comfy", "connect", "setup", "design", "aide", "version"];
 
 const STATUS_FR: Record<JobStatus, string> = { rendered: "Rendue", notified: "À valider", publishing: "En publication", published: "Publiée", rejected: "Jetée", failed: "Ratée" };
 const STATUS_ARG: Record<string, JobStatus> = { "a-valider": "notified", prete: "notified", publiee: "published", jetee: "rejected", ratee: "failed" };
@@ -365,6 +367,20 @@ async function dispatch(command: string, args: string[], io: CliIO): Promise<num
       return 0;
     case "env":
       return envCommand(args, io);
+    case "comfy": {
+      const url = args[0] ?? process.env.COMFYUI_URL?.trim() ?? (await discoverComfy());
+      if (!url) {
+        io.err.write("Aucun ComfyUI trouvé sur ce PC (ports 8188 et 8000). Lance-le, ou donne son adresse : septim comfy http://host.docker.internal:8188\nIl doit écouter sur 0.0.0.0 pour qu'un conteneur l'atteigne : option --listen (portable), ou Paramètres > Configuration du serveur > Hôte 0.0.0.0 (Desktop).\n");
+        return 1;
+      }
+      const info = await detectComfy(url);
+      if (!info.reachable) {
+        io.err.write(`ComfyUI ne répond pas sur ${url}.\nVérifie le port (8188 pour la version portable, 8000 pour l'application Desktop) et qu'il écoute sur 0.0.0.0 : option --listen (portable), ou Paramètres > Configuration du serveur > Hôte 0.0.0.0 (Desktop). Docker n'atteint pas 127.0.0.1.\n`);
+        return 1;
+      }
+      out(formatComfy(info, url));
+      return info.profile ? 0 : 1;
+    }
     case "studio":
       return studio(args, io, { daemon: false });
     case "start": {

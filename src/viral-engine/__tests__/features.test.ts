@@ -382,3 +382,52 @@ describe("ComfyUI sur ton PC : détecté, montré, branché tout seul", () => {
     expect(t.message).toMatch(/RTX 3070/);
   });
 });
+
+describe("Ollama de ton PC : tes modèles, à choisir d'un clic", () => {
+  const tags = (names: string[]) => (async () => json({ models: names.map((name) => ({ name })) })) as unknown as typeof fetch;
+  const INSTALLED = ["qwen2.5:3b", "qwen2.5:1.5b", "deepseek-r1:latest", "llama3.2:latest", "qwen3.5:cloud", "kimi-k2.5:cloud"];
+
+  it("liste les modèles installés (locaux d'abord, les modèles « cloud » repérés)", async () => {
+    const { features } = mk({ OLLAMA_HOST: "http://host.docker.internal:11434", VIRAL_OLLAMA_MODEL: "qwen2.5:3b" }, tags(INSTALLED));
+    const v = (await features.list()).find((f) => f.id === "ollama")!;
+    expect(v.status).toBe("actif");
+    expect(v.ollamaModels!.map((m) => m.name)).toEqual(["qwen2.5:3b", "qwen2.5:1.5b", "deepseek-r1:latest", "llama3.2:latest", "qwen3.5:cloud", "kimi-k2.5:cloud"]);
+    expect(v.ollamaModels!.filter((m) => m.cloud).map((m) => m.name)).toEqual(["qwen3.5:cloud", "kimi-k2.5:cloud"]);
+    expect(v.detail).toMatch(/6 modèles/);
+  });
+
+  it("choisir un autre modèle installé le rend actif tout de suite ; un modèle absent → « à installer »", async () => {
+    const { features, env } = mk({ OLLAMA_HOST: "http://host.docker.internal:11434", VIRAL_OLLAMA_MODEL: "qwen2.5:7b" }, tags(INSTALLED));
+    expect((await features.list()).find((f) => f.id === "ollama")!.status).toBe("a-installer");
+    const v = await features.update("ollama", { values: { VIRAL_OLLAMA_MODEL: "llama3.2:latest" } });
+    expect(v.status).toBe("actif");
+    expect(env.VIRAL_OLLAMA_MODEL).toBe("llama3.2:latest");
+    // « llama3.2 » sans étiquette = « llama3.2:latest » pour Ollama
+    expect((await features.update("ollama", { values: { VIRAL_OLLAMA_MODEL: "llama3.2" } })).status).toBe("actif");
+  });
+});
+
+describe("ComfyUI : tous les modèles, pas seulement ceux de la vidéo", () => {
+  it("LoRA, upscalers, ControlNet et CLIP vision sont listés aussi", async () => {
+    const { detectComfy } = await import("../comfy");
+    const fetchImpl = (async (url: string) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/system_stats") return new Response(JSON.stringify({ system: {}, devices: [] }));
+      const extra: Record<string, [string, string]> = {
+        LoraLoader: ["lora_name", "style-afrique.safetensors"],
+        UpscaleModelLoader: ["model_name", "4x-UltraSharp.pth"],
+        ControlNetLoader: ["control_net_name", "canny.safetensors"],
+        CLIPVisionLoader: ["clip_name", "clip_vision_h.safetensors"],
+      };
+      const name = path.replace("/object_info/", "");
+      if (!extra[name]) return new Response("{}");
+      return new Response(JSON.stringify({ [name]: { input: { required: { [extra[name][0]]: [[extra[name][1]]] } } } }));
+    }) as unknown as typeof fetch;
+    const r = await detectComfy("http://c:8188", fetchImpl);
+    expect(r.models.loras).toEqual(["style-afrique.safetensors"]);
+    expect(r.models.upscalers).toEqual(["4x-UltraSharp.pth"]);
+    expect(r.models.controlnets).toEqual(["canny.safetensors"]);
+    expect(r.models.clipVision).toEqual(["clip_vision_h.safetensors"]);
+  });
+});
+

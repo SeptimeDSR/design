@@ -556,3 +556,69 @@ describe("septim env : régler .env depuis le terminal", () => {
     expect(r.err).toMatch(/set|list|init|check/);
   });
 });
+
+describe("septim comfy : tout ce que ton ComfyUI a installé", () => {
+  async function comfyServer(files: Parameters<typeof import("./fixtures/fake-comfy").fakeComfy>[0]) {
+    const { createServer } = await import("node:http");
+    const { fakeComfy } = await import("./fixtures/fake-comfy");
+    const fake = fakeComfy(files);
+    const srv = createServer(async (req, res) => {
+      const r = await fake(`http://x${req.url}`);
+      res.writeHead(r.status, { "content-type": "application/json" }).end(await r.text());
+    });
+    await new Promise<void>((ok) => srv.listen(0, "127.0.0.1", () => ok()));
+    return { url: `http://127.0.0.1:${(srv.address() as { port: number }).port}`, close: () => srv.close() };
+  }
+
+  it("liste les modèles par catégorie, la carte, la version, et dit si Wan 2.2 5B est prêt", async () => {
+    const { WAN22_FILES } = await import("./fixtures/fake-comfy");
+    tempHome();
+    const s = await comfyServer(WAN22_FILES);
+    try {
+      const r = await run(["comfy", s.url]);
+      expect(r.code).toBe(0);
+      expect(r.out).toContain("RTX 3070");
+      expect(r.out).toContain("0.3.60");
+      expect(r.out).toMatch(/Modèles vidéo et d'image \(2\)/);
+      expect(r.out).toContain("wan2.2_ti2v_5B_fp16.safetensors");
+      expect(r.out).toContain("flux1-dev.safetensors");
+      expect(r.out).toMatch(/Encodeurs de texte \(2\)/);
+      expect(r.out).toContain("umt5_xxl_fp8_e4m3fn_scaled.safetensors");
+      expect(r.out).toMatch(/VAE \(2\)/);
+      expect(r.out).toMatch(/Wan 2\.2 5B/);
+      expect(r.out).toMatch(/prêt/);
+    } finally {
+      s.close();
+    }
+  });
+
+  it("sans argument : l'adresse de COMFYUI_URL ; modèles manquants → verdict avec le fichier et le dossier", async () => {
+    tempHome();
+    const s = await comfyServer({ unet: ["flux1-dev.safetensors"], clip: ["clip_l.safetensors"], vae: ["ae.safetensors"] });
+    process.env.COMFYUI_URL = s.url;
+    try {
+      const r = await run(["comfy"]);
+      expect(r.code).toBe(1);
+      expect(r.out).toContain("flux1-dev.safetensors");
+      expect(r.out).toMatch(/Il manque/);
+      expect(r.out).toContain("wan2.2_ti2v_5B_fp16.safetensors");
+      expect(r.out).toContain("models/diffusion_models");
+    } finally {
+      s.close();
+    }
+  });
+
+  it("ComfyUI injoignable → code 1, les ports 8188 et 8000 et l'écoute sur 0.0.0.0", async () => {
+    tempHome();
+    const r = await run(["comfy", "http://127.0.0.1:9"]);
+    expect(r.code).toBe(1);
+    const text = r.out + r.err;
+    expect(text).toMatch(/8188/);
+    expect(text).toMatch(/8000/);
+    expect(text).toMatch(/0\.0\.0\.0/);
+  });
+
+  it("septim aide cite comfy", async () => {
+    expect((await run(["aide"])).out).toMatch(/septim comfy/);
+  });
+});

@@ -17,5 +17,8 @@ SEPTIM - tout lancer sur Windows (3 etapes)
      septim env list                          ce qui est regle (jamais une cle affichee)
      septim env check                         tester les cles
 
+Voir tout ce que ton ComfyUI a installe :
+     septim comfy                             modeles, LoRA, VAE... et si les plans video sont prets
+
 Reglages d'un clic : onglet "Reglages" du Studio.
 Mode d'emploi complet : docs\GUIDE.md

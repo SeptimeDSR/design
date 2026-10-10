@@ -23,14 +23,15 @@ services:
       VIRAL_NOTIFIER: ${VIRAL_NOTIFIER:-console}
       REMOTION_BROWSER_EXECUTABLE: /usr/bin/chromium
       WHATSAPP_CHROME_PATH: /usr/bin/chromium
-      # Ollama du compose (gratuit, local). Celui de ton PC : SEPTIM_OLLAMA_HOST=http://host.docker.internal:11434 dans .env.
-      OLLAMA_HOST: ${SEPTIM_OLLAMA_HOST:-http://ollama:11434}
+      # L'Ollama de ton PC (tes modèles y sont déjà). Sans Ollama chez toi : COMPOSE_PROFILES=ollama-local et SEPTIM_OLLAMA_HOST=http://ollama:11434 dans .env.
+      OLLAMA_HOST: ${SEPTIM_OLLAMA_HOST:-http://host.docker.internal:11434}
       VIRAL_OLLAMA_MODEL: ${VIRAL_OLLAMA_MODEL:-qwen2.5:3b}
       # Ta musique : dépose des mp3 ou wav dans le dossier « musique » à côté de compose.yaml.
       VIRAL_MUSIC_DIR: /data/music
     depends_on:
       ollama:
         condition: service_healthy
+        required: false
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
@@ -47,8 +48,9 @@ services:
       start_period: 40s
       retries: 3
 
-  # Écrivain de scripts local et gratuit. Le modèle (≈ 2 à 5 Go) se télécharge une fois, depuis Réglages (ou tout seul au premier démarrage).
+  # Ollama dans Docker : seulement si tu n'en as pas sur ton PC (COMPOSE_PROFILES=ollama-local). Le modèle se télécharge depuis Réglages.
   ollama:
+    profiles: [ollama-local]
     image: ollama/ollama:latest
     restart: unless-stopped
     volumes:

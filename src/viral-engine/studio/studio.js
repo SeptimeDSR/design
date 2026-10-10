@@ -831,12 +831,17 @@ function buildRow(f) {
   // ComfyUI : ce que ton PC a installé.
   row.comfyBox = h("div", { class: "feature-comfy" });
 
+  // Ollama : tes modèles installés, à choisir d'un clic (reconstruits seulement si la liste change : le focus clavier reste).
+  row.modelsBox = h("div", { class: "models-pick", role: "group", "aria-label": "Modèles Ollama installés sur ton PC" });
+  row.modelsKey = "";
+
   row.el = h(
     "li",
     { class: "feature", id: `feature-${f.id}` },
     h("div", { class: "feature-head" }, h("label", { class: "feature-title", for: `switch-${f.id}` }, input, h("span", { class: "switch-ui", "aria-hidden": "true" }), h("span", { class: "feature-name", text: f.title })), row.pill),
     h("p", { class: "hint feature-help", text: f.help }),
     row.detail,
+    row.modelsBox,
     row.fieldsBox,
     row.choicesBox,
     row.linkBox,
@@ -909,6 +914,7 @@ function updateRow(row, f) {
     row.linkBox.querySelector("ol").hidden = link.state !== "qr";
   }
 
+  renderOllamaModels(row, f);
   renderComfy(row, f);
   if (f.id === "comfyui") {
     row.suggestBtn.hidden = !f.suggestion || !f.enabled || !!row.fields.get("COMFYUI_URL")?.el.value;
@@ -916,6 +922,33 @@ function updateRow(row, f) {
       row.suggestBtn.textContent = `Utiliser ${f.suggestion}`;
       row.suggestBtn.onclick = () => saveFeature("comfyui", { values: { COMFYUI_URL: f.suggestion } }, row).then(() => announce("Adresse de ComfyUI enregistrée.")).catch(() => undefined);
     }
+  }
+}
+
+function renderOllamaModels(row, f) {
+  const models = f.ollamaModels ?? [];
+  row.modelsBox.hidden = models.length === 0;
+  const key = models.map((m) => m.name).join("|");
+  const current = f.fields.find((fd) => fd.var === "VIRAL_OLLAMA_MODEL")?.value ?? "";
+  if (row.modelsKey !== key) {
+    row.modelsKey = key;
+    fill(
+      row.modelsBox,
+      models.map((m) =>
+        h("button", {
+          type: "button",
+          class: "chip",
+          "data-model": m.name,
+          title: m.cloud ? "Modèle cloud : il passe par ton compte Ollama et internet" : "Modèle installé sur ton PC",
+          text: m.cloud ? `${m.name} (cloud)` : m.name,
+          onclick: () => saveFeature("ollama", { values: { VIRAL_OLLAMA_MODEL: m.name } }, row).then(() => announce(`Modèle ${m.name} choisi.`)).catch(() => undefined),
+        }),
+      ),
+    );
+  }
+  for (const chip of row.modelsBox.children) {
+    const name = chip.dataset.model;
+    chip.setAttribute("aria-pressed", String(name === current || name === `${current}:latest`));
   }
 }
 
@@ -928,7 +961,7 @@ function renderComfy(row, f) {
     row.comfyBox,
     c.profile ? h("p", { class: "comfy-ok", text: `Ton ComfyUI sait faire les plans vidéo : ${c.profile === "wan22-5b" ? "Wan 2.2 5B" : "Wan 2.1 texte vers vidéo"} détecté${c.gpu ? `, carte ${c.gpu}` : ""}${GO(c.vramGb) ? ` (${GO(c.vramGb)})` : ""}.` }) : null,
     c.missing.length ? h("div", { class: "comfy-missing" }, h("p", { text: "Il manque :" }), h("ul", {}, c.missing.map((m) => h("li", { text: m }))), h("p", { class: "hint", text: "Dans ComfyUI, le menu Modèles propose « Wan2.2 5B » : il télécharge ces fichiers pour toi." })) : null,
-    h("div", { class: "comfy-found" }, list("Modèles vidéo installés", c.detected.diffusion), list("Encodeurs de texte", c.detected.textEncoders), list("VAE", c.detected.vae), list("Checkpoints", c.detected.checkpoints)),
+    h("div", { class: "comfy-found" }, list("Modèles vidéo installés", c.detected.diffusion), list("Encodeurs de texte", c.detected.textEncoders), list("VAE", c.detected.vae), list("Checkpoints", c.detected.checkpoints), list("LoRA", c.detected.loras ?? []), list("Upscalers", c.detected.upscalers ?? []), list("ControlNet", c.detected.controlnets ?? []), list("CLIP vision", c.detected.clipVision ?? [])),
   );
 }
 

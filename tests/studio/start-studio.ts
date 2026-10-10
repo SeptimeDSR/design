@@ -30,7 +30,7 @@ async function main() {
     const u = String(url);
     if (u.startsWith("https://api.pexels.com")) return new Response("{}", { status: (init?.headers as Record<string, string>)?.Authorization === "good-key" ? 200 : 401 });
     if (u.startsWith("http://host.docker.internal:8188")) return comfy(url, init);
-    if (u.endsWith("/api/tags")) return new Response(JSON.stringify({ models: [{ name: "llama3:8b" }] }));
+    if (u.endsWith("/api/tags")) return new Response(JSON.stringify({ models: ["qwen2.5:3b", "llama3.2:latest", "deepseek-r1:latest", "kimi-k2.5:cloud"].map((name) => ({ name })) }));
     throw new Error("fetch failed");
   }) as unknown as typeof fetch;
   // Installation factice : trois étapes de 0,7 s ; la dernière dépose les fichiers que l'usine cherche.

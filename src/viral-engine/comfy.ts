@@ -6,14 +6,14 @@ export type ComfyInfo = {
   version?: string;
   gpu?: string;
   vramGb?: number;
-  models: { diffusion: string[]; textEncoders: string[]; vae: string[]; checkpoints: string[] };
+  models: { diffusion: string[]; textEncoders: string[]; vae: string[]; checkpoints: string[]; loras: string[]; upscalers: string[]; controlnets: string[]; clipVision: string[] };
   nodes: Record<string, boolean>;
   profile?: ComfyProfile;
   picked?: { unet: string; clip: string; vae: string };
   missing: string[];
 };
 
-const NODES = ["UNETLoader", "CLIPLoader", "VAELoader", "CheckpointLoaderSimple", "ModelSamplingSD3", "CreateVideo", "SaveVideo", "Wan22ImageToVideoLatent", "EmptyHunyuanLatentVideo"];
+const NODES = ["UNETLoader", "CLIPLoader", "VAELoader", "CheckpointLoaderSimple", "ModelSamplingSD3", "CreateVideo", "SaveVideo", "Wan22ImageToVideoLatent", "EmptyHunyuanLatentVideo", "LoraLoader", "UpscaleModelLoader", "ControlNetLoader", "CLIPVisionLoader"];
 const trimUrl = (u: string) => u.replace(/\/+$/, "");
 
 // Les listes de fichiers : [[a, b]] (ancien front) ou ["COMBO", { options: [a, b] }] (nouveau).
@@ -34,7 +34,7 @@ const pickClip = (names: string[]) => {
 
 export async function detectComfy(url: string, fetchImpl: typeof fetch = fetch): Promise<ComfyInfo> {
   const base = trimUrl(url);
-  const empty: ComfyInfo = { reachable: false, models: { diffusion: [], textEncoders: [], vae: [], checkpoints: [] }, nodes: {}, missing: [] };
+  const empty: ComfyInfo = { reachable: false, models: { diffusion: [], textEncoders: [], vae: [], checkpoints: [], loras: [], upscalers: [], controlnets: [], clipVision: [] }, nodes: {}, missing: [] };
   const get = async (path: string) => {
     const res = await fetchImpl(`${base}${path}`, { signal: AbortSignal.timeout(4000) });
     if (!res.ok) throw new Error(String(res.status));
@@ -54,6 +54,10 @@ export async function detectComfy(url: string, fetchImpl: typeof fetch = fetch):
     textEncoders: options(info.CLIPLoader, "CLIPLoader", "clip_name"),
     vae: options(info.VAELoader, "VAELoader", "vae_name"),
     checkpoints: options(info.CheckpointLoaderSimple, "CheckpointLoaderSimple", "ckpt_name"),
+    loras: options(info.LoraLoader, "LoraLoader", "lora_name"),
+    upscalers: options(info.UpscaleModelLoader, "UpscaleModelLoader", "model_name"),
+    controlnets: options(info.ControlNetLoader, "ControlNetLoader", "control_net_name"),
+    clipVision: options(info.CLIPVisionLoader, "CLIPVisionLoader", "clip_name"),
   };
   const device = stats.devices?.[0];
   const out: ComfyInfo = {
@@ -89,4 +93,33 @@ export async function discoverComfy(fetchImpl: typeof fetch = fetch, hosts = ["h
   const candidates = hosts.flatMap((h) => ports.map((p) => `http://${h}:${p}`));
   const hits = await Promise.all(candidates.map((u) => fetchImpl(`${u}/system_stats`, { signal: AbortSignal.timeout(900) }).then((r) => r.ok, () => false)));
   return candidates.find((_, i) => hits[i]);
+}
+
+const PROFILE_NAME: Record<ComfyProfile, string> = { "wan22-5b": "Wan 2.2 5B", "wan21-t2v": "Wan 2.1 texte vers vidéo" };
+
+// Le rapport que `septim comfy` affiche : tout ce que ton ComfyUI a installé, puis le verdict pour les plans vidéo.
+export function formatComfy(info: ComfyInfo, url: string): string {
+  const lines = [`ComfyUI sur ${url}${info.version ? ` (version ${info.version})` : ""}`];
+  if (info.gpu) lines.push(`Carte : ${info.gpu}${info.vramGb ? `, ${info.vramGb} Go` : ""}`);
+  const groups: [string, string[]][] = [
+    ["Modèles vidéo et d'image", info.models.diffusion],
+    ["Checkpoints", info.models.checkpoints],
+    ["Encodeurs de texte", info.models.textEncoders],
+    ["VAE", info.models.vae],
+    ["LoRA", info.models.loras],
+    ["Upscalers", info.models.upscalers],
+    ["ControlNet", info.models.controlnets],
+    ["CLIP vision", info.models.clipVision],
+  ];
+  for (const [title, names] of groups) {
+    lines.push("", `${title} (${names.length})`);
+    lines.push(...(names.length ? names.map((n) => `  - ${n}`) : ["  (aucun)"]));
+  }
+  lines.push("");
+  if (info.profile && info.picked) {
+    lines.push(`Plans vidéo : ${PROFILE_NAME[info.profile]} prêt`, `  modèle ${info.picked.unet}`, `  texte  ${info.picked.clip}`, `  VAE    ${info.picked.vae}`);
+  } else {
+    lines.push("Plans vidéo : pas encore. Il manque :", ...info.missing.map((m) => `  - ${m}`), "  (dans ComfyUI, le menu Modèles > « Wan2.2 5B » télécharge ces fichiers)");
+  }
+  return lines.join("\n");
 }

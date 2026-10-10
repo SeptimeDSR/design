@@ -106,10 +106,11 @@ describe("documentation : elle ne dérive pas du code", () => {
     expect(compose).toContain("VIRAL_HOME: /data");
     expect(compose).toContain("healthcheck");
     expect(compose).toContain("shm_size");
-    // Tout tourne d'un seul `docker compose up` : Ollama inclus (le modèle se télécharge depuis les Réglages), la musique en lecture seule.
-    expect(compose).not.toMatch(/profiles:/);
-    expect(compose).toMatch(/ollama:\s*\n\s+image: ollama\/ollama/);
-    expect(compose).toMatch(/condition: service_healthy/);
+    // L'Ollama de ton PC par défaut (tes modèles sont déjà là) ; celui du compose seulement sur demande (profil), jamais obligatoire.
+    expect(compose).toMatch(/profiles:\s*\[ollama-local\]/);
+    expect(compose).toMatch(/ollama:\s*\n\s+profiles: \[ollama-local\]\s*\n\s+image: ollama\/ollama/);
+    expect(compose).toMatch(/condition: service_healthy\s*\n\s+required: false/);
+    expect(compose).toMatch(/OLLAMA_HOST: \$\{SEPTIM_OLLAMA_HOST:-http:\/\/host\.docker\.internal:11434\}/);
     expect(compose).toContain("VIRAL_MUSIC_DIR: /data/music");
     expect(compose).toMatch(/:\/data\/music:ro/);
     expect(compose).not.toContain("ollama-pull");

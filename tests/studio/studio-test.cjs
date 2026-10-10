@@ -164,6 +164,14 @@ const check = (name, ok, extra = "") => {
   await waitPill("voix", "Actif", 25000);
   check("Installer : la voix passe à Actif toute seule", true);
 
+  // Ollama : tes modèles installés, à choisir d'un clic
+  check("Ollama : modèle par défaut absent → « À installer »", (await pill("ollama").textContent()) === "À installer");
+  const chips = await page.locator("#feature-ollama .chip").allTextContents();
+  check("Ollama : les 4 modèles du PC sont proposés, le cloud repéré", chips.length === 4 && chips.includes("kimi-k2.5:cloud (cloud)"), chips.join(", "));
+  await page.click('#feature-ollama .chip[data-model="llama3.2:latest"]');
+  await waitPill("ollama", "Actif");
+  check("Ollama : un clic sur llama3.2 le rend actif et le marque choisi", (await page.getAttribute('#feature-ollama .chip[data-model="llama3.2:latest"]', "aria-pressed")) === "true" && (await page.getAttribute('#feature-ollama .chip[data-model="qwen2.5:3b"]', "aria-pressed")) === "false");
+
   // ComfyUI : trouvé sur le PC, modèles détectés et montrés
   await waitPill("comfyui", "Adresse manquante");
   const useBtn = page.locator('#feature-comfyui button:has-text("Utiliser http://host.docker.internal:8188")');

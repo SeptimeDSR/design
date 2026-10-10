@@ -1374,3 +1374,34 @@ textarea:focus-visible {
   display: inline-block;
   padding-block: 0.6rem;
 }
+
+/* Tes modèles Ollama : des boutons à bascule, le modèle utilisé est plein. */
+.models-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.chip {
+  min-height: 2.5rem;
+  padding: 0 0.9rem;
+  border: 1px solid rgb(233 236 242 / 0.35);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--craie);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--craie);
+}
+
+.chip[aria-pressed="true"] {
+  border-color: var(--raphia);
+  background: var(--raphia);
+  color: var(--nuit);
+}
