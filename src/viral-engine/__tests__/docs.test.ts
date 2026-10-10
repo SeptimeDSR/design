@@ -44,7 +44,7 @@ describe("documentation : elle ne dérive pas du code", () => {
     expect(tools).toHaveLength(9);
     for (const t of tools) expect(GUIDE, t).toContain(t);
     for (const r of ROUTES) expect(GUIDE, `${r.method} ${r.path}`).toContain(`${r.method} ${r.path}`);
-    for (const section of ["En 1 minute", "Installer", "Navigateur", "Terminal", "Claude Code", "MCP", "API", "Webhooks", "WhatsApp", "Recettes", "Configuration", "Dépannage", "Sécurité", "Ce qui manque encore"]) {
+    for (const section of ["En 1 minute", "Installer", "Navigateur", "Terminal", "Claude Code", "MCP", "API", "Webhooks", "WhatsApp", "Recettes", "Configuration", "Dépannage", "Sécurité", "Docker", "Ce qui manque encore"]) {
       expect(GUIDE, section).toMatch(new RegExp(`^##+ .*${section}`, "m"));
     }
   });
@@ -95,5 +95,29 @@ describe("documentation : elle ne dérive pas du code", () => {
     expect(sh).toContain("--voix");
     expect(sh).toContain("--voix-hd) SETUP_ARGS+=(--voix-hd)");
     expect(sh).not.toMatch(/\bread\s+-/);
+  });
+
+  it("Docker : compose.yaml, Dockerfile et entrée sont cohérents, le GUIDE donne les commandes", () => {
+    for (const f of ["Dockerfile", "compose.yaml", ".dockerignore", "docker/septim"]) expect(existsSync(join(ROOT, f)), f).toBe(true);
+    for (const f of ["docker/septim"]) expect(spawnSync("sh", ["-n", join(ROOT, f)]).status, f).toBe(0);
+    const compose = read("compose.yaml");
+    // Le Studio n'est ouvert qu'à cette machine par défaut ; le token est généré si absent ; les données survivent au conteneur.
+    expect(compose).toMatch(/127\.0\.0\.1|SEPTIM_BIND/);
+    expect(compose).toContain("VIRAL_HOME: /data");
+    expect(compose).toContain("healthcheck");
+    expect(compose).toContain("shm_size");
+    expect(compose).toMatch(/profiles:\s*\[ia\]/);
+    const docker = read("Dockerfile");
+    expect(docker).toContain("PUPPETEER_SKIP_DOWNLOAD=1");
+    expect(docker).toMatch(/chromium/);
+    expect(docker).toMatch(/ffmpeg/);
+    expect(docker).toMatch(/fonts-noto-color-emoji/);
+    const ignore = read(".dockerignore");
+    for (const secret of [".env", ".septim-viral", "node_modules"]) expect(ignore, secret).toMatch(new RegExp(`^${secret.replace(".", "\\.")}$`, "m"));
+    const dockerSection = GUIDE.slice(GUIDE.search(/^##+ .*Docker/m));
+    for (const cmd of ["docker compose up", "docker compose run --rm septim", "docker compose --profile ia", "docker compose logs", "docker compose down"]) expect(dockerSection, cmd).toContain(cmd);
+    // Variables propres au compose : documentées dans .env.example.
+    const example = read(".env.example");
+    for (const v of ["SEPTIM_BIND", "SEPTIM_OLLAMA_HOST"]) expect(example, v).toContain(v);
   });
 });

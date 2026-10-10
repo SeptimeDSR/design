@@ -1,0 +1,17 @@
+# Jamais dans l'image : secrets, données, dépendances de la machine hôte, sorties de build.
+.env
+.env.*
+!.env.example
+.septim-viral
+node_modules
+.next
+.git
+.superpowers
+deliverables
+tests
+docs
+coverage
+out
+*.tsbuildinfo
+*.log
+.DS_Store

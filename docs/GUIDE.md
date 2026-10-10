@@ -14,6 +14,8 @@ bash ~/septim/scripts/install.sh --voix
 septim studio
 ```
 
+**Avec Docker (Windows, macOS, Linux : rien d'autre à installer)** : `docker compose up -d`, puis ouvre l'adresse affichée par `docker compose logs septim`. Détails dans la section [Docker](#docker).
+
 Les exemples supposent un clone dans `~/septim` : si tu as cloné ailleurs, remplace `~/septim` par ton dossier partout.
 
 Ouvre http://127.0.0.1:4321, écris un sujet (« la tontine à Douala »), clique **Fabriquer la vidéo**. Deux minutes plus tard, la vidéo est dans la liste : regarde-la, puis **Publier #ref** et **Confirmer : OUI #ref**. Sans Postiz, l'usine te donne la légende prête à coller dans TikTok avec le son tendance.
@@ -575,9 +577,54 @@ Les lignes vides du `.env` (clés, numéros) sont sans effet. Les variables « a
 
 ---
 
+## Docker
+
+Un seul outil à installer (Docker Desktop, ou Docker Engine + le plugin Compose). L'image contient Node, Chromium, ffmpeg et Python : rien d'autre sur ta machine.
+
+```bash
+git clone https://github.com/SeptimeDSR/design septim && cd septim
+docker compose up -d                 # 1re fois : ≈ 5 à 10 min (construction de l'image)
+docker compose logs septim           # affiche : Studio SEPTIM : http://localhost:4321/?token=…
+```
+
+Ouvre cette adresse : c'est le Studio. Le token est généré une fois et gardé dans le volume de données (`/data/.token`) : il ne change pas au redémarrage.
+
+Les commandes du terminal (`septim …`) marchent dans le conteneur :
+
+```bash
+docker compose exec septim septim doctor                       # état de l'usine (sur le conteneur qui tourne)
+docker compose run --rm septim video "la tontine à Douala"     # une vidéo depuis le terminal
+docker compose exec septim septim setup --voix                 # voix française gratuite (Piper), gardée dans le volume
+docker compose exec septim septim setup --voix-hd              # voix HD (Chatterbox ; GPU conseillé, pas de GPU dans le conteneur par défaut)
+docker compose logs -f septim                                  # suivre (et scanner le QR WhatsApp)
+docker compose down                                            # arrêter (les vidéos restent) ; ajoute -v pour tout effacer
+```
+
+**Où sont les vidéos ?** Dans le volume `septim-data` (`/data/jobs/<id>/video.mp4`) : le plus simple : clic droit sur la vidéo dans le Studio, « Enregistrer la vidéo sous », ou `docker compose cp septim:/data/jobs ./videos`. Pour les voir directement dans ton dossier, mets `SEPTIM_DATA=./septim-data` dans `.env` (Windows et macOS ; sous Linux le dossier doit appartenir à l'utilisateur 1000).
+
+**Réglages** (dans `.env`, lu par compose et par l'usine) :
+
+| Variable | Défaut | Effet |
+| --- | --- | --- |
+| `SEPTIM_PORT` | `4321` | port sur ta machine |
+| `SEPTIM_BIND` | `127.0.0.1` | `0.0.0.0` ouvre au Wi-Fi (téléphone) ; le token reste exigé |
+| `SEPTIM_TOKEN` | généré | impose ton propre token |
+| `SEPTIM_DATA` | volume `septim-data` | `./septim-data` pour un dossier visible |
+| `VIRAL_NOTIFIER` | `console` | `whatsapp` : message « prêt », réponse `OUI #ref` ; scanne le QR dans `docker compose logs -f septim` (un `.env` copié de `.env.example` contient déjà `whatsapp`) |
+| `SEPTIM_OLLAMA_HOST` | `http://host.docker.internal:11434` | l'Ollama de ta machine ; `http://ollama:11434` avec le profil `ia` |
+
+**Écrivain de scripts gratuit (Ollama)** : `SEPTIM_OLLAMA_HOST=http://ollama:11434 docker compose --profile ia up -d` démarre Ollama et télécharge le modèle (≈ 4,7 Go, une fois). Sans GPU, mets `VIRAL_OLLAMA_MODEL=qwen2.5:3b`. Pour un GPU NVIDIA, décommente le bloc `deploy` du service `ollama` dans `compose.yaml`.
+
+**ComfyUI** (vidéo IA locale) tourne sur ta machine, hors du conteneur : `COMFYUI_URL=http://host.docker.internal:8188` (dans le conteneur, `127.0.0.1` est le conteneur lui-même).
+
+**Sécurité** : le port n'est publié que sur `127.0.0.1` par défaut, le conteneur tourne sans droits root, et `.env`, les vidéos et la session WhatsApp ne sont jamais copiés dans l'image (`.dockerignore`). Mettre à jour : `git pull && docker compose up -d --build`.
+
+---
+
 ## Ce qui manque encore
 
-- **Docker** et **CI GitHub Actions** : pas vérifiables depuis l'environnement de travail (pas de démon Docker) ; à faire quand une machine avec Docker est disponible.
+- **Docker : le rendu d'une vidéo dans le conteneur** n'a pas pu être vérifié par l'auteur (le réseau de son environnement bloque les paquets Debian de Chromium) : l'image, le démarrage, le token, l'API, le Studio et les commandes l'ont été. Si le premier rendu échoue chez toi, envoie la sortie de `docker compose logs septim`.
+- **CI GitHub Actions** : pas encore écrite.
 - **Application mobile** : le Studio en Wi-Fi (ou par tunnel) couvre le téléphone.
 - **Windows natif** : WSL est la voie documentée.
 - **Durée de la voix** : le script est vérifié sur une estimation du débit, pas sur la voix réelle.

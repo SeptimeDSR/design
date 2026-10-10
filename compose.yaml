@@ -1,0 +1,78 @@
+# Usine SEPTIM : `docker compose up -d` puis ouvre l'adresse affichée par `docker compose logs septim`.
+# Gratuit par défaut (Remotion, Piper, banques libres). Rien ne se publie sans « OUI #ref », rien ne dépense de crédit.
+name: septim
+
+services:
+  septim:
+    build: .
+    image: septim:local
+    init: true
+    restart: unless-stopped
+    # Chromium a besoin de mémoire partagée pour rendre une vidéo 1080×1920.
+    shm_size: 1gb
+    # Ton .env (clés Pexels, Postiz, token…) est lu s'il existe ; les lignes ci-dessous passent avant lui.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      VIRAL_HOME: /data
+      SEPTIM_HOST: 0.0.0.0
+      SEPTIM_PORT: "4321"
+      SEPTIM_PUBLISHED_PORT: ${SEPTIM_PORT:-4321}
+      # Console par défaut : le Studio marche tout de suite. WhatsApp : VIRAL_NOTIFIER=whatsapp dans .env, puis scanne le QR de `docker compose logs -f septim`.
+      VIRAL_NOTIFIER: ${VIRAL_NOTIFIER:-console}
+      REMOTION_BROWSER_EXECUTABLE: /usr/bin/chromium
+      WHATSAPP_CHROME_PATH: /usr/bin/chromium
+      # Ollama sur ta machine (ou profil « ia » ci-dessous avec SEPTIM_OLLAMA_HOST=http://ollama:11434).
+      OLLAMA_HOST: ${SEPTIM_OLLAMA_HOST:-http://host.docker.internal:11434}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      # Seulement cette machine. SEPTIM_BIND=0.0.0.0 ouvre au Wi-Fi (téléphone) : le token reste exigé.
+      - "${SEPTIM_BIND:-127.0.0.1}:${SEPTIM_PORT:-4321}:4321"
+    volumes:
+      # Volume Docker par défaut ; SEPTIM_DATA=./septim-data pour voir les fichiers dans ton dossier.
+      - ${SEPTIM_DATA:-septim-data}:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4321/api/v1/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
+
+  # Écrivain de scripts local et gratuit : docker compose --profile ia up -d
+  ollama:
+    profiles: [ia]
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    # GPU NVIDIA (optionnel, nécessite nvidia-container-toolkit) : décommente.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  # Télécharge le modèle une fois (≈ 4,7 Go pour qwen2.5:7b), puis s'arrête.
+  ollama-pull:
+    profiles: [ia]
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["sh", "-c", "ollama pull ${VIRAL_OLLAMA_MODEL:-qwen2.5:7b}"]
+    restart: "no"
+
+volumes:
+  septim-data:
+  ollama:

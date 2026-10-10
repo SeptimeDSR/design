@@ -1,0 +1,19 @@
+#!/bin/sh
+# La commande `septim` du conteneur (démarrage et `docker compose exec/run`) :
+# même token partout (généré une fois, gardé dans /data), adresse du Studio affichée au démarrage, puis la vraie commande.
+set -eu
+home="${VIRAL_HOME:-/data}"
+mkdir -p "$home"
+if [ -z "${SEPTIM_TOKEN:-}" ]; then
+  if [ ! -s "$home/.token" ]; then
+    (umask 077; node -e "process.stdout.write(require('crypto').randomBytes(16).toString('hex'))" > "$home/.token")
+  fi
+  SEPTIM_TOKEN=$(cat "$home/.token")
+  export SEPTIM_TOKEN
+fi
+if [ "${1:-}" = "start" ]; then
+  echo "────────────────────────────────────────────────────────────"
+  echo " Studio SEPTIM : http://localhost:${SEPTIM_PUBLISHED_PORT:-4321}/?token=${SEPTIM_TOKEN}"
+  echo "────────────────────────────────────────────────────────────"
+fi
+exec node /app/bin/septim.mjs "$@"
