@@ -163,3 +163,11 @@ Réseau: Ruling: certificates are supplied by the user (folder), never disabled 
 Réseau: Ruling: nothing is built on ComfyUI's Flux 2 klein / ACE-Step models the user has — an image or music workflow cannot be written blind; Pexels already gives real plans; the guide says what to download for Wan 2.2 5B — cost if wrong: no AI-generated plans or music until the user either downloads the 2 Wan files or exports a workflow
 Réseau: minor (deferred): a corporate proxy that signs with an INTERMEDIATE CA needs that chain's root exported too (the command exports the site certificate's issuer only)
 Réseau: minor (deferred): Chatterbox in Docker downloads torch (CPU) — several GB for a voice that is slow without GPU access; the Réglages help now says so
+
+## Films, durée au choix, lanceur (2026-10-11)
+- Ruling: au-delà de 60 s, moteur « film » 100 % ffmpeg (pas Chromium) : images Ken Burns (zoompan), voix Piper par plan, musique, sous-titres ASS, chapitres, morceaux par scène collés sans réencoder. Mesuré : 11 min de film en 720p en 5,6 min sur 4 cœurs.
+- Ruling: images gratuites d'abord (Flux 2 klein ComfyUI si COMFYUI_URL + fichiers présents, sinon photos Pexels/Pixabay, sinon cartes) ; pas de clips vidéo IA pour un film (disque) ; vidéo légère (LTX 2B, Wan 5B) seulement recommandée dans `septim comfy`.
+- Ruling: même demande = même dossier (id = hash) : un film « ratée » est repris ; un film terminé n'est jamais écrasé. Film long confié à l'usine qui tourne (HTTP) sinon au terminal.
+- Ruling: pas de film muet (requireVoice), refus avant de commencer si pas de place disque, WhatsApp reçoit le message sans le MP4.
+- Ruling: septim.cmd compare la version du dossier et celle du conteneur quand une commande échoue, reconstruit seul, relance la commande ; LANCER retire les anciens dossiers septim du PATH. Version du package à augmenter à chaque livraison.
+- Mineur laissé: voix masculine des personnages = voix du narrateur ; workflows Flux 2 / ACE-Step écrits d'après les nœuds officiels, non testés sur un vrai ComfyUI ; jeter un film ne supprime pas son dossier ; zoompan légèrement saccadé sur zooms très lents.
