@@ -24,6 +24,10 @@ if (-not (Test-Path ".env")) {
   Write-Host "Fichier .env cree. Pour tes cles : septim env init (dans un NOUVEAU terminal), ou l'onglet Reglages du Studio."
 }
 
+# Dossier des certificats (reseau qui lit le HTTPS) : vide par defaut, monte par Docker en lecture seule. Voir : septim reseau
+if (-not (Test-Path "certificats")) { New-Item -ItemType Directory -Path "certificats" | Out-Null }
+if (-not (Test-Path "musique")) { New-Item -ItemType Directory -Path "musique" | Out-Null }
+
 Write-Host ""
 Write-Host "Construction et demarrage de SEPTIM (5 a 10 minutes la premiere fois)..."
 docker compose up -d --build

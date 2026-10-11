@@ -5,6 +5,7 @@ import { createInterface } from "node:readline";
 import type { Env } from "./config";
 import { FactoryError } from "./errors";
 import { voiceHdSteps, voiceSteps } from "./setup";
+import { explainNetworkError } from "./net";
 
 // Les installations que le Studio sait lancer d'un bouton : voix Piper, voix HD Chatterbox, modèle Ollama.
 export type InstallId = "voix" | "voix-hd" | "ollama";
@@ -80,7 +81,12 @@ export function createInstalls(o: { home: string; env: Env; run?: StepRunner; fe
       update(id, { step: step.label, progress: i / steps.length });
       note(id, `▶ ${step.label}`);
       const code = await run(step.cmd, step.args, (l) => note(id, l));
-      if (code !== 0) throw new Error(step.hint.replace(/^Impossible/, "Impossible"));
+      if (code !== 0) {
+        // Un certificat remplacé par le réseau (antivirus, pare-feu) est la panne la plus courante des téléchargements : on la nomme.
+        const tail = states.get(id)!.log.slice(-40).join("\n");
+        const cert = /CERTIFICATE_VERIFY_FAILED|self[- ]signed certificate|SSLCertVerificationError|unable to get local issuer/i.test(tail) ? ` ${explainNetworkError("le site de téléchargement", "SELF_SIGNED_CERT_IN_CHAIN")}` : "";
+        throw new Error(`${step.hint}${cert}`);
+      }
     }
     update(id, { progress: 1 });
   }

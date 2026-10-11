@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { detectComfy, discoverComfy, type ComfyInfo, type ComfyProfile } from "./comfy";
 import type { Env } from "./config";
+import { explainNetworkError, isTrustError, networkCode } from "./net";
 import { FactoryError } from "./errors";
 import { INSTALL_IDS, type InstallId, type InstallState, type Installs } from "./installs";
 
@@ -34,7 +35,7 @@ const DEFS: Record<FeatureId, Def> = {
     fields: [{ var: "VIRAL_OLLAMA_MODEL", label: "Modèle", secret: false, placeholder: "qwen2.5:3b" }],
   },
   voix: { title: "Voix française (Piper)", help: "Voix gratuite et locale. Coupée : vidéo muette avec sous-titres.", group: "Voix", needs: "install", fields: [] },
-  "voix-hd": { title: "Voix HD (Chatterbox)", help: "Voix expressive, plus lente à produire ; une carte graphique aide.", group: "Voix", needs: "install", fields: [] },
+  "voix-hd": { title: "Voix HD (Chatterbox)", help: "Voix expressive, mais lente : dans Docker, le conteneur n'utilise pas ta carte graphique (processeur seulement, plusieurs Go à télécharger). La voix Piper suffit pour de vraies vidéos.", group: "Voix", needs: "install", fields: [] },
   whatsapp: {
     title: "WhatsApp",
     help: "Reçois « vidéo prête » et réponds OUI #ref. Lie ton téléphone une fois avec le QR code.",
@@ -406,41 +407,49 @@ export function createFeatures(o: { home: string; env: Env; installs: Installs; 
     return view(id, s);
   }
 
-  async function http(url: string, headers: Record<string, string> = {}): Promise<{ status: number; body: unknown } | undefined> {
+  type Http = { status: number; body?: unknown; failed?: boolean; code?: string };
+  async function http(url: string, headers: Record<string, string> = {}): Promise<Http> {
     try {
       const res = await doFetch(url, { headers, signal: AbortSignal.timeout(8000) });
       const body = await res.json().catch(() => undefined);
       return { status: res.status, body };
-    } catch {
-      return undefined;
+    } catch (error) {
+      // La cause réseau (certificat remplacé, DNS, délai) est dans error.cause : elle explique l'échec.
+      return { status: 0, failed: true, code: (error as Error)?.name === "TimeoutError" ? "ETIMEDOUT" : networkCode(error) };
     }
   }
 
   async function test(idIn: string): Promise<FeatureTest> {
     const id = check(idIn);
     const s = load();
-    const keyTest = async (name: string, key: string | undefined, run: (k: string) => Promise<{ status: number; body: unknown } | undefined>, okMessage: (b: unknown) => string, host: string): Promise<FeatureTest> => {
+    const keyTest = async (name: string, key: string | undefined, run: (k: string) => Promise<Http>, okMessage: (b: unknown) => string, host: string, advice = ""): Promise<FeatureTest> => {
       if (!key) return { ok: false, message: `Mets d'abord la clé ${name} (le champ ci-dessus, ou dans le fichier .env).` };
       const r = await run(key);
-      if (!r) return { ok: false, message: `${host} ne répond pas : vérifie la connexion internet de l'usine.` };
+      if (r.failed) return { ok: false, message: explainNetworkError(host, r.code) };
       if (r.status >= 200 && r.status < 300) return { ok: true, message: okMessage(r.body) };
-      return { ok: false, message: `Clé ${name} refusée (${r.status}). Vérifie qu'elle est copiée en entier.` };
+      // La raison donnée par le service (jamais la clé) aide : « API key not valid », « API not enabled »…
+      const reason = (r.body as { error?: { message?: unknown } } | undefined)?.error?.message;
+      const why = typeof reason === "string" && reason.length < 200 ? ` ${reason}` : "";
+      return { ok: false, message: `Clé ${name} refusée (${r.status}).${why} Vérifie qu'elle est copiée en entier.${advice ? ` ${advice}` : ""}` };
     };
     switch (id) {
       case "pexels":
-        return keyTest("Pexels", value(s, "PEXELS_API_KEY"), (k) => http("https://api.pexels.com/v1/search?query=nature&per_page=1", { Authorization: k }), () => "Clé Pexels acceptée.", "Pexels");
+        return keyTest("Pexels", value(s, "PEXELS_API_KEY"), (k) => http("https://api.pexels.com/v1/search?query=nature&per_page=1", { Authorization: k }), () => "Clé Pexels acceptée.", "api.pexels.com");
       case "pixabay":
-        return keyTest("Pixabay", value(s, "PIXABAY_API_KEY"), (k) => http(`https://pixabay.com/api/videos/?key=${encodeURIComponent(k)}&q=nature&per_page=3`), () => "Clé Pixabay acceptée.", "Pixabay");
+        return keyTest("Pixabay", value(s, "PIXABAY_API_KEY"), (k) => http(`https://pixabay.com/api/videos/?key=${encodeURIComponent(k)}&q=nature&per_page=3`), () => "Clé Pixabay acceptée.", "pixabay.com");
       case "youtube":
-        return keyTest("YouTube", value(s, "YOUTUBE_API_KEY"), (k) => http(`https://www.googleapis.com/youtube/v3/videos?part=id&chart=mostPopular&maxResults=1&regionCode=CM&key=${encodeURIComponent(k)}`), () => "Clé YouTube acceptée.", "YouTube");
+        return keyTest("YouTube", value(s, "YOUTUBE_API_KEY"), (k) => http(`https://www.googleapis.com/youtube/v3/videos?part=id&chart=mostPopular&maxResults=1&regionCode=CM&key=${encodeURIComponent(k)}`), () => "Clé YouTube acceptée.", "www.googleapis.com", "Vérifie aussi que « YouTube Data API v3 » est activée dans ton projet Google Cloud (Bibliothèque > YouTube Data API v3 > Activer).");
       case "apify":
-        return keyTest("Apify", value(s, "APIFY_TOKEN"), (k) => http(`https://api.apify.com/v2/users/me?token=${encodeURIComponent(k)}`), (b) => `Token Apify accepté (compte ${(b as { data?: { username?: string } })?.data?.username ?? "?"}).`, "Apify");
+        return keyTest("Apify", value(s, "APIFY_TOKEN"), (k) => http(`https://api.apify.com/v2/users/me?token=${encodeURIComponent(k)}`), (b) => `Token Apify accepté (compte ${(b as { data?: { username?: string } })?.data?.username ?? "?"}).`, "api.apify.com");
       case "publication": {
         const key = value(s, "POSTIZ_API_KEY");
         const url = trimUrl(value(s, "POSTIZ_API_URL") ?? "https://api.postiz.com");
         if (!key) return { ok: false, message: "Mets d'abord la clé API Postiz (Postiz > Paramètres > Public API), puis l'adresse de ton Postiz." };
         const r = await http(`${url}/public/v1/integrations`, { Authorization: key });
-        if (!r) return { ok: false, message: `Postiz ne répond pas sur ${url}. Depuis Docker, ton PC s'appelle host.docker.internal (pas localhost) : par exemple http://host.docker.internal:4007/api` };
+        if (r.failed) {
+          const cert = isTrustError(r.code) ? ` ${explainNetworkError(new URL(url).host, r.code)}` : "";
+          return { ok: false, message: `Postiz ne répond pas sur ${url}. Depuis Docker, ton PC s'appelle host.docker.internal (pas localhost) : par exemple http://host.docker.internal:4007/api.${cert}` };
+        }
         if (r.status < 200 || r.status >= 300) return { ok: false, message: `Postiz a refusé la clé (${r.status}) sur ${url}. Vérifie la clé et l'adresse (elle se termine par /api sur un Postiz auto-hébergé).` };
         const list = (Array.isArray(r.body) ? r.body : []) as { identifier?: string; disabled?: boolean }[];
         const live = list.filter((i) => !i.disabled);

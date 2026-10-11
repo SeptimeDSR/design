@@ -132,3 +132,35 @@ describe("installations lancées depuis le Studio", () => {
     expect(() => inst.start("nope" as never)).toThrow(/installer/i);
   });
 });
+
+describe("installation : un certificat remplacé par le réseau est expliqué", () => {
+  it("la voix qui échoue sur CERTIFICATE_VERIFY_FAILED → la cause et « septim reseau », en plus de l'indice de l'étape", async () => {
+    const run: StepRunner = async (_cmd, args, onLine) => {
+      if (args.includes("piper.download_voices")) {
+        onLine("urllib.error.URLError: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain (_ssl.c:992)>");
+        return 1;
+      }
+      return 0;
+    };
+    const inst = createInstalls({ home: home(), env: {}, run });
+    const state = await settle(inst, "voix");
+    expect(state.status).toBe("failed");
+    expect(state.error).toMatch(/Téléchargement de la voix/);
+    expect(state.error).toMatch(/remplace le certificat/);
+    expect(state.error).toMatch(/septim reseau/);
+  });
+
+  it("une autre erreur n'ajoute rien", async () => {
+    const run: StepRunner = async (_c, args, onLine) => {
+      if (args.includes("pip")) {
+        onLine("ERROR: No matching distribution found for piper-tts");
+        return 1;
+      }
+      return 0;
+    };
+    const inst = createInstalls({ home: home(), env: {}, run });
+    const state = await settle(inst, "voix");
+    expect(state.error).not.toMatch(/septim reseau/);
+  });
+});
+

@@ -11,6 +11,22 @@ if [ -z "${SEPTIM_TOKEN:-}" ]; then
   SEPTIM_TOKEN=$(cat "$home/.token")
   export SEPTIM_TOKEN
 fi
+# Réseau qui lit le HTTPS (antivirus, pare-feu, proxy d'entreprise) : les certificats posés dans le dossier « certificats »
+# sont ajoutés à ceux du système pour Python (Piper), pip, curl et Node. Sans certificat valide, rien n'est modifié.
+certs="${SEPTIM_CERTS_DIR:-/certs}"
+extra="${SEPTIM_EXTRA_CA:-/tmp/septim-extra-ca.crt}"
+bundle="${SEPTIM_CA_BUNDLE:-/tmp/septim-ca.crt}"
+: > "$extra"
+for f in "$certs"/*.crt "$certs"/*.pem; do
+  if [ -f "$f" ] && grep -q "BEGIN CERTIFICATE" "$f" 2>/dev/null; then
+    cat "$f" >> "$extra"
+    printf '\n' >> "$extra"
+  fi
+done
+if [ -s "$extra" ]; then
+  if [ -f /etc/ssl/certs/ca-certificates.crt ]; then cat /etc/ssl/certs/ca-certificates.crt "$extra" > "$bundle"; else cat "$extra" > "$bundle"; fi
+  export SSL_CERT_FILE="$bundle" REQUESTS_CA_BUNDLE="$bundle" PIP_CERT="$bundle" CURL_CA_BUNDLE="$bundle" NODE_EXTRA_CA_CERTS="$extra"
+fi
 if [ "${1:-}" = "start" ]; then
   echo "────────────────────────────────────────────────────────────"
   echo " Studio SEPTIM : http://localhost:${SEPTIM_PUBLISHED_PORT:-4321}/?token=${SEPTIM_TOKEN}"

@@ -210,7 +210,8 @@ Dans le Studio, l'onglet **Réglages** liste les 11 fonctions de l'usine. Chacun
 | `septim mcp` | serveur MCP stdio (pour les assistants) |
 | `septim connect <client> [--write]` | brancher un assistant MCP (sans client : la liste) |
 | `septim setup [--sans-claude] [--voix] [--voix-hd]` | `.env`, Claude Code, voix (HD : Chatterbox), diagnostic |
-| `septim comfy [adresse]` | tout ce que ton ComfyUI a installé (modèles vidéo et d'image, checkpoints, encodeurs de texte, VAE, LoRA, upscalers, ControlNet, CLIP vision) et s'il sait faire les plans vidéo ; sans adresse : `COMFYUI_URL`, sinon il cherche sur les ports 8188 et 8000 |
+| `septim reseau [site…]` | pourquoi un téléchargement échoue avec « certificate verify failed » : montre, site par site, qui remplace les certificats HTTPS (antivirus, pare-feu, proxy) et donne la commande qui exporte son certificat |
+| `septim comfy [adresse]` | tout ce que ton ComfyUI a installé (modèles vidéo et d'image, checkpoints, encodeurs de texte, VAE, LoRA, upscalers, ControlNet, CLIP vision) et s'il sait faire les plans vidéo ; sans adresse : `COMFYUI_URL`, sinon il cherche sur les ports 8188 et 8000 ; `septim comfy --brut CLIPLoader` affiche la réponse brute d'un nœud (pour comprendre une liste vide) |
 | `septim env [list\|set CLE=valeur\|unset CLE\|init\|check]` | régler le fichier `.env` depuis le terminal et tester les clés (voir ci-dessous) |
 | `septim doctor` | état de l'usine et commandes pour le reste |
 | `septim design init [dossier]` | installer septim-design dans un autre projet Next.js |
@@ -695,6 +696,31 @@ docker compose down                                            # arrêter (les v
 **Postiz** : le CLI Postiz est dans l'image ; ton Postiz tourne chez toi (voir Réglages).
 
 **Sécurité** : le port n'est publié que sur `127.0.0.1` par défaut, le conteneur tourne sans droits root, et `.env`, les vidéos et la session WhatsApp ne sont jamais copiés dans l'image (`.dockerignore`). Mettre à jour : `git pull && docker compose up -d --build`.
+
+---
+
+## Réseau qui intercepte le HTTPS
+
+**Le symptôme** : une installation (voix Piper, voix HD) ou un test de clé échoue avec `CERTIFICATE_VERIFY_FAILED`, `self-signed certificate in certificate chain` ou « Ton réseau remplace le certificat de … ». Ce n'est pas un bug de l'usine : ton antivirus (scan HTTPS), ton pare-feu, ta box ou un proxy d'entreprise lit le trafic chiffré en présentant **son propre certificat**. Ton Windows lui fait confiance, le conteneur non.
+
+**Étape 1, voir qui** :
+```powershell
+septim reseau
+```
+Il teste les sites dont l'usine a besoin (Hugging Face pour la voix, PyPI pour les paquets Python, Pexels, Pixabay, YouTube, Apify) et affiche, pour chaque site au certificat remplacé, **le nom de l'émetteur** (par exemple « Kaspersky Anti-Virus Personal Root Certificate »). Il ne lit que le certificat : aucune donnée n'est envoyée.
+
+**Étape 2, donner son certificat au conteneur** : `septim reseau` affiche la commande PowerShell exacte, avec le nom trouvé. Elle écrit `certificats\reseau.crt`. À lancer dans le dossier `septim`.
+
+**Étape 3, relancer** :
+```powershell
+docker compose up -d
+septim reseau
+```
+Les sites doivent passer au vert. Le dossier `certificats` est monté dans l'usine : Python, pip, curl et Node reçoivent ce certificat en plus de ceux du système. Seuls les fichiers `.crt` ou `.pem` contenant un vrai certificat sont pris.
+
+**Étape 4, refaire l'installation** : Réglages > Voix française (Piper) > **Relancer l'installation**.
+
+Autre voie : dans ton antivirus, désactive le « scan HTTPS » (ou « inspection SSL ») pour Docker, ou ajoute `huggingface.co` aux exceptions. Si `septim reseau` dit « injoignable » plutôt que « certificat remplacé », le problème est la connexion ou le DNS, pas un certificat.
 
 ---
 

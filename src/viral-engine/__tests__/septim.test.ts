@@ -622,3 +622,49 @@ describe("septim comfy : tout ce que ton ComfyUI a installé", () => {
     expect((await run(["aide"])).out).toMatch(/septim comfy/);
   });
 });
+
+describe("septim env check : le message complet", () => {
+  it("formatEnvCheck garde toutes les lignes d'un message (la liste « Ajoute : » ne disparaît plus)", async () => {
+    const { formatEnvCheck } = await import("../septim");
+    const text = formatEnvCheck([
+      { label: "Pexels", ok: true, message: "Clé Pexels acceptée." },
+      { label: "ComfyUI", ok: false, message: "ComfyUI répond mais aucun modèle ne convient. Ajoute :\n• Modèle vidéo : wan2.2_ti2v_5B_fp16.safetensors → dossier ComfyUI/models/diffusion_models\nAstuce : menu Modèles." },
+    ]);
+    expect(text).toMatch(/✓ Pexels : Clé Pexels acceptée\./);
+    expect(text).toMatch(/✗ ComfyUI : ComfyUI répond/);
+    expect(text).toContain("wan2.2_ti2v_5B_fp16.safetensors");
+    expect(text).toContain("Astuce : menu Modèles.");
+    expect(text.split("\n").filter((l) => l.startsWith("    ")).length).toBe(2);
+  });
+
+  it("le conseil « certificat remplacé » n'apparaît que si c'est la cause (pas pour une simple absence de réponse)", async () => {
+    const { envCheckAdvice } = await import("../septim");
+    expect(envCheckAdvice([{ label: "Pexels", ok: false, message: "api.pexels.com ne répond pas : vérifie la connexion internet de l'usine (« septim reseau » détaille site par site)." }])).toBe("");
+    expect(envCheckAdvice([{ label: "Apify", ok: false, message: "Ton réseau remplace le certificat de api.apify.com (antivirus…)." }])).toMatch(/septim reseau/);
+  });
+});
+
+describe("septim comfy --brut : la réponse brute de ComfyUI pour un nœud", () => {
+  it("affiche le JSON de /object_info/<Nœud> (pour comprendre une liste vide), nœud inconnu → dit qu'il n'existe pas", async () => {
+    const { createServer } = await import("node:http");
+    tempHome();
+    const srv = createServer((req, res) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(req.url === "/object_info/CLIPLoader" ? JSON.stringify({ CLIPLoader: { input: { required: { clip_name: [["qwen_3_4b.safetensors"]], type: [["flux2", "wan"]] } } } }) : "{}");
+    });
+    await new Promise<void>((ok) => srv.listen(0, "127.0.0.1", () => ok()));
+    const url = `http://127.0.0.1:${(srv.address() as { port: number }).port}`;
+    try {
+      const a = await run(["comfy", "--brut", "CLIPLoader", url]);
+      expect(a.code).toBe(0);
+      expect(a.out).toContain("qwen_3_4b.safetensors");
+      expect(a.out).toContain('"clip_name"');
+      const b = await run(["comfy", "--brut", "NoeudInconnu", url]);
+      expect(b.code).toBe(1);
+      expect(b.out + b.err).toMatch(/n'existe pas/);
+      expect((await run(["comfy", "--brut"])).code).toBe(1);
+    } finally {
+      srv.close();
+    }
+  });
+});

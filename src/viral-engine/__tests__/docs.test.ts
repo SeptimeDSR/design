@@ -161,7 +161,9 @@ describe("documentation : elle ne dérive pas du code", () => {
     expect(read(".gitattributes")).toMatch(/\*\.cmd[^\n]*eol=crlf|\*\.\{bat,cmd,ps1\}[^\n]*eol=crlf/);
     expect(read("LANCER.ps1")).toContain("SetEnvironmentVariable");
     // septim env : le .env de l'hôte est monté le temps de la commande (jamais créé en dossier par Docker), puis l'usine est recréée.
-    expect(text).toContain("docker compose run --rm --no-deps -v");
+    expect(text).toContain("docker compose --progress quiet run --rm --no-deps -v");
+    // Le bandeau « What's next : Debug with Gordon » de Docker Desktop n'a rien à faire dans les messages de septim.
+    expect(text).toContain("DOCKER_CLI_HINTS=false");
     expect(text).toContain("/app/.env");
     expect(text).toMatch(/if not exist "%~dp0\.env"/);
     expect(text).toMatch(/docker compose up -d/);

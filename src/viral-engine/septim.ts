@@ -7,6 +7,7 @@ import { runCli, userPath, type CliIO } from "./cli";
 import { loadDotEnv } from "./config";
 import { createInterface } from "node:readline";
 import { detectComfy, discoverComfy, formatComfy } from "./comfy";
+import { checkTls, formatNetReport, NET_HOSTS } from "./net";
 import { envCatalog, formatEnvList, readEnv, setEnvVars, unsetEnvVar, validateEnvName } from "./envfile";
 import { CLIENT_NAMES, isMcpClient, MCP_CLIENTS, dockerMcpConfig, mcpConfig, writeMcpConfig } from "./connect";
 import { formatDiagnosis } from "./doctor";
@@ -40,6 +41,7 @@ Installer et réparer
   septim setup [--sans-claude] [--voix] [--voix-hd]   .env, Claude Code, voix gratuite (HD : Chatterbox), diagnostic
   septim env [list|set CLE=valeur|unset CLE|init|check]   régler le fichier .env (clés, adresses) depuis le terminal et tester les clés
   septim comfy [adresse]              tout ce que ton ComfyUI a installé (modèles, LoRA…) et s'il sait faire les plans vidéo
+  septim reseau [site…]               pourquoi un téléchargement échoue : qui remplace les certificats HTTPS (antivirus, pare-feu)
   septim doctor                       ce qui tourne, et les commandes pour le reste
   septim design init [dossier]        installer septim-design dans un autre projet
   septim version
@@ -59,7 +61,7 @@ const ALIASES: Record<string, string> = {
   "--version": "version",
   "-v": "version",
 };
-const COMMANDS = ["video", "lint", "videos", "voir", "publier", "jeter", "studio", "start", "mcp", "doctor", "env", "comfy", "connect", "setup", "design", "aide", "version"];
+const COMMANDS = ["video", "lint", "videos", "voir", "publier", "jeter", "studio", "start", "mcp", "doctor", "env", "comfy", "reseau", "connect", "setup", "design", "aide", "version"];
 
 const STATUS_FR: Record<JobStatus, string> = { rendered: "Rendue", notified: "À valider", publishing: "En publication", published: "Publiée", rejected: "Jetée", failed: "Ratée" };
 const STATUS_ARG: Record<string, JobStatus> = { "a-valider": "notified", prete: "notified", publiee: "published", jetee: "rejected", ratee: "failed" };
@@ -206,6 +208,19 @@ const INIT_QUESTIONS: { name: string; question: string; hint?: string }[] = [
   { name: "COMFYUI_URL", question: "Adresse de ton ComfyUI", hint: "depuis Docker : http://host.docker.internal:8188 (8000 pour l'application Desktop)" },
 ];
 
+// Un résultat par clé, avec TOUT le message (la liste des modèles manquants, la cause réseau…), les lignes suivantes décalées.
+export function formatEnvCheck(results: { label: string; ok: boolean; message: string }[]): string {
+  return results
+    .map((r) => {
+      const [first, ...rest] = r.message.split("\n");
+      return [`${r.ok ? "✓" : "✗"} ${r.label} : ${first}`, ...rest.map((l) => `    ${l}`)].join("\n");
+    })
+    .join("\n");
+}
+
+export const envCheckAdvice = (results: { ok: boolean; message: string; label?: string }[]): string =>
+  results.some((r) => !r.ok && /remplace le certificat/.test(r.message)) ? "Un certificat est remplacé par ton réseau : « septim reseau » détaille site par site et donne la commande qui règle ça." : "";
+
 async function envCommand(args: string[], io: CliIO): Promise<number> {
   const out = (t = "") => void io.out.write(`${t}\n`);
   const root = repoRoot();
@@ -302,13 +317,12 @@ async function envCommand(args: string[], io: CliIO): Promise<number> {
       return 0;
     }
     const factory = createFactory();
-    let ok = true;
-    for (const [, id, label] of set) {
-      const r = await factory.settings.test(id);
-      out(`${r.ok ? "✓" : "✗"} ${label} : ${r.message.split("\n")[0]}`);
-      ok = ok && r.ok;
-    }
-    return ok ? 0 : 1;
+    const results: { label: string; ok: boolean; message: string }[] = [];
+    for (const [, id, label] of set) results.push({ label, ...(await factory.settings.test(id)) });
+    out(formatEnvCheck(results));
+    const advice = envCheckAdvice(results);
+    if (advice) out(`\n${advice}`);
+    return results.every((r) => r.ok) ? 0 : 1;
   }
 
   io.err.write(`Sous-commande inconnue « ${sub} ».\n${ENV_USAGE}\n`);
@@ -367,7 +381,28 @@ async function dispatch(command: string, args: string[], io: CliIO): Promise<num
       return 0;
     case "env":
       return envCommand(args, io);
+    case "reseau": {
+      // « hote » ou « hote:port » ; sans argument : les sites dont l'usine a besoin.
+      const targets = args.length ? args.map((a) => ({ host: a.split(":")[0], port: Number(a.split(":")[1] ?? 443), purpose: undefined as string | undefined })) : NET_HOSTS.map((h) => ({ ...h, port: 443 }));
+      const checks = await Promise.all(targets.map(async (t) => ({ ...(await checkTls(t.host, t.port)), purpose: t.purpose })));
+      out(formatNetReport(checks));
+      return checks.every((c) => c.state === "ok") ? 0 : 1;
+    }
     case "comfy": {
+      const brut = args.indexOf("--brut");
+      if (brut >= 0) {
+        // La réponse brute d'un nœud : sert à comprendre pourquoi une liste est vide (« septim comfy --brut CLIPLoader »).
+        const node = args[brut + 1];
+        if (!node) throw new FactoryError("bad_request", "Il manque le nom du nœud : septim comfy --brut CLIPLoader [adresse]");
+        const base = (args.find((a, i) => i !== brut && i !== brut + 1) ?? process.env.COMFYUI_URL?.trim() ?? (await discoverComfy()))?.replace(/\/+$/, "");
+        if (!base) throw new FactoryError("bad_request", "Aucun ComfyUI trouvé : donne son adresse (septim comfy --brut CLIPLoader http://host.docker.internal:8188).");
+        const res = await fetch(`${base}/object_info/${encodeURIComponent(node)}`, { signal: AbortSignal.timeout(8000) }).catch(() => undefined);
+        if (!res?.ok) throw new FactoryError("not_found", `ComfyUI ne répond pas sur ${base}.`);
+        const data = (await res.json()) as Record<string, unknown>;
+        if (!Object.keys(data).length) throw new FactoryError("not_found", `Le nœud « ${node} » n'existe pas dans ce ComfyUI (version trop ancienne, ou nom mal écrit).`);
+        out(JSON.stringify(data, null, 2));
+        return 0;
+      }
       const url = args[0] ?? process.env.COMFYUI_URL?.trim() ?? (await discoverComfy());
       if (!url) {
         io.err.write("Aucun ComfyUI trouvé sur ce PC (ports 8188 et 8000). Lance-le, ou donne son adresse : septim comfy http://host.docker.internal:8188\nIl doit écouter sur 0.0.0.0 pour qu'un conteneur l'atteigne : option --listen (portable), ou Paramètres > Configuration du serveur > Hôte 0.0.0.0 (Desktop).\n");

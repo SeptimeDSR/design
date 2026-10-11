@@ -1,6 +1,8 @@
 @echo off
 rem septim sous Windows : relaie vers l'usine qui tourne dans Docker (LANCER.bat la demarre). Fichier en ASCII.
 setlocal
+rem Pas de bandeau d'aide de Docker Desktop dans les messages de septim.
+set DOCKER_CLI_HINTS=false
 cd /d "%~dp0"
 if /i "%~1"=="start" goto up
 if /i "%~1"=="studio" goto up
@@ -17,7 +19,7 @@ exit /b 0
 :env
 rem septim env : regle le fichier .env de ce dossier. Il est monte dans un conteneur le temps de la commande.
 if not exist "%~dp0.env" echo # Reglages SEPTIM : septim env init, septim env set CLE=valeur> "%~dp0.env"
-docker compose run --rm --no-deps -v "%~dp0.env:/app/.env" septim %*
+docker compose --progress quiet run --rm --no-deps -v "%~dp0.env:/app/.env" septim %*
 if errorlevel 1 exit /b 1
 if /i "%~2"=="set" goto reapply
 if /i "%~2"=="unset" goto reapply

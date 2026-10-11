@@ -431,3 +431,43 @@ describe("ComfyUI : tous les modèles, pas seulement ceux de la vidéo", () => {
   });
 });
 
+describe("tester une clé : l'erreur dit la vraie cause", () => {
+  const failing = (code: string) => (async () => {
+    throw Object.assign(new Error("fetch failed"), { cause: { code } });
+  }) as unknown as typeof fetch;
+
+  it("certificat remplacé par le réseau → nomme le site et renvoie vers « septim reseau »", async () => {
+    const { features } = mk({ APIFY_TOKEN: "tok-secret" }, failing("SELF_SIGNED_CERT_IN_CHAIN"));
+    const r = await features.test("apify");
+    expect(r.ok).toBe(false);
+    expect(r.message).toMatch(/remplace le certificat de api\.apify\.com/);
+    expect(r.message).toMatch(/septim reseau/);
+    expect(r.message).not.toContain("tok-secret");
+  });
+
+  it("DNS et délai ont chacun leur phrase", async () => {
+    const dns = mk({ PEXELS_API_KEY: "k" }, failing("ENOTFOUND"));
+    expect((await dns.features.test("pexels")).message).toMatch(/api\.pexels\.com ne se résout pas/);
+    const slow = mk({ PIXABAY_API_KEY: "k" }, failing("ETIMEDOUT"));
+    expect((await slow.features.test("pixabay")).message).toMatch(/délai/);
+  });
+
+  it("YouTube 400 : la raison donnée par Google et la piste « API activée dans Google Cloud », sans la clé", async () => {
+    const f = (async () => new Response(JSON.stringify({ error: { code: 400, message: "API key not valid. Please pass a valid API key." } }), { status: 400 })) as unknown as typeof fetch;
+    const { features } = mk({ YOUTUBE_API_KEY: "yt-secret-key" }, f);
+    const r = await features.test("youtube");
+    expect(r.ok).toBe(false);
+    expect(r.message).toContain("API key not valid");
+    expect(r.message).toMatch(/YouTube Data API v3/);
+    expect(r.message).toMatch(/400/);
+    expect(r.message).not.toContain("yt-secret-key");
+  });
+
+  it("Postiz injoignable avec un certificat remplacé : la piste du certificat s'ajoute à celle de host.docker.internal", async () => {
+    const { features } = mk({ POSTIZ_API_KEY: "k", POSTIZ_API_URL: "https://postiz.exemple.org/api" }, failing("UNABLE_TO_VERIFY_LEAF_SIGNATURE"));
+    const r = await features.test("publication");
+    expect(r.message).toMatch(/certificat/);
+    expect(r.message).toMatch(/postiz\.exemple\.org/);
+  });
+});
+
