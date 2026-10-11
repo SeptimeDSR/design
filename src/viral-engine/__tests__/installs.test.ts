@@ -42,8 +42,9 @@ describe("installations lancées depuis le Studio", () => {
     const inst = createInstalls({ home: h, env: {}, run });
     const state = await settle(inst, "voix");
     expect(state.status).toBe("done");
-    expect(calls).toHaveLength(3);
+    expect(calls).toHaveLength(4);
     expect(calls[2]).toContain("piper.download_voices fr_FR-tom-medium");
+    expect(calls[3]).toContain("piper.download_voices fr_FR-siwis-medium");
     expect(state.log.join("\n")).toContain("sortie de");
     expect(state.progress).toBe(1);
     expect(JSON.parse(readFileSync(join(h, "installs", "voix.json"), "utf8")).status).toBe("done");
@@ -164,3 +165,22 @@ describe("installation : un certificat remplacé par le réseau est expliqué", 
   });
 });
 
+describe("voix : réseau qui bloque Hugging Face", () => {
+  it("la voix féminine est facultative : son échec n'arrête pas l'installation", async () => {
+    const run: StepRunner = async (_c, args) => (args.includes("fr_FR-siwis-medium") ? 1 : 0);
+    const state = await settle(createInstalls({ home: home(), env: {}, run }), "voix");
+    expect(state.status).toBe("done");
+    expect(state.log.join("\n")).toMatch(/siwis.*facultative|facultative/);
+  });
+
+  it("une voix déposée à la main dans le dossier voix/ n'est pas retéléchargée", async () => {
+    const dir = home();
+    mkdirSync(join(dir, "voix"), { recursive: true });
+    for (const f of ["fr_FR-tom-medium.onnx", "fr_FR-tom-medium.onnx.json", "fr_FR-siwis-medium.onnx"]) writeFileSync(join(dir, "voix", f), "x");
+    const calls: string[] = [];
+    const run: StepRunner = async (_c, args) => (calls.push(args.join(" ")), 0);
+    const state = await settle(createInstalls({ home: dir, env: { VIRAL_VOICES_DIR: join(dir, "voix") }, run }), "voix");
+    expect(state.status).toBe("done");
+    expect(calls.some((c) => c.includes("download_voices"))).toBe(false);
+  });
+});

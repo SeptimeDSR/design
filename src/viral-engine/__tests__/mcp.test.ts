@@ -6,10 +6,12 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, describe, expect, it } from "vitest";
 import { createMcpServer, mcpHttpHandler } from "../mcp";
 import { startServer } from "../server/http";
+import type { JobRequest } from "../pipeline";
 import { fakeFactory, seedJob } from "./fixtures/fake-factory";
 
 const TONTINE = JSON.parse(readFileSync(join(__dirname, "fixtures", "tontine.json"), "utf8"));
 const TOOLS = [
+  "septim_cancel_task",
   "septim_create_video",
   "septim_doctor",
   "septim_get_task",
@@ -51,7 +53,7 @@ describe("MCP : ce que voit le client", () => {
     );
     expect(publish.annotations?.destructiveHint).toBe(true);
     const resources = (await s.client.listResources()).resources.map((r) => r.uri).sort();
-    expect(resources).toEqual(["septim://checklist", "septim://guide-heat"]);
+    expect(resources).toEqual(["septim://checklist", "septim://guide-film", "septim://guide-heat"]);
     const prompts = (await s.client.listPrompts()).prompts.map((p) => p.name);
     expect(prompts).toEqual(["nouvelle_video"]);
   });
@@ -170,5 +172,54 @@ describe("MCP : HTTP sans état sur le serveur de l'usine", () => {
     cleanup.push(() => srv.close());
     const res = await fetch(`${srv.url}/mcp`, { headers: { Accept: "text/event-stream" } });
     expect(res.status).toBe(405);
+  });
+});
+
+describe("MCP : films", () => {
+  const filmJson = {
+    title: "La dette",
+    characters: [{ name: "Mireille", gender: "femme" }],
+    scenes: [{ title: "Le courrier", shots: [{ narration: "Il pleuvait ce soir là sur la ville depuis très longtemps maintenant." }, { narration: "Je ne signerai pas ce papier, dit-elle.", speaker: "Mireille" }] }],
+  };
+
+  it("septim_create_video accepte duration, genre, qualité : la demande arrive normalisée à l'usine", async () => {
+    const seen: JobRequest[] = [];
+    const s: Awaited<ReturnType<typeof connect>> = await connect({ runJob: async (req) => (seen.push(req), seedJob(s.store, "5f8a4d25", req)) });
+    const r = await s.call("septim_create_video", { topic: "la dette", duration: "1h", genre: "mystere", quality: "eco", orientation: "paysage" });
+    expect(r.isError).toBe(false);
+    await s.factory.idle();
+    expect(seen[0]).toMatchObject({ durationSec: 3600, genre: "mystere", quality: "eco", orientation: "paysage" });
+  });
+
+  it("un film donné : vérifié, puis tourné ; un film vide est refusé avec le message", async () => {
+    const seen: JobRequest[] = [];
+    const s: Awaited<ReturnType<typeof connect>> = await connect({ runJob: async (req) => (seen.push(req), seedJob(s.store, "5f8a4d25", req)) });
+    expect((await s.call("septim_create_video", { film: filmJson, duration: "15s" })).isError).toBe(false);
+    await s.factory.idle();
+    expect((seen[0].film as { title: string }).title).toBe("La dette");
+    const bad = await s.call("septim_create_video", { film: { title: "x", scenes: [] } });
+    expect(bad.isError).toBe(true);
+    expect(bad.data.error.message).toMatch(/film est vide/);
+  });
+
+  it("septim_lint_script vérifie aussi un film ; septim_cancel_task annule une tâche en attente", async () => {
+    const s: Awaited<ReturnType<typeof connect>> = await connect({ runJob: () => new Promise(() => undefined) });
+    const lint = await s.call("septim_lint_script", { script: filmJson, duration: "1h" });
+    expect(lint.data.ok).toBe(false);
+    expect(JSON.stringify(lint.data.issues)).toMatch(/film\.duration/);
+    const first = await s.call("septim_create_video", { topic: "un", duration: "2min" });
+    const second = await s.call("septim_create_video", { topic: "deux", duration: "2min" });
+    await new Promise((r) => setTimeout(r, 30));
+    const cancelled = await s.call("septim_cancel_task", { id: second.data.task.id });
+    expect(cancelled.isError).toBe(false);
+    expect((await s.call("septim_cancel_task", { id: "nulle-part" })).data.error.code).toBe("not_found");
+    void first;
+  });
+
+  it("la ressource septim://guide-film donne le format du film", async () => {
+    const s = await connect();
+    const doc = await s.client.readResource({ uri: "septim://guide-film" });
+    expect(JSON.stringify(doc)).toContain("scenes");
+    expect(JSON.stringify(doc)).toContain("narration");
   });
 });

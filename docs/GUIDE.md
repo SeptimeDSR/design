@@ -311,6 +311,7 @@ Le serveur MCP `septim` donne à l'assistant 9 outils, 2 ressources et 1 prompt.
 | `septim_lint_script` | vérifier un script avec les règles virales |
 | `septim_publish_video` | publier : exige la phrase de l'humain, telle quelle, dans `confirmation` (« OUI #5f8a ») |
 | `septim_reject_video` | jeter |
+| `septim_cancel_task` | annuler une fabrication (un film se reprend en relançant la même demande) |
 | `septim_doctor` | diagnostic |
 | `septim_lessons` | ce qui marche |
 
@@ -408,7 +409,9 @@ Dans les exemples, `U=http://127.0.0.1:4321/api/v1` et `A="Authorization: Bearer
 | `POST /api/v1/videos/:ref/redo` | jeter et refaire → 202 + tâche | `curl -H "$A" -X POST $U/videos/5f8a/redo` |
 | `GET /api/v1/tasks` | les tâches de toutes les portes (Studio, API, MCP, terminal) | `curl -H "$A" $U/tasks` |
 | `GET /api/v1/tasks/:id` | suivre une tâche | `curl -H "$A" $U/tasks/3fa9c1d2` |
-| `POST /api/v1/lint` | vérifier un script | `curl -H "$A" -H 'Content-Type: application/json' -d @lint.json $U/lint` (`{"script": {...}, "template": "maths"}`) |
+| `POST /api/v1/tasks/:id/cancel` | annuler une fabrication (un film annulé se reprend) → 202 | `curl -H "$A" -X POST $U/tasks/3fa9c1d2/cancel` |
+| `GET /api/v1/estimate` | temps, place disque, verdict pour une durée (`?durationSec=1h30&quality=eco`) | `curl -H "$A" "$U/estimate?durationSec=1h&quality=standard"` |
+| `POST /api/v1/lint` | vérifier un script ou un film | `curl -H "$A" -H 'Content-Type: application/json' -d @lint.json $U/lint` (`{"script": {...}, "template": "maths"}`) |
 | `GET /api/v1/lessons` | ce qui marche (vide tant qu'aucune vidéo publiée n'a 48 h de vues) | `curl -H "$A" $U/lessons` |
 | `GET /api/v1/settings` | les 11 fonctions des Réglages : interrupteur, état, champs (jamais une clé) | `curl -H "$A" $U/settings` |
 | `POST /api/v1/settings/:id` | cocher, décocher, régler un champ (`{"enabled": false}`, `{"values": {"PEXELS_API_KEY": "…"}}`) | `curl -H "$A" -H 'Content-Type: application/json' -d '{"enabled":false}' $U/settings/pexels` |
@@ -699,6 +702,31 @@ docker compose down                                            # arrêter (les v
 
 ---
 
+## Films de 1 minute à 4 heures
+
+`septim video "la dette de Mireille" --duree 1h30 --genre drame` fabrique un **film** : l'histoire est écrite scène par scène, dite par une voix (narrateur + voix de femme pour les personnages féminins), illustrée par des images qui bougent doucement, avec musique, sous-titres, titre, générique et **chapitres**. Jusqu'à 60 secondes, c'est le format court habituel (`--duree 45s` règle sa longueur) ; au-delà, c'est un film.
+
+| Réglage | Terminal | Studio | Valeurs |
+| --- | --- | --- | --- |
+| Durée | `--duree 90min` (`45s`, `3min`, `1h30` ; un nombre seul = des minutes) | menu Durée | 15 s à 4 h |
+| Genre | `--genre mystere` | Genre du film | drame, thriller, mystere, horreur, romance, comedie, aventure, conte, histoire-vraie, documentaire |
+| Format | `--format paysage` ou `vertical` | Format | paysage par défaut (YouTube, Facebook) |
+| Qualité | `--qualite eco` | Qualité | eco 480p très léger, standard 720p, hd 1080p |
+
+**Place disque et temps.** Avant de commencer, l'usine annonce le temps et la place (`septim video … ` affiche « environ 25 min, 280 Mo ») et refuse s'il n'y a pas la place. Un film d'une heure en qualité eco pèse environ 60 Mo, en standard environ 110 Mo ; le dossier de travail (voix, images) est effacé scène par scène. Mesuré sur 4 cœurs : ffmpeg rend un film environ 2 fois plus vite que sa durée (une heure en 720p ≈ 30 min) ; l'écriture par le modèle Ollama est la partie lente.
+
+**En arrière-plan et reprise.** Si l'usine tourne (Docker, `septim start`), le film lui est confié : le terminal peut se fermer. `septim taches` montre l'avancement, `septim annuler <tâche>` l'arrête. Une coupure ne perd rien : relancer la même commande (ou « Refaire » dans le Studio) reprend à la scène où le film s'était arrêté. Un film terminé n'est jamais écrasé : la même commande en refait un autre.
+
+**Qui écrit.** Sans script, Ollama écrit (modèle `VIRAL_LONG_MODEL`, sinon celui des Réglages). Un petit modèle écrit des histoires simples : choisis un modèle plus gros parmi tes modèles Ollama, ou fais écrire le film par Claude Code (ressource MCP `septim://guide-film`, format dans `plugins/septim-viral/skills/viral/references/film.md`) puis `septim video --script film.json`. `septim lint film.json --duree 1h` vérifie que le texte tient la durée.
+
+**Images.** Gratuit d'abord : si `COMFYUI_URL` est posée et que ton ComfyUI a Flux 2 klein (modèle, encodeur `qwen_3_4b`, VAE `flux2-vae`), chaque plan est dessiné par lui ; sinon des photos libres Pexels/Pixabay (clé gratuite) qui bougent ; sinon des cartes sombres de cinéma. `septim comfy` dit ce qui manque, dossier par dossier. C'est un récit illustré, pas du live-action : pour des clips vidéo IA, voir « Plans vidéo ».
+
+**Musique.** Tes pistes (`VIRAL_MUSIC_DIR`, une par ambiance), sinon ACE-Step 1.5 dans ComfyUI, sinon un lit d'ambiance généré.
+
+**Publier.** Toujours avec « OUI #ref ». Un film long part sur YouTube et Facebook (TikTok accepte 10 min, Instagram 3 min) ; la description contient les chapitres. Trop lourd pour WhatsApp : le message donne le fichier et le Studio le lit.
+
+---
+
 ## Réseau qui intercepte le HTTPS
 
 **Le symptôme** : une installation (voix Piper, voix HD) ou un test de clé échoue avec `CERTIFICATE_VERIFY_FAILED`, `self-signed certificate in certificate chain` ou « Ton réseau remplace le certificat de … ». Ce n'est pas un bug de l'usine : ton antivirus (scan HTTPS), ton pare-feu, ta box ou un proxy d'entreprise lit le trafic chiffré en présentant **son propre certificat**. Ton Windows lui fait confiance, le conteneur non.
@@ -719,6 +747,8 @@ septim reseau
 Les sites doivent passer au vert. Le dossier `certificats` est monté dans l'usine : Python, pip, curl et Node reçoivent ce certificat en plus de ceux du système. Seuls les fichiers `.crt` ou `.pem` contenant un vrai certificat sont pris.
 
 **Étape 4, refaire l'installation** : Réglages > Voix française (Piper) > **Relancer l'installation**.
+
+**Si le téléchargement de la voix reste bloqué** : ouvre dans ton navigateur (qui, lui, fait confiance à ton antivirus) les deux fichiers de la voix et enregistre-les dans le dossier `voix` à côté de `compose.yaml` : `https://huggingface.co/rhasspy/piper-voices/resolve/main/fr/fr_FR/tom/medium/fr_FR-tom-medium.onnx` et `…/fr_FR-tom-medium.onnx.json` (pour une voix de femme : `fr/fr_FR/siwis/medium/fr_FR-siwis-medium.onnx` et `.onnx.json`). Puis `docker compose up -d` : l'usine les prend sans rien télécharger.
 
 Autre voie : dans ton antivirus, désactive le « scan HTTPS » (ou « inspection SSL ») pour Docker, ou ajoute `huggingface.co` aux exceptions. Si `septim reseau` dit « injoignable » plutôt que « certificat remplacé », le problème est la connexion ou le DNS, pas un certificat.
 

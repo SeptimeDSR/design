@@ -312,7 +312,7 @@ describe("septim : vrais processus, lancés depuis un autre dossier", () => {
     await client.connect(transport);
     try {
       const tools = await client.listTools();
-      expect(tools.tools).toHaveLength(9);
+      expect(tools.tools).toHaveLength(10);
       const doctor = (await client.callTool({ name: "septim_doctor", arguments: {} })) as { content: { text: string }[] };
       expect(JSON.parse(doctor.content[0].text).canRender).toBe(true);
       expect(errors).toEqual([]);

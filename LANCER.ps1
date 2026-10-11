@@ -27,6 +27,7 @@ if (-not (Test-Path ".env")) {
 # Dossier des certificats (reseau qui lit le HTTPS) : vide par defaut, monte par Docker en lecture seule. Voir : septim reseau
 if (-not (Test-Path "certificats")) { New-Item -ItemType Directory -Path "certificats" | Out-Null }
 if (-not (Test-Path "musique")) { New-Item -ItemType Directory -Path "musique" | Out-Null }
+if (-not (Test-Path "voix")) { New-Item -ItemType Directory -Path "voix" | Out-Null }
 
 Write-Host ""
 Write-Host "Construction et demarrage de SEPTIM (5 a 10 minutes la premiere fois)..."
@@ -51,12 +52,20 @@ if ($url) {
 } else {
   Write-Host "SEPTIM demarre encore. Regarde : docker compose logs septim"
 }
-# La commande "septim" disponible dans tous les nouveaux terminaux (une seule fois ; ne touche qu'a ton PATH utilisateur).
+# La commande "septim" disponible dans tous les nouveaux terminaux (ne touche qu'a ton PATH utilisateur).
+# Un ancien dossier septim\ garde sinon la priorite et relaie vers une vieille usine : on le retire du PATH.
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if ($null -eq $userPath) { $userPath = "" }
-if (($userPath -split ";") -notcontains $PSScriptRoot) {
-  [Environment]::SetEnvironmentVariable("Path", ($userPath.TrimEnd(";") + ";" + $PSScriptRoot), "User")
-  Write-Host "La commande 'septim' est ajoutee a ton PATH : ouvre un NOUVEAU terminal, puis par exemple : septim doctor"
+$parts = @($userPath -split ";" | Where-Object { $_ -ne "" })
+$kept = @($parts | Where-Object { ($_ -eq $PSScriptRoot) -or -not (Test-Path (Join-Path $_ "septim.cmd")) })
+$removed = @($parts | Where-Object { ($_ -ne $PSScriptRoot) -and (Test-Path (Join-Path $_ "septim.cmd")) })
+$already = $kept -contains $PSScriptRoot
+$kept = @($PSScriptRoot) + @($kept | Where-Object { $_ -ne $PSScriptRoot })
+$newPath = $kept -join ";"
+if ($newPath -ne $userPath) {
+  [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
+  if (-not $already) { Write-Host "La commande 'septim' est ajoutee a ton PATH : ouvre un NOUVEAU terminal, puis par exemple : septim doctor" }
+  foreach ($r in $removed) { Write-Host "Ancien dossier septim retire du PATH : $r (ouvre un NOUVEAU terminal)" }
 }
 
 Write-Host ""

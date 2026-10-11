@@ -28,6 +28,7 @@ services:
       VIRAL_OLLAMA_MODEL: ${VIRAL_OLLAMA_MODEL:-qwen2.5:3b}
       # Ta musique : dépose des mp3 ou wav dans le dossier « musique » à côté de compose.yaml.
       VIRAL_MUSIC_DIR: /data/music
+      VIRAL_VOICES_DIR: /data/voix
     depends_on:
       ollama:
         condition: service_healthy
@@ -43,6 +44,8 @@ services:
       - ${SEPTIM_MUSIC:-./musique}:/data/music:ro
       # Réseau qui lit le HTTPS (antivirus, pare-feu) : tes certificats racine ici (septim reseau explique comment).
       - ./certificats:/certs:ro
+      # Voix Piper téléchargées à la main (.onnx + .onnx.json) quand ton réseau bloque Hugging Face.
+      - ./voix:/data/voix:ro
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4321/api/v1/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
       interval: 30s

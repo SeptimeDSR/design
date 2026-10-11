@@ -44,7 +44,54 @@
             <p class="hint" id="topic-hint">Laisse vide pour la tendance du jour.</p>
           </div>
 
-          <fieldset class="choice">
+          <div class="field">
+            <label for="duration">Durée</label>
+            <select id="duration" name="duration" aria-describedby="estimate">
+              <option value="30">30 secondes</option>
+              <option value="45" selected>45 secondes</option>
+              <option value="60">1 minute</option>
+              <option value="180">3 minutes</option>
+              <option value="600">10 minutes</option>
+              <option value="1800">30 minutes</option>
+              <option value="3600">1 heure</option>
+              <option value="5400">1 h 30</option>
+              <option value="7200">2 heures</option>
+              <option value="custom">Autre durée…</option>
+            </select>
+            <input id="duration-custom" name="duration-custom" type="text" autocomplete="off" placeholder="2h15, 90min, 45s" aria-label="Durée personnalisée" hidden />
+            <p class="hint" id="estimate" aria-live="polite"></p>
+          </div>
+
+          <div id="film-options" hidden>
+            <div class="field">
+              <label for="genre">Genre du film</label>
+              <select id="genre" name="genre">
+                <option value="drame">Drame</option>
+                <option value="thriller">Thriller</option>
+                <option value="mystere">Mystère</option>
+                <option value="horreur">Horreur</option>
+                <option value="romance">Romance</option>
+                <option value="comedie">Comédie</option>
+                <option value="aventure">Aventure</option>
+                <option value="conte">Conte</option>
+                <option value="histoire-vraie">Histoire vraie</option>
+                <option value="documentaire">Documentaire</option>
+              </select>
+            </div>
+            <fieldset class="choice">
+              <legend>Format</legend>
+              <label><input type="radio" name="orientation" value="paysage" checked /> <span>Paysage (YouTube)</span></label>
+              <label><input type="radio" name="orientation" value="vertical" /> <span>Vertical</span></label>
+            </fieldset>
+            <fieldset class="choice">
+              <legend>Qualité</legend>
+              <label><input type="radio" name="quality" value="eco" /> <span>Éco, 480p (peu de place)</span></label>
+              <label><input type="radio" name="quality" value="standard" checked /> <span>Standard, 720p</span></label>
+              <label><input type="radio" name="quality" value="hd" /> <span>HD, 1080p</span></label>
+            </fieldset>
+          </div>
+
+          <fieldset class="choice" id="template-choice">
             <legend>Template</legend>
             <label><input type="radio" name="template" value="" checked /> <span>Au choix</span></label>
             <label><input type="radio" name="template" value="story" /> <span>Histoire</span></label>
@@ -76,7 +123,7 @@
       <section class="panel tasks" aria-labelledby="tasks-title">
         <h2 id="tasks-title">En fabrication</h2>
         <ol class="task-list" id="tasks"></ol>
-        <p class="empty" id="tasks-empty">Rien en cours. Un rendu prend environ deux minutes ; tu peux fermer la page, il continue.</p>
+        <p class="empty" id="tasks-empty">Rien en cours. Un format court prend environ deux minutes, un film plusieurs minutes à plusieurs heures ; tu peux fermer la page, il continue.</p>
       </section>
 
       <section class="videos" id="videos" aria-labelledby="videos-title" tabindex="-1">

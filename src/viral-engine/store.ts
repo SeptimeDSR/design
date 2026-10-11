@@ -8,11 +8,26 @@ import type { TemplateId, Timeline, ViralScript, Lang } from "./types";
 
 export type JobStatus = "rendered" | "notified" | "publishing" | "published" | "rejected" | "failed";
 
+// Un film (long métrage) : ce que l'écran et les portes ont besoin de savoir sans rouvrir le MP4.
+export type FilmInfo = {
+  genre?: string;
+  orientation: "paysage" | "vertical";
+  quality: "eco" | "standard" | "hd";
+  requestedSec: number;
+  scenes: number;
+  chapters: { title: string; startMs: number; endMs: number }[];
+  imageSource: string;
+  musicSource: string;
+};
+
 export type Job = {
   id: string;
   createdAt: string;
   status: JobStatus;
-  request: { topic?: string; template?: TemplateId; lang?: Lang; script?: unknown };
+  // « long » : un film de plusieurs minutes (moteur ffmpeg) ; absent : un format court (Remotion).
+  kind?: "long";
+  film?: FilmInfo;
+  request: { topic?: string; template?: TemplateId; lang?: Lang; script?: unknown; durationSec?: number; genre?: string; orientation?: string; quality?: string; filmProvided?: boolean };
   script: ViralScript;
   timeline: Timeline;
   arm: string;

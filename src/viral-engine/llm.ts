@@ -6,7 +6,8 @@ import { buildTimeline, lintScript, normalizeBeats } from "./story";
 import type { Beat, HookFormula, Lang, TemplateId, ViralScript } from "./types";
 
 export type LlmClient = { chat(prompt: string): Promise<string> };
-export type ScriptInput = { topic: string; lang: Lang; formula: HookFormula; template: TemplateId; trend?: string };
+// targetSec : durée choisie pour un format court (15 à 60 s) ; absent : le réglage viral habituel.
+export type ScriptInput = { topic: string; lang: Lang; formula: HookFormula; template: TemplateId; trend?: string; targetSec?: number };
 
 export function ollamaClient(cfg: ViralConfig): LlmClient {
   const client = new Ollama({ host: cfg.ollama.host });
@@ -60,7 +61,7 @@ export async function generateScript(
       const parsed = parseHeatResponse(await client.chat(prompt));
       const script = parsed && assembleScript(input, parsed);
       if (script) {
-        const issues = lintScript(script, buildTimeline(script));
+        const issues = lintScript(script, buildTimeline(script), { targetSec: input.targetSec });
         if (!issues.length) return { script, source: "ollama", attempts: attempt };
         prompt = `${buildHeatPrompt(input)}\n\nTa réponse précédente viole ces règles, corrige-les :\n${issues.map((i) => `- ${i.rule} : ${i.message}`).join("\n")}`;
       }

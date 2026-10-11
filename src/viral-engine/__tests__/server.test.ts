@@ -417,3 +417,43 @@ describe("serveur : réglages (les interrupteurs du Studio)", () => {
   });
 });
 
+describe("serveur : films (durée, genre, estimation, annulation)", () => {
+  it("POST /api/v1/videos avec durationSec « 1h30 », genre et qualité → 202 ; durée illisible → 400 avec un exemple", async () => {
+    const s = await boot();
+    const ok = await s.post("/api/v1/videos", { topic: "la dette", durationSec: "1h30", genre: "drame", quality: "eco" });
+    expect(ok.status).toBe(202);
+    const task = (await ok.json()) as { request: { durationSec: number; genre: string; quality: string } };
+    expect(task.request).toMatchObject({ durationSec: 5400, genre: "drame", quality: "eco" });
+    const bad = await s.post("/api/v1/videos", { topic: "x", durationSec: "beaucoup" });
+    expect(bad.status).toBe(400);
+    expect(JSON.stringify(await bad.json())).toMatch(/45s/);
+    expect((await s.post("/api/v1/videos", { topic: "x", durationSec: true })).status).toBe(400);
+    expect((await s.post("/api/v1/videos", { topic: "x", film: [1] })).status).toBe(400);
+  });
+
+  it("GET /api/v1/estimate → temps, place disque, verdict ; sans durée → 400", async () => {
+    const s = await boot();
+    const res = await s.get("/api/v1/estimate?durationSec=1h&quality=eco");
+    expect(res.status).toBe(200);
+    const e = (await res.json()) as { durationSec: number; estMinutes: number; diskMb: number; ok: boolean; long: boolean };
+    expect(e).toMatchObject({ durationSec: 3600, long: true });
+    expect(e.estMinutes).toBeGreaterThan(0);
+    expect(e.diskMb).toBeGreaterThan(0);
+    expect((await s.get("/api/v1/estimate")).status).toBe(400);
+    expect((await s.get("/api/v1/estimate?durationSec=2s")).status).toBe(400);
+  });
+
+  it("POST /api/v1/tasks/:id/cancel → 202 ; tâche inconnue → 404", async () => {
+    const s = await boot();
+    expect((await s.post("/api/v1/tasks/nulle-part/cancel")).status).toBe(404);
+  });
+
+  it("POST /api/v1/lint avec un film → ok:false et la règle de durée quand le texte est trop court", async () => {
+    const s = await boot();
+    const film = { title: "La dette", scenes: [{ title: "S", shots: [{ narration: "Il pleuvait sur la ville depuis trois jours." }] }] };
+    const res = await s.post("/api/v1/lint", { script: film, durationSec: "1h" });
+    const body = (await res.json()) as { ok: boolean; issues: { rule: string }[] };
+    expect(body.ok).toBe(false);
+    expect(body.issues.map((i) => i.rule)).toContain("film.duration");
+  });
+});

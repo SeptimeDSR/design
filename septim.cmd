@@ -9,7 +9,28 @@ if /i "%~1"=="studio" goto up
 if /i "%~1"=="connect" if /i "%~2"=="claude-code" goto connect
 if /i "%~1"=="env" goto env
 docker compose exec septim septim %*
+set "RC=%errorlevel%"
+if "%RC%"=="0" exit /b 0
+rem Une commande qui echoue alors que l'usine tourne depuis une AUTRE version du zip : on reconstruit, puis on relance la commande.
+call :stale
+if errorlevel 1 exit /b %RC%
+docker compose exec septim septim %*
 exit /b %errorlevel%
+
+:stale
+set "LOCALV="
+set "BOXV="
+for /f "delims=" %%v in ('powershell -NoProfile -Command "(Get-Content -Raw -LiteralPath '%~dp0package.json' | ConvertFrom-Json).version"') do set "LOCALV=%%v"
+for /f "delims=" %%v in ('docker compose exec -T septim septim version 2^>nul') do set "BOXV=%%v"
+if not defined LOCALV exit /b 0
+if not defined BOXV exit /b 0
+if "%LOCALV%"=="%BOXV%" exit /b 0
+echo.
+echo L'usine qui tourne est la version %BOXV%, ce dossier est la version %LOCALV%.
+echo Mise a jour automatique (2 a 10 minutes, une seule fois)...
+docker compose up -d --build
+if errorlevel 1 exit /b 0
+exit /b 1
 
 :up
 docker compose up -d

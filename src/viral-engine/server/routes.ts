@@ -1,3 +1,4 @@
+import { parseDuration } from "../duration";
 import { createReadStream, statSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { FactoryError } from "../errors";
@@ -48,6 +49,21 @@ function options(body: Record<string, unknown>) {
   const lang = optionalString(body.lang, "lang");
   if (lang !== undefined && lang !== "fr" && lang !== "en") throw bad("lang doit valoir fr ou en.");
   return { topic: optionalString(body.topic, "topic"), template: template as TemplateId | undefined, lang: lang as Lang | undefined };
+}
+
+// Durée, genre, format, qualité, film : posés tels quels, le cœur les vérifie et dit quoi corriger.
+function videoOptions(body: Record<string, unknown>) {
+  const duration = body.durationSec ?? body.duration;
+  if (duration !== undefined && typeof duration !== "number" && typeof duration !== "string") throw bad("durationSec doit être un nombre de secondes, ou un texte comme « 90s », « 3min », « 1h30 ».");
+  const film = body.film;
+  if (film !== undefined && (typeof film !== "object" || film === null || Array.isArray(film))) throw bad("film doit être un objet JSON.");
+  return {
+    durationSec: duration as number | undefined,
+    genre: optionalString(body.genre, "genre") as never,
+    orientation: optionalString(body.orientation, "orientation") as never,
+    quality: optionalString(body.quality, "quality") as never,
+    film,
+  };
 }
 
 const withUrl = (v: VideoDetail) => ({ ...v, videoUrl: v.hasVideo ? `/api/v1/videos/${v.id}/video` : undefined });
@@ -120,7 +136,7 @@ const API: Route[] = [
     handle: (c) => {
       const script = c.body.script;
       if (script !== undefined && (typeof script !== "object" || script === null || Array.isArray(script))) throw bad("script doit être un objet JSON.");
-      return { status: 202, json: c.factory.createVideo({ ...options(c.body), script: script as never }) };
+      return { status: 202, json: c.factory.createVideo({ ...options(c.body), ...videoOptions(c.body), script: script as never }) };
     },
   },
   { method: "GET", path: "/api/v1/videos/:ref", handle: (c) => ({ json: withUrl(c.factory.getVideo(c.params.ref)) }) },
@@ -142,12 +158,32 @@ const API: Route[] = [
   { method: "POST", path: "/api/v1/videos/:ref/redo", handle: (c) => ({ status: 202, json: c.factory.redo(c.params.ref) }) },
   { method: "GET", path: "/api/v1/tasks", handle: (c) => ({ json: { tasks: c.factory.listTasks() } }) },
   { method: "GET", path: "/api/v1/tasks/:id", handle: (c) => ({ json: c.factory.getTask(c.params.id) }) },
+  { method: "POST", path: "/api/v1/tasks/:id/cancel", handle: (c) => ({ status: 202, json: c.factory.cancel(c.params.id) }) },
+  {
+    method: "GET",
+    path: "/api/v1/estimate",
+    handle: (c) => {
+      const durationSec = c.query.get("durationSec") ?? c.query.get("duration");
+      if (!durationSec) throw bad("Il manque durationSec (en secondes, ou « 90s », « 3min », « 1h30 »).");
+      const quality = c.query.get("quality") || undefined;
+      return { json: c.factory.estimate({ durationSec: /^\d+$/.test(durationSec) ? Number(durationSec) : durationSec, quality: quality as never }) };
+    },
+  },
   {
     method: "POST",
     path: "/api/v1/lint",
     handle: (c) => {
       const { topic, template, lang } = options(c.body);
-      return { json: c.factory.lintScript(c.body.script, { topic, template, lang }) };
+      const target = c.body.durationSec ?? c.body.duration;
+      let targetSec: number | undefined;
+      if (target !== undefined) {
+        try {
+          targetSec = parseDuration(target as number | string);
+        } catch (error) {
+          throw bad((error as Error).message);
+        }
+      }
+      return { json: c.factory.lintScript(c.body.script, { topic, template, lang, targetSec }) };
     },
   },
   { method: "GET", path: "/api/v1/lessons", handle: (c) => ({ json: c.factory.lessons() }) },

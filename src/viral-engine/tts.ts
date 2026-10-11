@@ -14,6 +14,12 @@ const PIPER_VOICE: Record<Lang, string> = {
   fr: process.env.VIRAL_PIPER_VOICE ?? "fr_FR-tom-medium",
   en: process.env.VIRAL_PIPER_VOICE_EN ?? "en_US-ryan-high",
 };
+// Voix féminine pour les personnages (films) ; absente, tout le monde garde la voix principale.
+export const PIPER_VOICE_F: Record<Lang, string> = {
+  fr: process.env.VIRAL_PIPER_VOICE_F ?? "fr_FR-siwis-medium",
+  en: process.env.VIRAL_PIPER_VOICE_EN_F ?? "en_US-amy-medium",
+};
+export const narratorVoice = (lang: Lang): string => PIPER_VOICE[lang];
 const KOKORO_VOICE = process.env.VIRAL_KOKORO_VOICE ?? "am_michael";
 
 // install.sh --voix installe Piper dans un venv de l'usine (pip --user est refusé par Ubuntu 23+ et Debian 12, PEP 668).
@@ -24,9 +30,20 @@ export function pythonBin(env: Record<string, string | undefined> = process.env)
 }
 
 const piperDir = () => process.env.VIRAL_PIPER_DIR ?? join(process.env.VIRAL_HOME ?? ".septim-viral", "voices");
+// Dossier voix/ de l'utilisateur (téléchargé à la main quand le réseau bloque Hugging Face) : ./voix monté dans Docker.
+const extraVoiceDir = () => process.env.VIRAL_VOICES_DIR;
+
+export function piperModelPath(voice: string): string | undefined {
+  for (const dir of [piperDir(), extraVoiceDir()]) {
+    if (dir && existsSync(join(dir, `${voice}.onnx`))) return join(dir, `${voice}.onnx`);
+  }
+  return undefined;
+}
+
+export const hasPiperVoice = (voice: string): boolean => !!piperModelPath(voice);
 
 function piperReady(lang: Lang): boolean {
-  if (!existsSync(join(piperDir(), `${PIPER_VOICE[lang]}.onnx`))) return false;
+  if (!hasPiperVoice(PIPER_VOICE[lang])) return false;
   return spawnSync(pythonBin(), ["-c", "import piper"], { stdio: "ignore" }).status === 0;
 }
 
@@ -46,9 +63,12 @@ export async function detectEngine(lang: Lang, pref = process.env.VIRAL_TTS ?? "
   return "silent";
 }
 
-function runPiper(text: string, lang: Lang, outPath: string, speed: number): Promise<void> {
+function runPiper(text: string, lang: Lang, outPath: string, speed: number, voice?: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const args = ["-m", "piper", "-m", PIPER_VOICE[lang], "--data-dir", piperDir(), "-f", outPath, "--length-scale", (1 / speed).toFixed(3)];
+    const name = voice ?? PIPER_VOICE[lang];
+    // Une voix qui n'est que dans le dossier voix/ se donne par son chemin complet.
+    const model = existsSync(join(piperDir(), `${name}.onnx`)) ? name : (piperModelPath(name) ?? name);
+    const args = ["-m", "piper", "-m", model, "--data-dir", piperDir(), "-f", outPath, "--length-scale", (1 / speed).toFixed(3)];
     const child = spawn(pythonBin(), args, { stdio: ["pipe", "ignore", "pipe"] });
     let err = "";
     child.stderr.on("data", (d) => (err += d));
@@ -165,14 +185,14 @@ async function runChatterbox(text: string, lang: Lang, outPath: string): Promise
 
 export async function synthesize(
   text: string,
-  opts: { lang: Lang; outPath: string; speed?: number; engine?: TtsEngine },
+  opts: { lang: Lang; outPath: string; speed?: number; engine?: TtsEngine; voice?: string },
 ): Promise<{ path: string; durationMs: number; engine: TtsEngine }> {
   const speed = opts.speed ?? RULES.voiceSpeed;
   const engine = opts.engine ?? (await detectEngine(opts.lang));
   await mkdir(dirname(opts.outPath), { recursive: true });
 
   try {
-    if (engine === "piper") await runPiper(text, opts.lang, opts.outPath, speed);
+    if (engine === "piper") await runPiper(text, opts.lang, opts.outPath, speed, opts.voice);
     else if (engine === "kokoro") await runKokoro(text, opts.outPath, speed);
     else if (engine === "chatterbox") await runChatterbox(text, opts.lang, opts.outPath);
     if (engine !== "silent") {

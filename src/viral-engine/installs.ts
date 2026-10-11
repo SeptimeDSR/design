@@ -81,6 +81,10 @@ export function createInstalls(o: { home: string; env: Env; run?: StepRunner; fe
       update(id, { step: step.label, progress: i / steps.length });
       note(id, `▶ ${step.label}`);
       const code = await run(step.cmd, step.args, (l) => note(id, l));
+      if (code !== 0 && step.optional) {
+        note(id, `• ${step.label} non installée (facultative).`);
+        continue;
+      }
       if (code !== 0) {
         // Un certificat remplacé par le réseau (antivirus, pare-feu) est la panne la plus courante des téléchargements : on la nomme.
         const tail = states.get(id)!.log.slice(-40).join("\n");
@@ -138,7 +142,7 @@ export function createInstalls(o: { home: string; env: Env; run?: StepRunner; fe
     persist(states.get(id)!);
     const job = (async () => {
       try {
-        if (id === "voix") await pythonSteps(id, voiceSteps(o.home, o.env.VIRAL_PIPER_VOICE ?? "fr_FR-tom-medium"));
+        if (id === "voix") await pythonSteps(id, voiceSteps(o.home, o.env.VIRAL_PIPER_VOICE ?? "fr_FR-tom-medium", [o.env.VIRAL_PIPER_VOICE_F ?? "fr_FR-siwis-medium"], o.env.VIRAL_VOICES_DIR));
         else if (id === "voix-hd") await pythonSteps(id, voiceHdSteps(o.home));
         else await pull(id);
         update(id, { status: "done", finishedAt: new Date().toISOString() });

@@ -5,6 +5,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 import { checklist } from "./checklist";
+import { parseDuration } from "./duration";
 import { FactoryError } from "./errors";
 import type { Factory, Task } from "./factory";
 import { readVersion, type McpHttpHandler } from "./server/http";
@@ -16,8 +17,9 @@ const PUBLISH_DESCRIPTION =
   'Publie une vidéo. N\'appelle cet outil QUE si l\'humain a écrit lui-même "OUI #<ref>" pour cette vidéo dans la conversation ; passe cette phrase telle quelle dans confirmation.';
 
 const INSTRUCTIONS = [
-  "Usine SEPTIM : vidéos virales 9:16 (TikTok, Reels, Shorts) rendues en local avec Remotion, sans crédit.",
-  "Pour une vidéo : écris un script H.E.A.T (ressource septim://guide-heat), vérifie-le avec septim_lint_script jusqu'à ok:true, puis septim_create_video avec ce script.",
+  "Usine SEPTIM : vidéos virales 9:16 (TikTok, Reels, Shorts) rendues en local avec Remotion, sans crédit ; et films de 1 minute à 4 heures (drame, thriller, mystère…) avec voix, images, musique et chapitres.",
+  "Pour une vidéo courte (60 s au plus) : écris un script H.E.A.T (ressource septim://guide-heat), vérifie-le avec septim_lint_script jusqu'à ok:true, puis septim_create_video avec ce script.",
+  "Pour un film : septim_create_video avec duration (« 1h », « 90min »), genre, et si tu veux mieux que le modèle local, film = l'histoire écrite par toi (ressource septim://guide-film). Un film dure longtemps : ne mets pas wait_seconds, suis la tâche avec septim_get_task (progress) ; septim_cancel_task l'arrête.",
   "Règle absolue : ne publie jamais de toi-même. Montre la vidéo, puis attends que l'humain écrive « OUI #ref » ; alors seulement, septim_publish_video avec sa phrase dans confirmation.",
   "Aucune dépense : les options PRO à crédits (Higgsfield, Runway, Pika) ne se lancent jamais d'ici.",
 ].join("\n");
@@ -88,13 +90,18 @@ export function createMcpServer(factory: Factory): McpServer {
         template,
         lang,
         script: scriptSchema.optional(),
+        duration: z.union([z.string(), z.number().int()]).optional().describe("Durée voulue : « 45s », « 3min », « 1h30 » ou un nombre de secondes. Jusqu'à 60 s : format court ; au-delà : un film (15 s à 4 h)."),
+        genre: z.enum(["drame", "thriller", "mystere", "horreur", "romance", "comedie", "aventure", "conte", "histoire-vraie", "documentaire"]).optional().describe("Film seulement."),
+        orientation: z.enum(["paysage", "vertical"]).optional().describe("Film seulement. Défaut : paysage."),
+        quality: z.enum(["eco", "standard", "hd"]).optional().describe("Film seulement : eco 480p très léger (peu de place disque), standard 720p, hd 1080p."),
+        film: z.object({}).loose().optional().describe("Un film déjà écrit (title, characters, scenes[{title, mood, shots[{narration, speaker, visual}]}]) : l'usine le tourne sans l'écrire. Format : septim://guide-film."),
         wait_seconds: z.number().int().min(0).max(MAX_WAIT_S).optional().describe("Attendre la fin du rendu, en secondes (0 : rendre la main tout de suite)."),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    ({ topic, template, lang, script, wait_seconds }) =>
+    ({ topic, template, lang, script, duration, genre, orientation, quality, film, wait_seconds }) =>
       run(async () => {
-        const task = factory.createVideo({ topic, template, lang, script: script as never });
+        const task = factory.createVideo({ topic, template, lang, script: script as never, durationSec: duration as never, genre, orientation, quality, film });
         if (!wait_seconds) return { task, next: `Suis la tâche avec septim_get_task {"id":"${task.id}"}.` };
         const done = await waitForTask(factory, task.id, wait_seconds);
         const video = done.status === "done" && done.ref ? factory.getVideo(done.jobId ?? done.ref) : undefined;
@@ -110,6 +117,17 @@ export function createMcpServer(factory: Factory): McpServer {
     "septim_get_task",
     { title: "Suivre une tâche", description: "État d'une tâche de fabrication : queued, running, done (avec ref) ou failed (avec error).", inputSchema: { id: z.string().min(1) }, annotations: { readOnlyHint: true } },
     ({ id }) => run(() => factory.getTask(id)),
+  );
+
+  server.registerTool(
+    "septim_cancel_task",
+    {
+      title: "Annuler une fabrication",
+      description: "Arrête une tâche en attente ou en cours (utile pour un film long lancé par erreur). Un film annulé se reprend plus tard avec septim_create_video (même demande).",
+      inputSchema: { id: z.string().min(1) },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    ({ id }) => run(() => factory.cancel(id)),
   );
 
   server.registerTool(
@@ -136,11 +154,12 @@ export function createMcpServer(factory: Factory): McpServer {
     "septim_lint_script",
     {
       title: "Vérifier un script",
-      description: "Vérifie un script avec les règles virales (hook ≤ 3 s, beats ≤ 3 s, réponse à ≥ 80 %, durée cible) sans rien fabriquer. Corrige jusqu'à ok:true.",
-      inputSchema: { script: scriptSchema, topic: z.string().optional(), template, lang },
+      description: "Vérifie un script avec les règles virales (hook ≤ 3 s, beats ≤ 3 s, réponse à ≥ 80 %, durée cible) sans rien fabriquer ; vérifie aussi un film (scenes). Corrige jusqu'à ok:true.",
+      inputSchema: { script: scriptSchema, topic: z.string().optional(), template, lang, duration: z.union([z.string(), z.number().int()]).optional().describe("Durée visée (« 45s », « 1h30 ») : le contrôle vérifie que le texte la tient.") },
       annotations: { readOnlyHint: true },
     },
-    ({ script, topic, template, lang }) => run(() => factory.lintScript(script, { topic, template, lang })),
+    ({ script, topic, template, lang, duration }) =>
+      run(() => factory.lintScript(script, { topic, template, lang, targetSec: duration === undefined ? undefined : parseDuration(duration) })),
   );
 
   server.registerTool(
@@ -185,6 +204,15 @@ export function createMcpServer(factory: Factory): McpServer {
     { title: "Guide H.E.A.T", description: "Format du script et règles d'écriture (hook, beats, réponse, légende).", mimeType: "text/markdown" },
     async (uri) => ({
       contents: [{ uri: uri.href, mimeType: "text/markdown", text: readFileSync(resolve(root(), "plugins/septim-viral/skills/viral/references/heat.md"), "utf8") }],
+    }),
+  );
+
+  server.registerResource(
+    "guide-film",
+    "septim://guide-film",
+    { title: "Guide du film", description: "Format JSON d'un film (scènes, plans, personnages, voix, images) et règles d'écriture pour retenir de 1 minute à 4 heures.", mimeType: "text/markdown" },
+    async (uri) => ({
+      contents: [{ uri: uri.href, mimeType: "text/markdown", text: readFileSync(resolve(root(), "plugins/septim-viral/skills/viral/references/film.md"), "utf8") }],
     }),
   );
 

@@ -73,3 +73,29 @@ describe("buildHeatPrompt", () => {
     expect(p).toContain("#café");
   });
 });
+
+describe("durée choisie pour un format court", () => {
+  const input = { topic: "la tontine", lang: "fr" as const, formula: "question" as const, template: "story" as const };
+
+  it("sans durée : le prompt garde la fourchette habituelle ; avec une durée, ±15 % et un nombre de beats adapté", async () => {
+    const { buildHeatPrompt } = await import("../heat");
+    expect(buildHeatPrompt(input)).toContain("25 à 45 secondes");
+    expect(buildHeatPrompt(input)).toContain("8 à 12 beats");
+    const p = buildHeatPrompt({ ...input, targetSec: 45 });
+    expect(p).toContain("38 à 52 secondes");
+    expect(p).toContain("11 à 15 beats");
+    expect(buildHeatPrompt({ ...input, targetSec: 15 })).toContain("3 à 6 beats");
+  });
+
+  it("le linter accepte la durée demandée, et refuse un script de 30 s quand on en demande 15 ou 60", async () => {
+    const { fallbackScript } = await import("../heat");
+    const { buildTimeline, lintScript } = await import("../story");
+    const script = fallbackScript({ ...input });
+    const timeline = buildTimeline(script);
+    const secs = timeline.durationMs / 1000;
+    const rule = (target?: number) => lintScript(script, timeline, { targetSec: target }).some((i) => i.rule === "duration.out_of_range");
+    expect(rule(Math.round(secs))).toBe(false);
+    expect(rule(15)).toBe(true);
+    expect(rule(60)).toBe(true);
+  });
+});

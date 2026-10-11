@@ -11,6 +11,9 @@ import { checkTls, formatNetReport, NET_HOSTS } from "./net";
 import { envCatalog, formatEnvList, readEnv, setEnvVars, unsetEnvVar, validateEnvName } from "./envfile";
 import { CLIENT_NAMES, isMcpClient, MCP_CLIENTS, dockerMcpConfig, mcpConfig, writeMcpConfig } from "./connect";
 import { formatDiagnosis } from "./doctor";
+import { formatDuration } from "./duration";
+import { callFactory } from "./remote";
+import { detectFilmModels, formatFilmModels } from "./film/comfy-film";
 import { FactoryError } from "./errors";
 import { createFactory, type VideoDetail, type VideoSummary } from "./factory";
 import { connectClaudeCode, installVoice, installVoiceHd, setup } from "./setup";
@@ -23,7 +26,10 @@ export const HELP = `SEPTIM — l'usine à vidéos virales, depuis le terminal
 
 Fabriquer une vidéo
   septim video "la tontine" [--template story|maths|film] [--lang fr|en] [--script script.json] [--broll dossier] [--no-notify]
-  septim lint script.json [--template maths] [--lang fr]     vérifier un script sans rien rendre
+  septim video "la dette" --duree 1h30 [--genre drame] [--format paysage|vertical] [--qualite eco|standard|hd]   un film de 1 min à 4 h
+  septim lint script.json [--template maths] [--lang fr]     vérifier un script (ou un film) sans rien rendre
+  septim taches                       ce qui est en fabrication (films : avancement)
+  septim annuler <tâche>              arrêter une fabrication (un film se reprend en relançant la même commande)
 
 Regarder et décider
   septim videos [--status a-valider|publiee|jetee|ratee] [--limit 20]
@@ -61,7 +67,7 @@ const ALIASES: Record<string, string> = {
   "--version": "version",
   "-v": "version",
 };
-const COMMANDS = ["video", "lint", "videos", "voir", "publier", "jeter", "studio", "start", "mcp", "doctor", "env", "comfy", "reseau", "connect", "setup", "design", "aide", "version"];
+const COMMANDS = ["video", "lint", "taches", "annuler", "videos", "voir", "publier", "jeter", "studio", "start", "mcp", "doctor", "env", "comfy", "reseau", "connect", "setup", "design", "aide", "version"];
 
 const STATUS_FR: Record<JobStatus, string> = { rendered: "Rendue", notified: "À valider", publishing: "En publication", published: "Publiée", rejected: "Jetée", failed: "Ratée" };
 const STATUS_ARG: Record<string, JobStatus> = { "a-valider": "notified", prete: "notified", publiee: "published", jetee: "rejected", ratee: "failed" };
@@ -86,7 +92,7 @@ function distance(a: string, b: string): number {
 
 const suggest = (word: string) => [...COMMANDS, ...Object.keys(ALIASES).filter((k) => !k.startsWith("-"))].sort((a, b) => distance(word, a) - distance(word, b))[0];
 
-const seconds = (ms: number) => `${(ms / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} s`;
+const seconds = (ms: number) => (ms >= 180_000 ? formatDuration(Math.round(ms / 1000)) : `${(ms / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} s`);
 const when = (iso?: string) => (iso ? new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso)) : "");
 
 function videoLine(v: VideoSummary): string {
@@ -109,7 +115,11 @@ function videoDetail(v: VideoDetail): string[] {
     ...v.caption.split("\n").map((l) => `  ${l}`),
     `  ${v.hashtags.join(" ")}`,
   ];
-  if (v.error) lines.push("", `Erreur    ${v.error}`);
+  if (v.film) {
+    lines.push("", `Film      ${v.film.scenes} scènes, ${v.film.orientation}, qualité ${v.film.quality}, images ${BROLL_FR[v.film.imageSource] ?? v.film.imageSource}, musique ${v.film.musicSource}`, "Chapitres");
+    for (const c of v.film.chapters) lines.push(`  ${formatDuration(Math.round(c.startMs / 1000)).padStart(7)}  ${c.title}`);
+  }
+  if (v.error) lines.push("", `Erreur    ${v.error}${v.kind === "long" ? "\n          Relance la même commande : le film reprend où il s'était arrêté (ou « Refaire » dans le Studio)." : ""}`);
   if (v.status === "notified" || v.status === "rendered") lines.push("", `Pour publier : septim publier ${v.ref}   (ou réponds OUI #${v.ref} sur WhatsApp)`, `Pour jeter   : septim jeter ${v.ref}`);
   return lines;
 }
@@ -365,6 +375,36 @@ async function dispatch(command: string, args: string[], io: CliIO): Promise<num
       out("Détail : septim voir <ref>    Publier : septim publier <ref>");
       return 0;
     }
+    case "taches": {
+      const tasks = createFactory().listTasks().slice(0, 10);
+      if (!tasks.length) {
+        out("Aucune fabrication pour l'instant.");
+        return 0;
+      }
+      const FR: Record<string, string> = { queued: "en attente", running: "en cours", done: "terminée", failed: "ratée" };
+      for (const t of tasks) {
+        const what = t.request.topic ?? (t.request.filmProvided ? "film donné" : "tendance du jour");
+        const dur = t.request.durationSec ? ` · ${formatDuration(t.request.durationSec)}` : "";
+        const prog = t.status === "running" && t.progress ? `  ${t.progress.percent} % — ${t.progress.message}` : "";
+        out(`${t.id}  ${FR[t.status].padEnd(10)} ${what.slice(0, 40)}${dur}${t.ref ? `  → #${t.ref}` : ""}${prog}`);
+        if (t.status === "failed" && t.error) out(`          ${t.error.split("\n")[0]}`);
+      }
+      return 0;
+    }
+    case "annuler": {
+      const id = args[0];
+      if (!id) throw new FactoryError("bad_request", "Il manque la tâche : septim annuler <tâche> (l'identifiant est donné par septim taches).");
+      const r = await callFactory(process.env, "POST", `/api/v1/tasks/${encodeURIComponent(id)}/cancel`);
+      if (r.ok) {
+        out(`Annulation demandée pour ${id}. Un film annulé se reprend en relançant la même commande.`);
+        return 0;
+      }
+      if (r.reason === "absent") {
+        out("Aucune usine ne tourne : il n'y a rien à annuler (si le film était en cours, il est déjà arrêté).");
+        return 1;
+      }
+      throw new FactoryError("conflict", r.message);
+    }
     case "voir":
       for (const l of videoDetail(createFactory().getVideo(needRef("voir")))) out(l);
       return 0;
@@ -414,7 +454,10 @@ async function dispatch(command: string, args: string[], io: CliIO): Promise<num
         return 1;
       }
       out(formatComfy(info, url));
-      return info.profile ? 0 : 1;
+      const filmModels = await detectFilmModels(url, fetch, process.env);
+      out("");
+      out(formatFilmModels(filmModels));
+      return info.profile || filmModels.image.ready ? 0 : 1;
     }
     case "studio":
       return studio(args, io, { daemon: false });

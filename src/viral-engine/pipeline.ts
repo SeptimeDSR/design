@@ -3,6 +3,8 @@ import { copyFileSync, mkdirSync, readdirSync } from "node:fs";
 import { extname } from "node:path";
 import { join } from "node:path";
 import { allArms, armKey, chooseArm, parseArm } from "./bandit";
+import { isLongForm, type Genre, type Orientation, type Quality } from "./duration";
+import { runLongJob, type LongJobDeps } from "./film/job";
 import { loadConfig, type Env, type ViralConfig } from "./config";
 import { writeAmbient } from "./ambient";
 import { gatherBroll, type BrollResult } from "./broll";
@@ -22,7 +24,19 @@ import type { ViralProps } from "../remotion/viral/props";
 
 // script : écrit par Claude en mode interactif (/septim-viral:viral). Il doit passer le linter, sinon erreur explicite.
 // brollDir : PRO, clips générés (Higgsfield Soul / Seedance) utilisés en fond à la place des décors procéduraux.
-export type JobRequest = { topic?: string; template?: TemplateId; lang?: Lang; script?: Partial<ViralScript>; brollDir?: string };
+// durationSec au-delà d'une minute : un film (genre, format, qualité) ; film : un film déjà écrit (Claude Code, toi).
+export type JobRequest = {
+  topic?: string;
+  template?: TemplateId;
+  lang?: Lang;
+  script?: Partial<ViralScript>;
+  brollDir?: string;
+  durationSec?: number;
+  genre?: Genre;
+  orientation?: Orientation;
+  quality?: Quality;
+  film?: unknown;
+};
 
 export type PipelineDeps = {
   env: Env;
@@ -33,6 +47,10 @@ export type PipelineDeps = {
   hasPostizCredentials: boolean;
   // B-roll gratuit (IA locale ComfyUI, Pexels, Pixabay) quand aucun dossier --broll n'est donné.
   broll: (script: ViralScript, timeline: Timeline, dir: string) => Promise<BrollResult>;
+  // Film : progression, annulation et remplacements de test.
+  progress?: (p: { phase: string; percent: number; message: string; done?: number; total?: number }) => void;
+  signal?: AbortSignal;
+  film?: LongJobDeps;
 };
 
 const PREFIXES = /^(je veux|j'aimerais|fais(-moi)?|crée|cree|make|create)\s+(une?|la|le|a|an|the)?\s*(histoire|vidéo|video|story)\s+(sur|about|de|on)\s+/i;
@@ -51,7 +69,7 @@ export function checkScript(input: ScriptInput, raw: Partial<ViralScript>) {
   }
   const timeline = buildTimeline(script);
   const payoff = timeline.segments.find((s) => s.kind === "payoff")!;
-  return { script, issues: lintScript(script, timeline), durationMs: timeline.durationMs, payoffRatio: payoff.startMs / timeline.durationMs };
+  return { script, issues: lintScript(script, timeline, { targetSec: input.targetSec }), durationMs: timeline.durationMs, payoffRatio: payoff.startMs / timeline.durationMs };
 }
 
 export function cleanTopic(raw: string): string {
@@ -64,6 +82,8 @@ function chooseArmFor(state: ReturnType<ReturnType<typeof createStore>["loadStat
 }
 
 export async function runJob(req: JobRequest, partial: Partial<PipelineDeps> = {}): Promise<Job> {
+  // Plus d'une minute : le moteur long métrage (écriture par scènes, voix, images, ffmpeg).
+  if (req.film !== undefined || (req.durationSec !== undefined && isLongForm(req.durationSec))) return runLongJob(req, partial);
   const env = partial.env ?? process.env;
   const cfg: ViralConfig = loadConfig(env);
   const store = createStore(cfg.home);
@@ -78,7 +98,7 @@ export async function runJob(req: JobRequest, partial: Partial<PipelineDeps> = {
   let script: ViralScript;
   let source: Job["source"];
   if (req.script) {
-    const checked = checkScript({ topic, lang, template, formula }, req.script);
+    const checked = checkScript({ topic, lang, template, formula, targetSec: req.durationSec }, req.script);
     if (!checked.script || checked.issues.length) {
       throw new Error(`Script refusé par le linter viral :\n${checked.issues.map((i) => `- ${i.rule} : ${i.message}`).join("\n")}`);
     }
@@ -86,7 +106,7 @@ export async function runJob(req: JobRequest, partial: Partial<PipelineDeps> = {
     source = "claude";
   } else {
     const llm = partial.llm ? { chat: partial.llm } : undefined;
-    ({ script, source } = await generateScript({ topic, lang, template, formula, trend: trend?.sound ?? trend?.title }, cfg, llm));
+    ({ script, source } = await generateScript({ topic, lang, template, formula, trend: trend?.sound ?? trend?.title, targetSec: req.durationSec }, cfg, llm));
   }
 
   const id = randomBytes(4).toString("hex");

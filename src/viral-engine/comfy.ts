@@ -17,7 +17,7 @@ const NODES = ["UNETLoader", "CLIPLoader", "VAELoader", "CheckpointLoaderSimple"
 const trimUrl = (u: string) => u.replace(/\/+$/, "");
 
 // Les listes de fichiers : [[a, b]] (ancien front) ou ["COMBO", { options: [a, b] }] (nouveau).
-function options(info: unknown, node: string, field: string): string[] {
+export function options(info: unknown, node: string, field: string): string[] {
   const entry = (info as Record<string, { input?: { required?: Record<string, unknown> } }> | undefined)?.[node]?.input?.required?.[field];
   if (!Array.isArray(entry)) return [];
   if (Array.isArray(entry[0])) return entry[0].filter((x): x is string => typeof x === "string");

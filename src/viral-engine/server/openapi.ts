@@ -31,6 +31,11 @@ const videoRequest = {
     template: { type: "string", enum: ["story", "maths", "film"] },
     lang: { type: "string", enum: ["fr", "en"] },
     script: ref("Script"),
+    durationSec: { oneOf: [{ type: "integer", minimum: 15, maximum: 14400 }, { type: "string", example: "1h30" }], description: "Durée voulue : en secondes, ou écrite comme « 90s », « 3min », « 1h30 ». Jusqu'à 60 s : un format court ; au-delà : un film (15 s à 4 h)." },
+    genre: { type: "string", enum: ["drame", "thriller", "mystere", "horreur", "romance", "comedie", "aventure", "conte", "histoire-vraie", "documentaire"], description: "Film seulement." },
+    orientation: { type: "string", enum: ["paysage", "vertical"], description: "Film seulement. Défaut : paysage." },
+    quality: { type: "string", enum: ["eco", "standard", "hd"], description: "Film seulement : eco 480p très léger, standard 720p, hd 1080p. Défaut : standard." },
+    film: { type: "object", description: "Un film déjà écrit : title, characters, scenes[{title, mood, shots[{narration, speaker, visual}]}]. L'usine le tourne sans l'écrire.", additionalProperties: true },
   },
 };
 
@@ -72,7 +77,7 @@ export const openapi = {
       },
       post: {
         operationId: "createVideo",
-        summary: "Fabriquer une vidéo. Répond tout de suite avec une tâche ; le rendu dure environ 2 minutes.",
+        summary: "Fabriquer une vidéo. Répond tout de suite avec une tâche ; un format court dure environ 2 minutes, un film plusieurs minutes à plusieurs heures (suivre la progression de la tâche).",
         requestBody: body(videoRequest, false),
         responses: {
           "202": json(ref("Task"), "Tâche créée (queued). Suivre /api/v1/tasks/{id} ou attendre le webhook video.ready."),
@@ -140,6 +145,25 @@ export const openapi = {
         summary: "Suivi d'une tâche (queued, running, done, failed).",
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
         responses: { "200": json(ref("Task"), "Tâche."), "404": error("Tâche inconnue."), ...common },
+      },
+    },
+    "/api/v1/tasks/{id}/cancel": {
+      post: {
+        operationId: "cancelTask",
+        summary: "Annuler une fabrication (en attente ou en cours). Un film annulé se reprend plus tard avec « Refaire ».",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "202": json(ref("Task"), "Annulation demandée."), "404": error("Tâche inconnue."), "409": error("Déjà terminée, ou tâche d'un autre processus."), ...common },
+      },
+    },
+    "/api/v1/estimate": {
+      get: {
+        operationId: "estimate",
+        summary: "Ce que coûterait une vidéo : temps de fabrication, place disque, et s'il y a la place.",
+        parameters: [
+          { name: "durationSec", in: "query", required: true, schema: { type: "string", example: "3600" }, description: "Secondes, ou « 90s », « 3min », « 1h30»." },
+          { name: "quality", in: "query", schema: { type: "string", enum: ["eco", "standard", "hd"], default: "standard" } },
+        ],
+        responses: { "200": json({ type: "object", properties: { durationSec: { type: "integer" }, quality: { type: "string" }, long: { type: "boolean" }, estMinutes: { type: "integer" }, diskMb: { type: "integer" }, finalMb: { type: "integer" }, freeMb: { type: "integer" }, ok: { type: "boolean" }, message: { type: "string" } } }, "Estimation."), "400": error("Durée ou qualité illisible."), ...common },
       },
     },
     "/api/v1/lint": {
@@ -229,6 +253,7 @@ export const openapi = {
           jobId: { type: "string" },
           ref: { type: "string" },
           error: { type: "string" },
+          progress: { type: "object", description: "Film en cours : étape (ecriture, voix, images, rendu, assemblage), pourcentage et message.", properties: { phase: { type: "string" }, percent: { type: "integer", minimum: 0, maximum: 100 }, message: { type: "string" } } },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
         },
@@ -244,6 +269,7 @@ export const openapi = {
           topic: { type: "string" },
           template: { type: "string" },
           lang: { type: "string" },
+          kind: { type: "string", enum: ["long"], description: "« long » : un film ; absent : un format court." },
           durationMs: { type: "integer" },
           voice: { type: "string" },
           source: { type: "string", enum: ["ollama", "fallback", "claude"] },
@@ -267,6 +293,7 @@ export const openapi = {
               posted: { type: "object", additionalProperties: { type: "array", items: { type: "string" } } },
               error: { type: "string" },
               publishMode: { type: "string" },
+              film: { type: "object", description: "Film : genre, format, qualité, nombre de scènes, chapitres (title, startMs, endMs), origine des images et de la musique." },
             },
           },
         ],

@@ -74,7 +74,13 @@ function h(tag, props = {}, ...children) {
   return el;
 }
 
-const seconds = (ms) => `${(ms / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} s`;
+const seconds = (ms) => (ms >= 180000 ? longDuration(Math.round(ms / 1000)) : `${(ms / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} s`);
+function longDuration(total) {
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  if (h) return m ? `${h} h ${String(m).padStart(2, "0")}` : `${h} h`;
+  return `${m} min`;
+}
 const when = (iso) => (iso ? new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso)) : "");
 const percent = (x) => `${Math.round(x * 100)} %`;
 
@@ -215,6 +221,16 @@ function readForm() {
   const template = String(data.get("template") ?? "");
   if (template) body.template = template;
   body.lang = String(data.get("lang") ?? "fr");
+  const duration = durationValue();
+  if (duration !== undefined) {
+    body.durationSec = duration;
+    if (typeof duration === "string" || duration > 60) {
+      body.genre = String(data.get("genre") ?? "drame");
+      body.orientation = String(data.get("orientation") ?? "paysage");
+      body.quality = String(data.get("quality") ?? "standard");
+      delete body.template;
+    }
+  }
   const raw = $("script").value.trim();
   if (raw) {
     try {
@@ -224,6 +240,43 @@ function readForm() {
     }
   }
   return body;
+}
+
+// 45 s par défaut ; « Autre durée » : le texte tel quel (« 2h15 »), le serveur le comprend.
+function durationValue() {
+  const v = $("duration").value;
+  if (v === "custom") {
+    const t = $("duration-custom").value.trim();
+    return t || undefined;
+  }
+  return Number(v);
+}
+
+let estimateTimer;
+function refreshDuration() {
+  const custom = $("duration").value === "custom";
+  $("duration-custom").hidden = !custom;
+  const d = durationValue();
+  const long = d !== undefined && (typeof d === "string" || d > 60);
+  $("film-options").hidden = !long;
+  $("template-choice").hidden = long;
+  clearTimeout(estimateTimer);
+  const box = $("estimate");
+  if (!long) {
+    box.textContent = "";
+    return;
+  }
+  estimateTimer = setTimeout(async () => {
+    try {
+      const q = { durationSec: String(d), quality: document.querySelector('input[name="quality"]:checked')?.value ?? "standard" };
+      const e = await api("GET /api/v1/estimate", { query: q });
+      box.textContent = `${e.message.startsWith("Pas assez") ? e.message : `Environ ${longDuration(e.estMinutes * 60)} de fabrication, ${e.diskMb} Mo de place (il en reste ${e.freeMb} Mo).`}`;
+      box.dataset.tone = e.ok ? "ok" : "error";
+    } catch (error) {
+      box.textContent = error.message;
+      box.dataset.tone = "error";
+    }
+  }, 400);
 }
 
 function showLint(result, problem) {
@@ -252,7 +305,7 @@ async function lint() {
       showLint(null, { message: "Colle d'abord un script JSON." });
       return;
     }
-    showLint(await api("POST /api/v1/lint", { body: { script: body.script, topic: body.topic, template: body.template, lang: body.lang } }));
+    showLint(await api("POST /api/v1/lint", { body: { script: body.script, topic: body.topic, template: body.template, lang: body.lang, durationSec: body.durationSec } }));
   } catch (error) {
     showLint(null, error);
   } finally {
@@ -270,7 +323,7 @@ async function make(event) {
     renderTasks();
     $("topic").value = "";
     $("lint-result").replaceChildren();
-    announce("Vidéo en fabrication. Environ deux minutes ; tu peux fermer la page, le rendu continue.");
+    announce(task.request?.durationSec > 60 ? "Film en fabrication. Suis l'avancement dans « En fabrication » ; tu peux fermer la page, il continue." : "Vidéo en fabrication. Environ deux minutes ; tu peux fermer la page, le rendu continue.");
     schedulePoll(1500);
   } catch (error) {
     if (error.details?.issues) {
@@ -297,13 +350,38 @@ function renderTasks() {
         { class: "task", "data-status": t.status },
         h("div", { class: "task-top" }, h("span", { class: "task-topic", text: topic }), h("span", { class: "task-status", text: TASK_STATUS[t.status] ?? t.status })),
         h("span", { class: "hint", text: `${t.kind === "redo" ? "Nouvelle version" : template}, lancée le ${when(t.createdAt)}` }),
-        t.status === "queued" || t.status === "running" ? h("div", { class: "progress", role: "presentation" }) : null,
+        t.status === "running" && t.progress
+          ? meter(t.progress.percent)
+          : t.status === "queued" || t.status === "running"
+            ? h("div", { class: "progress", role: "presentation" })
+            : null,
+        t.status === "running" && t.progress ? h("span", { class: "hint", text: `${t.progress.percent} % — ${t.progress.message}` }) : null,
+        t.status === "queued" || t.status === "running"
+          ? h("button", { type: "button", class: "button quiet", text: "Annuler", onclick: () => cancelTask(t.id) })
+          : null,
         t.status === "done" && t.jobId ? h("a", { class: "task-link", href: `#video-${t.jobId}`, onclick: () => showVideo(t.jobId), text: `Voir la vidéo #${t.ref}` }) : null,
         t.status === "failed" ? h("p", { class: "task-error", text: t.error || "Le rendu a échoué." }) : null,
       );
     }),
   );
   $("tasks-empty").hidden = tasks.length > 0;
+}
+
+// Barre d'avancement : la largeur passe par le DOM (la politique de sécurité interdit les attributs style).
+function meter(percent) {
+  const bar = h("span");
+  bar.style.width = `${percent}%`;
+  return h("div", { class: "meter", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(percent), "aria-label": "Avancement du film" }, bar);
+}
+
+async function cancelTask(id) {
+  try {
+    await api("POST /api/v1/tasks/:id/cancel", { params: { id } });
+    announce("Annulation demandée. Un film annulé se reprend avec « Refaire ».");
+    schedulePoll(1000);
+  } catch (error) {
+    announce(error.message, "error");
+  }
 }
 
 let pollTimer;
@@ -441,7 +519,7 @@ function updateCard(card, detail, first = false) {
     ...[
       ["Statut", parts.status],
       ["Durée", seconds(detail.durationMs)],
-      ["Template", TEMPLATES[detail.template] ?? detail.template],
+      [detail.kind === "long" ? "Format" : "Template", detail.kind === "long" ? `Film, ${detail.film?.scenes ?? "?"} scènes` : (TEMPLATES[detail.template] ?? detail.template)],
       ["Voix", VOICES[detail.voice] ?? detail.voice],
       ["Script", SOURCES[detail.source] ?? detail.source],
       [detail.publishedAt ? "Publiée le" : "Créée le", when(detail.publishedAt ?? detail.createdAt)],
@@ -1021,6 +1099,10 @@ function init() {
   window.addEventListener("hashchange", () => showView(location.hash === "#reglages" ? "settings" : "atelier"));
   $("make-form").addEventListener("submit", make);
   $("lint").addEventListener("click", lint);
+  $("duration").addEventListener("change", refreshDuration);
+  $("duration-custom").addEventListener("input", refreshDuration);
+  for (const r of document.querySelectorAll('input[name="quality"]')) r.addEventListener("change", refreshDuration);
+  refreshDuration();
   $("filters").addEventListener("click", (event) => {
     const button = event.target.closest("[data-filter]");
     if (!button) return;

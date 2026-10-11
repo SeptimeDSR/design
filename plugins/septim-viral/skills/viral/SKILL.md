@@ -28,6 +28,10 @@ Le script de secours du moteur sert au démon sans Ollama. En interactif, **c'es
 - Vérifie, corrige, recommence jusqu'au ✓ (5 essais maximum) : outil `septim_lint_script`, ou
   `septim lint <fichier> --template <t>`
 
+## 2 bis. Un film (plus d'une minute)
+
+Durée au-delà de 60 s (« un film de 1 h », « un court métrage drame ») : écris un **film**, pas un script H.E.A.T. Format et règles : `references/film.md` (ressource MCP `septim://guide-film`). Vérifie avec `septim_lint_script` (ou `septim lint film.json --duree 1h`), puis `septim_create_video` avec `film` et `duration` **sans `wait_seconds`** (un film dure longtemps) ; suis `septim_get_task` (progress) ; `septim_cancel_task` l'arrête. Terminal : `septim video "sujet" --duree 1h --genre drame --script film.json`.
+
 ## 3. Rendre la version FREE (toujours)
 
 Outil `septim_create_video` avec le script et `wait_seconds: 240`, ou `septim video "<sujet>" --template <t> --script <fichier>`.

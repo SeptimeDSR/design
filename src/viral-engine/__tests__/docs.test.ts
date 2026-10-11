@@ -41,7 +41,7 @@ describe("documentation : elle ne dérive pas du code", () => {
     for (const c of commands) expect(GUIDE, `septim ${c}`).toContain(`septim ${c}`);
     for (const c of MCP_CLIENTS) expect(GUIDE, c).toContain(`septim connect ${c}`);
     const tools = [...read("src/viral-engine/mcp.ts").matchAll(/registerTool\(\s*"(\w+)"/g)].map((m) => m[1]);
-    expect(tools).toHaveLength(9);
+    expect(tools).toHaveLength(10);
     for (const t of tools) expect(GUIDE, t).toContain(t);
     for (const r of ROUTES) expect(GUIDE, `${r.method} ${r.path}`).toContain(`${r.method} ${r.path}`);
     for (const section of ["En 1 minute", "Installer", "Navigateur", "Terminal", "Claude Code", "MCP", "API", "Webhooks", "WhatsApp", "Recettes", "Configuration", "Dépannage", "Sécurité", "Docker", "Ce qui manque encore"]) {
@@ -167,7 +167,13 @@ describe("documentation : elle ne dérive pas du code", () => {
     expect(text).toContain("/app/.env");
     expect(text).toMatch(/if not exist "%~dp0\.env"/);
     expect(text).toMatch(/docker compose up -d/);
+    // Usine d'une autre version que le dossier (zip décompressé sans relancer LANCER) : reconstruction automatique, puis la commande est relancée.
+    expect(text).toContain(":stale");
+    expect(text).toMatch(/docker compose exec -T septim septim version/);
+    expect(text).toMatch(/docker compose up -d --build/);
     const lancer = read("LANCER.ps1");
+    // Un ancien dossier septim\ ne garde pas la priorité dans le PATH.
+    expect(lancer).toMatch(/Ancien dossier septim retire du PATH/);
     expect(lancer).toMatch(/Test-Path \.?\\?"?\.env"?/);
     expect(lancer).not.toMatch(/Copy-Item[^\n]*\.env\.example/);
     for (const cmd of ["septim env init", "septim env set", "septim env list", "septim env check"]) expect(GUIDE, cmd).toContain(cmd);

@@ -41,7 +41,7 @@ export function lintHook(hook: string, lang: Lang): LintIssue[] {
   return issues;
 }
 
-type HeatInput = { topic: string; lang: Lang; formula: HookFormula; template: TemplateId; trend?: string };
+type HeatInput = { topic: string; lang: Lang; formula: HookFormula; template: TemplateId; trend?: string; targetSec?: number };
 
 const FORMULA_BRIEF: Record<HookFormula, string> = {
   question: "une question personnelle qui met le viewer dans la situation",
@@ -52,8 +52,12 @@ const FORMULA_BRIEF: Record<HookFormula, string> = {
 
 export function buildHeatPrompt(input: HeatInput): string {
   const language = input.lang === "fr" ? "français" : "anglais";
+  const t = input.targetSec;
+  // Durée choisie : fourchette de ±15 %, et autant de beats qu'il en faut (un beat = environ 3,5 s).
+  const span = t ? `${Math.round(t * 0.85)} à ${Math.round(t * 1.15)}` : "25 à 45";
+  const beats = t ? `${Math.max(3, Math.round(t / 3.5) - 2)} à ${Math.round(t / 3.5) + 2}` : "8 à 12";
   return [
-    `Tu écris le script d'une vidéo verticale virale de 25 à 45 secondes, en ${language}.`,
+    `Tu écris le script d'une vidéo verticale virale de ${span} secondes, en ${language}.`,
     `Sujet : ${input.topic}`,
     input.trend ? `Tendance du moment à exploiter : ${input.trend}` : "",
     `Template visuel : ${input.template}.`,
@@ -65,7 +69,7 @@ export function buildHeatPrompt(input: HeatInput): string {
     "- T (Transition) : avance vite, une idée par beat.",
     "",
     "Règles :",
-    "- 8 à 12 beats, chacun lisible en moins de 3 secondes (8 mots maximum).",
+    `- ${beats} beats, chacun lisible en moins de 3 secondes (8 mots maximum).`,
     "- Ne donne PAS la réponse avant le payoff : le payoff arrive en dernier, en une phrase courte.",
     "- Glisse une petite récompense surprise vers le milieu (un chiffre, un détail inattendu).",
     "",

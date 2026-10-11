@@ -66,7 +66,8 @@ type Run = (cmd: string, args: string[]) => number;
 const inherit: Run = (cmd, args) => spawnSync(cmd, args, { stdio: "inherit" }).status ?? 1;
 
 // Une étape d'installation : la même liste sert à `septim setup` (terminal) et aux boutons du Studio.
-export type InstallStep = { label: string; cmd: string; args: string[]; hint: string };
+// optional : un échec est noté mais ne coûte pas l'installation (la voix féminine des films).
+export type InstallStep = { label: string; cmd: string; args: string[]; hint: string; optional?: boolean };
 
 const venvPython = (home: string) => join(home, "venv", process.platform === "win32" ? "Scripts/python.exe" : "bin/python");
 
@@ -79,12 +80,19 @@ const venvStep = (home: string, flag: string): InstallStep => ({
 });
 
 // Piper : voix gratuite, locale, dans un venv de l'usine, puis la voix française.
-export function voiceSteps(home: string, voice = process.env.VIRAL_PIPER_VOICE ?? "fr_FR-tom-medium"): InstallStep[] {
+// Une voix déjà posée à la main dans le dossier voix/ (VIRAL_VOICES_DIR) n'est pas retéléchargée : c'est la sortie quand le réseau bloque Hugging Face.
+export function voiceSteps(home: string, voice = process.env.VIRAL_PIPER_VOICE ?? "fr_FR-tom-medium", extra: string[] = [], local = process.env.VIRAL_VOICES_DIR): InstallStep[] {
   const py = venvPython(home);
+  const have = (v: string) => existsSync(join(home, "voices", `${v}.onnx`)) || (!!local && existsSync(join(local, `${v}.onnx`)));
+  const download = (v: string, optional: boolean): InstallStep[] =>
+    have(v)
+      ? []
+      : [{ label: `Voix ${v}`, cmd: py, args: ["-m", "piper.download_voices", v, "--data-dir", join(home, "voices")], hint: `Téléchargement de la voix ${v} raté (réseau ?). Relance l'installation. Si ton réseau bloque Hugging Face, télécharge ${v}.onnx et ${v}.onnx.json dans le dossier voix/ (voir septim reseau).`, ...(optional ? { optional: true } : {}) }];
   return [
     venvStep(home, "--voix"),
     { label: "Piper (voix gratuite)", cmd: py, args: ["-m", "pip", "install", "--upgrade", "piper-tts"], hint: "pip n'a pas pu installer piper-tts (réseau ?). Relance l'installation." },
-    { label: `Voix ${voice}`, cmd: py, args: ["-m", "piper.download_voices", voice, "--data-dir", join(home, "voices")], hint: `Téléchargement de la voix ${voice} raté (réseau ?). Relance l'installation.` },
+    ...download(voice, false),
+    ...extra.flatMap((v) => download(v, true)),
   ];
 }
 
@@ -104,6 +112,10 @@ export function voiceHdSteps(home: string): InstallStep[] {
 function runSteps(steps: InstallStep[], io: IO, run: Run): boolean {
   for (const step of steps) {
     if (run(step.cmd, step.args) !== 0) {
+      if (step.optional) {
+        io.err.write(`• ${step.label} non installée (facultative) : ${step.hint}\n`);
+        continue;
+      }
       io.err.write(`✗ ${step.hint.replace(/Relance l'installation\./, "Relance septim setup.")}\n`);
       return false;
     }
