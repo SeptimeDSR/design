@@ -4,13 +4,19 @@ import { parseReply } from "./approval";
 import { rewardFromViews, updateArm } from "./bandit";
 import { loadConfig, loadDotEnv } from "./config";
 import { tryLock } from "./lock";
-import { BOT_PREFIX, jobRef } from "./message";
+import { BOT_PREFIX } from "./message";
 import type { Platform, PublishMode } from "./publish-plan";
 import type { JobRequest } from "./pipeline";
-import type { Job, Store } from "./store";
+import { RefError, type Job, type Store } from "./store";
 import type { PublishResult } from "./publish";
 
 export type { PublishResult };
+
+// Ce que l'usine installe toute seule au démarrage : dans Docker, la voix et le modèle d'écriture (visibles dans Réglages).
+export function autoInstallIds(env: Record<string, string | undefined>): string[] {
+  const raw = env.SEPTIM_AUTO_INSTALL ?? (env.SEPTIM_IN_DOCKER ? "voix,ollama" : "");
+  return raw.split(",").map((x) => x.trim()).filter((x) => ["voix", "voix-hd", "ollama"].includes(x));
+}
 
 export type DaemonDeps = {
   store: Store;
@@ -20,6 +26,9 @@ export type DaemonDeps = {
   publish: (job: Job) => Promise<PublishResult>;
   runJob: (req: JobRequest) => Promise<Job>;
   views: (job: Job) => Promise<number | null>;
+  // Les webhooks de la fabrique : une décision prise sur WhatsApp prévient aussi n8n et les autres.
+  onPublished?: (job: Job) => void;
+  onRejected?: (job: Job) => void;
 };
 
 const REWARD_DELAY_MS = 48 * 3600_000;
@@ -31,7 +40,7 @@ const isStalePublishing = (job: Job, now = Date.now()) =>
 
 const pendingJobs = (store: Store) => store.listJobs().filter((j) => j.status === "notified" || isStalePublishing(j));
 
-const describe = (jobs: Job[]) => jobs.map((j) => `#${jobRef(j)} « ${j.script.hook} »`).join("\n");
+const describe = (jobs: Job[], store: Store) => jobs.map((j) => `#${store.ref(j.id)} « ${j.script.hook} »`).join("\n");
 
 export type ReplyContext = { quoted?: string };
 
@@ -42,7 +51,7 @@ export async function handleReply(text: string, deps: DaemonDeps, ctx: ReplyCont
 
   if (reply.intent === "unknown") {
     if (reply.looksLikeApproval && pending.length) {
-      const hint = pending.length === 1 ? `OUI #${jobRef(pending[0])}` : `OUI #xxxx (${pending.map((j) => `#${jobRef(j)}`).join(", ")})`;
+      const hint = pending.length === 1 ? `OUI #${deps.store.ref(pending[0].id)}` : `OUI #xxxx (${pending.map((j) => `#${deps.store.ref(j.id)}`).join(", ")})`;
       await deps.notify(`${BOT_PREFIX} · Je n'ai rien publié. Pour publier, réponds exactement ${hint}.`);
     }
     return;
@@ -51,9 +60,18 @@ export async function handleReply(text: string, deps: DaemonDeps, ctx: ReplyCont
   const ref = reply.jobRef ?? ctx.quoted?.match(/#([0-9a-f]{4,})/i)?.[1]?.toLowerCase();
   let job: Job | undefined;
   if (ref) {
-    job = deps.store.findJob(ref);
+    // Deux vidéos qui commencent par les mêmes caractères : on demande, on ne devine jamais.
+    try {
+      job = deps.store.resolveRef(ref);
+    } catch (error) {
+      if (error instanceof RefError && error.code === "ambiguous_ref") {
+        await deps.notify(`${BOT_PREFIX} · Je n'ai rien publié. ${error.message}`);
+        return;
+      }
+      job = undefined;
+    }
   } else if (pending.length > 1) {
-    await deps.notify(`${BOT_PREFIX} · Plusieurs vidéos attendent, dis-moi laquelle (réponds par exemple OUI #${jobRef(pending[0])}) :\n${describe(pending)}`);
+    await deps.notify(`${BOT_PREFIX} · Plusieurs vidéos attendent, dis-moi laquelle (réponds par exemple OUI #${deps.store.ref(pending[0].id)}) :\n${describe(pending, deps.store)}`);
     return;
   } else {
     job = pending[0];
@@ -64,28 +82,49 @@ export async function handleReply(text: string, deps: DaemonDeps, ctx: ReplyCont
     return;
   }
   if (job.status === "published") {
-    await deps.notify(`${BOT_PREFIX} · #${jobRef(job)} est déjà publiée.`);
+    await deps.notify(`${BOT_PREFIX} · #${deps.store.ref(job.id)} est déjà publiée.`);
     return;
   }
   if (inFlight.has(job.id) || (job.status === "publishing" && !isStalePublishing(job))) {
-    await deps.notify(`${BOT_PREFIX} · Publication de #${jobRef(job)} déjà en cours.`);
+    await deps.notify(`${BOT_PREFIX} · Publication de #${deps.store.ref(job.id)} déjà en cours.`);
     return;
   }
   if (job.status !== "notified" && !isStalePublishing(job)) {
-    await deps.notify(`${BOT_PREFIX} · #${jobRef(job)} est déjà traitée.`);
+    await deps.notify(`${BOT_PREFIX} · #${deps.store.ref(job.id)} est déjà traitée.`);
     return;
   }
 
-  if (reply.intent === "publish") return publishWithLedger(job, deps);
-
-  if (reply.intent === "reject") {
-    deps.store.saveJob({ ...job, status: "rejected" });
-    await deps.notify(`${BOT_PREFIX} · Jetée 🗑️ #${jobRef(job)}.`);
+  if (reply.intent === "publish") {
+    await publishWithLedger(job, deps);
+    const after = deps.store.getJob(job.id);
+    if (after?.status === "published") deps.onPublished?.(after);
     return;
   }
 
-  if (reply.intent === "redo") {
-    deps.store.saveJob({ ...job, status: "rejected" });
+  if (reply.intent === "reject" || reply.intent === "redo") {
+    // Même verrou que la publication : un NON qui arrive pendant un envoi n'écrase pas « publié ».
+    const release = tryLock(join(deps.store.jobsDir, job.id, "publish.lock"), STALE_PUBLISHING_MS);
+    if (!release) {
+      await deps.notify(`${BOT_PREFIX} · Publication de #${deps.store.ref(job.id)} déjà en cours.`);
+      return;
+    }
+    let rejected: Job;
+    try {
+      const fresh = deps.store.getJob(job.id) ?? job;
+      if (fresh.status !== "notified" && !isStalePublishing(fresh)) {
+        await deps.notify(`${BOT_PREFIX} · #${deps.store.ref(fresh.id)} est déjà traitée.`);
+        return;
+      }
+      rejected = { ...fresh, status: "rejected" };
+      deps.store.saveJob(rejected);
+    } finally {
+      release();
+    }
+    deps.onRejected?.(rejected);
+    if (reply.intent === "reject") {
+      await deps.notify(`${BOT_PREFIX} · Jetée 🗑️ #${deps.store.ref(job.id)}.`);
+      return;
+    }
     await deps.notify(`${BOT_PREFIX} · Je refais une version sur « ${job.script.topic} »…`);
     await deps.runJob({ topic: job.script.topic, template: job.script.template, lang: job.script.lang });
     return;
@@ -95,9 +134,9 @@ export async function handleReply(text: string, deps: DaemonDeps, ctx: ReplyCont
   const seconds = Math.round(job.timeline.durationMs / 1000);
   const dollars = ((seconds / 10) * 3).toFixed(0);
   await deps.notify(
-    `${BOT_PREFIX} · BESOIN CREDIT : Higgsfield Soul + Seedance pour #${jobRef(job)} (${seconds} s ≈ ${dollars} $ de crédits). ` +
+    `${BOT_PREFIX} · BESOIN CREDIT : Higgsfield Soul + Seedance pour #${deps.store.ref(job.id)} (${seconds} s ≈ ${dollars} $ de crédits). ` +
       `Je ne dépense rien tout seul : lance /septim-viral:viral "${job.script.topic}" en PRO dans Claude Code. ` +
-      `Alternative gratuite : la version Remotion est déjà prête, réponds OUI #${jobRef(job)} pour la publier.`,
+      `Alternative gratuite : la version Remotion est déjà prête, réponds OUI #${deps.store.ref(job.id)} pour la publier.`,
   );
 }
 
@@ -107,14 +146,14 @@ export async function publishWithLedger(stale: Job, deps: Pick<DaemonDeps, "stor
   if (inFlight.has(stale.id)) return;
   const release = tryLock(join(deps.store.jobsDir, stale.id, "publish.lock"), STALE_PUBLISHING_MS);
   if (!release) {
-    await deps.notify(`${BOT_PREFIX} · Publication de #${jobRef(stale)} déjà en cours.`);
+    await deps.notify(`${BOT_PREFIX} · Publication de #${deps.store.ref(stale.id)} déjà en cours.`);
     return;
   }
   inFlight.add(stale.id);
   try {
     const job = deps.store.getJob(stale.id) ?? stale;
     if (job.status === "published") {
-      await deps.notify(`${BOT_PREFIX} · #${jobRef(job)} est déjà publiée.`);
+      await deps.notify(`${BOT_PREFIX} · #${deps.store.ref(job.id)} est déjà publiée.`);
       return;
     }
     deps.store.saveJob({ ...job, status: "publishing", publishingSince: new Date().toISOString() });
@@ -124,22 +163,22 @@ export async function publishWithLedger(stale: Job, deps: Pick<DaemonDeps, "stor
       const done = Object.keys(posted);
       if (r.manualText) {
         deps.store.saveJob({ ...job, status: "published", posted, publishedAt: new Date().toISOString() });
-        await deps.notify(`${BOT_PREFIX} · Légende prête #${jobRef(job)}, colle-la et ajoute le son tendance :\n\n${r.manualText}`);
+        await deps.notify(`${BOT_PREFIX} · Légende prête #${deps.store.ref(job.id)}, colle-la et ajoute le son tendance :\n\n${r.manualText}`);
       } else if (r.failed.length) {
         deps.store.saveJob({ ...job, status: "notified", posted });
         const failed = r.failed.map((f) => `${f.platform} (${f.error})`).join(", ");
         await deps.notify(
-          `${BOT_PREFIX} · Publication partielle #${jobRef(job)}. Déjà en ligne : ${done.join(", ") || "rien"}. Échec : ${failed}. ` +
-            `Réponds OUI #${jobRef(job)} pour réessayer seulement ce qui a échoué.`,
+          `${BOT_PREFIX} · Publication partielle #${deps.store.ref(job.id)}. Déjà en ligne : ${done.join(", ") || "rien"}. Échec : ${failed}. ` +
+            `Réponds OUI #${deps.store.ref(job.id)} pour réessayer seulement ce qui a échoué.`,
         );
       } else {
         deps.store.saveJob({ ...job, status: "published", posted, publishedAt: new Date().toISOString() });
         const missing = r.missing.length ? `\nPas connecté dans Postiz : ${r.missing.join(", ")}.` : "";
-        await deps.notify(`${BOT_PREFIX} · Publié ✅ #${jobRef(job)} sur ${done.join(", ")}.${missing}`);
+        await deps.notify(`${BOT_PREFIX} · Publié ✅ #${deps.store.ref(job.id)} sur ${done.join(", ")}.${missing}`);
       }
     } catch (error) {
       deps.store.saveJob({ ...job, status: "notified" });
-      await deps.notify(`${BOT_PREFIX} · Publication ratée #${jobRef(job)} : ${(error as Error).message}. Réponds OUI #${jobRef(job)} pour réessayer.`);
+      await deps.notify(`${BOT_PREFIX} · Publication ratée #${deps.store.ref(job.id)} : ${(error as Error).message}. Réponds OUI #${deps.store.ref(job.id)} pour réessayer.`);
     }
   } finally {
     inFlight.delete(stale.id);
@@ -188,34 +227,61 @@ export async function collectRewards(deps: DaemonDeps, now = Date.now()): Promis
   });
 }
 
-async function main() {
+// septim start : un seul processus possède WhatsApp et la file de rendu ; le Studio, l'API et le MCP HTTP tournent avec lui.
+export async function runDaemon(): Promise<void> {
   loadDotEnv();
   const cron = (await import("node-cron")).default;
   const { createStore } = await import("./store");
-  const { createNotifier } = await import("./notify");
-  const { runJob } = await import("./pipeline");
+  const { createNotifierHub } = await import("./notifier-hub");
   const { publishJob, fetchJobViews } = await import("./publish");
   const { resolveModeFromEnv } = await import("./publish-mode");
   const { flushOutbox } = await import("./outbox");
+  const { createFactory } = await import("./factory");
+  const { attachWebhooks } = await import("./webhooks");
 
   const cfg = loadConfig();
   const store = createStore(cfg.home);
-  const notifier = createNotifier(cfg.notifier, cfg);
-  const mode = resolveModeFromEnv();
-  const notify = (t: string, m?: string) => notifier.send(t, m);
-  const runner = createCycleRunner((req) => runJob(req, { notify }), notify);
+  // Un seul interlocuteur, changeable à chaud depuis le Studio (WhatsApp, avec son QR, ou la console).
+  const hub = createNotifierHub({ cfg: () => loadConfig(process.env) });
+  const notify = (t: string, m?: string) => hub.send(t, m);
+  // Toutes les portes (cycle, REFAIS, Studio, API, MCP) passent par la même file de la fabrique : un rendu à la fois.
+  const factory = createFactory({ notify });
+  factory.attachHub(hub);
+  attachWebhooks(factory);
+  const render = async (req: JobRequest): Promise<Job> => {
+    const task = factory.createVideo({ topic: req.topic, template: req.template, lang: req.lang, script: req.script });
+    await factory.idle();
+    const done = factory.getTask(task.id);
+    const job = done.jobId ? store.getJob(done.jobId) : undefined;
+    if (!job) throw new Error(done.error ?? "rendu raté");
+    return job;
+  };
+  const runner = createCycleRunner(render, notify);
   const deps: DaemonDeps = {
     store,
-    mode,
-    platforms: cfg.platforms,
+    // Mode et plateformes relus à chaque publication : un interrupteur du Studio compte tout de suite.
+    get mode() {
+      return resolveModeFromEnv(process.env);
+    },
+    get platforms() {
+      return loadConfig(process.env).platforms;
+    },
     notify,
-    publish: (job) => publishJob(job, mode, cfg.platforms, cfg.tiktokMethod),
+    publish: (job) => {
+      const live = loadConfig(process.env);
+      return publishJob(job, resolveModeFromEnv(process.env), live.platforms, live.tiktokMethod);
+    },
     runJob: runner,
     views: (job) => fetchJobViews(job),
+    onPublished: (j) => factory.announce("video.published", j.id),
+    onRejected: (j) => factory.announce("video.rejected", j.id),
   };
 
-  await notifier.start();
-  notifier.onMessage((text, meta) => void handleReply(text, deps, { quoted: meta?.quoted }).catch((e) => console.error("[réponse]", e)));
+  hub.onMessage((text, meta) => void handleReply(text, deps, { quoted: meta?.quoted }).catch((e) => console.error("[réponse]", e)));
+  await hub.start();
+  // Les réglages du Studio (settings.json) sont déjà appliqués par la fabrique : on relit le mode, pas l'ancien cfg.
+  await hub.use(loadConfig(process.env).notifier);
+  factory.onSettingsChange(() => void hub.use(loadConfig(process.env).notifier).catch((e) => console.error("[messages]", e)));
   // Le CLI dépose ses messages dans la boîte d'envoi : le démon est le seul à parler à WhatsApp.
   const drain = () => void flushOutbox(store.home, notify).catch((e) => console.error("[boîte d'envoi]", e));
   drain();
@@ -224,8 +290,24 @@ async function main() {
     if (runner.pending === 0) void runner({}).catch((e) => console.error("[cycle]", e));
   });
   cron.schedule("0 9 * * *", () => void collectRewards(deps).catch((e) => console.error("[analytics]", e)));
-  console.log(`SEPTIM-VIRAL-OS en marche · cycle « ${cfg.cron} » · publication ${mode} · notifications ${cfg.notifier}`);
+  console.log(`SEPTIM-VIRAL-OS en marche · cycle « ${cfg.cron} » · publication ${resolveModeFromEnv(process.env)} · notifications ${loadConfig(process.env).notifier}`);
+
+  const port = Number(process.env.SEPTIM_PORT || 4321);
+  if (port !== 0) {
+    const { startServer } = await import("./server/http");
+    const { mcpHttpHandler } = await import("./mcp");
+    const corsOrigins = (process.env.SEPTIM_CORS_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+    try {
+      const srv = await startServer({ factory, port, host: process.env.SEPTIM_HOST || undefined, token: process.env.SEPTIM_TOKEN, corsOrigins, mcp: mcpHttpHandler(factory) });
+      console.log(`Studio, API et MCP HTTP : ${srv.url}${process.env.SEPTIM_TOKEN ? "/?token=…" : ""}`);
+    } catch (error) {
+      // WhatsApp et le cycle continuent : seul le serveur manque.
+      console.error(`[serveur] ${(error as Error).message}`);
+    }
+  }
+  // Voix et modèle d'écriture : installés d'eux-mêmes (on suit l'avancement dans Réglages).
+  factory.settings.autoInstall(autoInstallIds(process.env));
   if (process.argv.includes("--now")) await runner({});
 }
 
-if (process.argv[1]?.endsWith("daemon.ts")) main();
+if (process.argv[1]?.endsWith("daemon.ts")) void runDaemon();

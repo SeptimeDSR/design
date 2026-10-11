@@ -28,7 +28,7 @@ describe("pageCaptions", () => {
 
   it("coupe après une question", () => {
     const pages = pageCaptions(wordTimings("Tu sais pourquoi ? Moi oui", 0, 3000));
-    expect(pages[0].at(-1)?.text).toBe("pourquoi ?");
+    expect(pages[0].at(-1)?.text).toBe("pourquoi\u00a0?");
   });
 });
 

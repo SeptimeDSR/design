@@ -4,7 +4,7 @@ module.exports = {
     {
       name: "septim-viral",
       script: "node_modules/.bin/tsx",
-      args: "src/viral-engine/daemon.ts",
+      args: "src/viral-engine/septim.ts start", // démon + WhatsApp + cycle + Studio, API et MCP HTTP
       cwd: __dirname, // le démon charge lui-même .env (pm2 n'a pas d'option env_file)
       autorestart: true,
       max_restarts: 20,

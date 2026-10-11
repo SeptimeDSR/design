@@ -5,7 +5,8 @@ export type HookFormula = "question" | "choc" | "secret" | "contre-intuitif";
 export const TEMPLATES: TemplateId[] = ["story", "maths", "film"];
 export const FORMULAS: HookFormula[] = ["question", "choc", "secret", "contre-intuitif"];
 
-export type Beat = { text: string; emphasis?: string };
+// visual : le plan à montrer pendant ce beat (B-roll), décrit concrètement, en anglais de préférence.
+export type Beat = { text: string; emphasis?: string; visual?: string };
 
 export type ViralScript = {
   topic: string;

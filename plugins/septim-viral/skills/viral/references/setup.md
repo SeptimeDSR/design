@@ -1,18 +1,18 @@
-# Installer l'usine chez toi (WSL Ubuntu)
+# Installer l'usine chez toi (Linux, WSL Ubuntu, macOS)
 
 ```bash
-git clone https://github.com/SeptimeDSR/design ~/septim && cd ~/septim
-PUPPETEER_SKIP_DOWNLOAD=1 npm install   # Remotion, moteur, WhatsApp… (sans le Chromium de puppeteer : voir sécurité)
-cp .env.example .env            # tout est optionnel, l'usine tourne sans rien
-npm run viral:doctor            # dit ce qui manque, avec les commandes
+git clone https://github.com/SeptimeDSR/design ~/septim
+bash ~/septim/scripts/install.sh --voix   # npm, commande septim, .env, Claude Code, voix française, diagnostic
 ```
+
+Le script est idempotent : relance-le quand tu veux. Ensuite, `septim doctor` dit ce qui manque, avec les commandes. Mode d'emploi complet : `docs/GUIDE.md`.
 
 | Brique | Coût | Commande |
 | --- | --- | --- |
-| Voix française (Piper) | gratuit | `pip install piper-tts` puis `python3 -m piper.download_voices fr_FR-tom-medium --data-dir .septim-viral/voices` |
+| Voix française (Piper) | gratuit | `septim setup --voix` (Piper dans `.septim-viral/venv`, voix `fr_FR-tom-medium`) |
 | Voix anglaise (Kokoro) | gratuit | `npm i kokoro-js` |
 | Script automatique (Ollama + qwen2.5) | gratuit | `curl -fsSL https://ollama.com/install.sh \| sh` puis `ollama pull qwen2.5:7b` (`qwen2.5:3b` si peu de RAM) |
-| WhatsApp | gratuit, non officiel (un seul destinataire, faible volume) | `npm run viral:daemon`, scanner le QR une fois |
+| WhatsApp | gratuit, non officiel (un seul destinataire, faible volume) | `septim start`, scanner le QR une fois |
 | Vraies vidéos WhatsApp | gratuit | installer Google Chrome, `WHATSAPP_CHROME_PATH=/usr/bin/google-chrome` |
 | Publication | Postiz cloud 29 $/mois (apps approuvées) ou auto-hébergé gratuit (TikTok/YouTube privés sans audit) | `npm i -g postiz && postiz auth:login` |
 | Tendances YouTube Cameroun | gratuit | `YOUTUBE_API_KEY=…` |
@@ -23,7 +23,7 @@ npm run viral:doctor            # dit ce qui manque, avec les commandes
 
 Le message « Vidéo prête » se termine par une référence, par exemple `#5f8a`. Pour publier, réponds `OUI #5f8a` (ou réponds en citant le message de la vidéo). « ok », « oui ? » ou « je regarde » ne publient rien. `NON #5f8a` jette, `REFAIS #5f8a` en fait une autre, `PRO #5f8a` donne le coût de la version Higgsfield.
 
-Si WhatsApp ne transmet pas ta réponse (bibliothèque non officielle), publie depuis le terminal : `npm run viral -- --publish 5f8a`. C'est le même registre que le démon : une vidéo n'est jamais publiée deux fois.
+Si WhatsApp ne transmet pas ta réponse (bibliothèque non officielle), publie depuis le terminal : `septim publier 5f8a` (ou le Studio, ou `/septim-viral:publier 5f8a`). C'est le même registre que le démon : une vidéo n'est jamais publiée deux fois.
 
 WSL ne lance pas cron sans systemd : le démon utilise `node-cron`, pm2 le garde en vie. Pour le relancer au démarrage de Windows : Planificateur de tâches → `wsl -e bash -lc "cd ~/septim && pm2 resurrect"`.
 

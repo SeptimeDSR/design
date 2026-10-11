@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { platformsForDuration } from "./film/platforms";
 import { postText } from "./message";
 import { postizSettings, type Platform, type PublishMode } from "./publish-plan";
 import type { Job } from "./store";
@@ -62,7 +63,9 @@ export async function publishJob(
   if (!job.videoPath) throw new Error("Pas de vidéo à publier");
 
   const integrations = parseJson(await postiz(["integrations:list"])) as { id: string; identifier: string; disabled?: boolean }[];
-  const targets = platforms.map((p) => ({ platform: p, integration: integrations.find((i) => !i.disabled && IDENTIFIERS[p].includes(i.identifier)) }));
+  // Un film long ne part que là où sa durée est acceptée (YouTube, Facebook).
+  const wanted = job.kind === "long" ? platformsForDuration(job.timeline.durationMs / 1000, platforms) : platforms;
+  const targets = wanted.map((p) => ({ platform: p, integration: integrations.find((i) => !i.disabled && IDENTIFIERS[p].includes(i.identifier)) }));
   const missing = targets.filter((t) => !t.integration).map((t) => t.platform);
   const todo = targets.filter((t) => t.integration && !posted[t.platform]?.length);
   const failed: PublishResult["failed"] = [];

@@ -57,6 +57,13 @@ export async function deliverWebhook(
   return { ok: false, attempts: delays.length + 1 };
 }
 
+const pending = new Set<Promise<unknown>>();
+
+// Une commande courte (septim publier, septim jeter) attend ses livraisons avant de quitter.
+export async function flushWebhooks(): Promise<void> {
+  while (pending.size) await Promise.allSettled([...pending]);
+}
+
 // Branche les événements de l'usine sur VIRAL_WEBHOOK_URL (n8n, Make, Zapier, Slack…). Sans URL : rien.
 export function attachWebhooks(
   factory: { on: (e: FactoryEvent, h: (p: EventPayload) => void) => () => void },
@@ -66,7 +73,11 @@ export function attachWebhooks(
   const url = env.VIRAL_WEBHOOK_URL?.trim();
   if (!url) return () => undefined;
   const offs = EVENTS.map((event) =>
-    factory.on(event, (p) => void deliverWebhook(url, event, webhookPayload(event, p, env.SEPTIM_PUBLIC_URL), { secret: env.VIRAL_WEBHOOK_SECRET, fetchImpl })),
+    factory.on(event, (p) => {
+      const delivery = deliverWebhook(url, event, webhookPayload(event, p, env.SEPTIM_PUBLIC_URL), { secret: env.VIRAL_WEBHOOK_SECRET, fetchImpl });
+      pending.add(delivery);
+      void delivery.finally(() => pending.delete(delivery));
+    }),
   );
   return () => offs.forEach((off) => off());
 }

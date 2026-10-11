@@ -16,8 +16,8 @@
     {
       "name": "septim-viral",
       "source": "./plugins/septim-viral",
-      "description": "Usine à vidéos virales : script H.E.A.T, rendu Remotion gratuit, WhatsApp « je publie ? », Postiz sur OUI.",
-      "version": "1.0.0"
+      "description": "Usine à vidéos virales : script H.E.A.T, rendu Remotion gratuit, Studio, MCP, API, WhatsApp ; publication seulement sur « OUI #ref ».",
+      "version": "1.1.0"
     }
   ]
 }

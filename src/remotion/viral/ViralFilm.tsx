@@ -1,51 +1,78 @@
-import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import { AudioTracks, BrollBackground, Captions, ProgressBar, SaveBadge, usePunch } from "./shared";
+import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { AudioTracks, BigWord, BrollBackground, Captions, HookCard, PayoffFlash, ProgressBar, SaveBadge, usePunch } from "./shared";
+import { LAYOUT, chapterLabel, sceneFor } from "./layout";
 import { msToFrame, type ViralProps } from "./props";
 
 const NIGHT = "#07080a";
-const SILVER = "#f1ece2";
+const SILVER = "#f4efe5";
 const AMBER = "#ffb347";
 const SERIF = "'Instrument Serif', Georgia, serif";
-const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV", "XVI"];
+// Instrument Serif est étroite : chasse moyenne ~0,40 em.
+const EM = 0.4;
 
-// Film : cinémascope, grain, un travelling avant par plan, un numéro de chapitre à chaque coupe.
+// Film : plein cadre, grain, un travelling avant par plan, un chapitre géant à chaque coupe.
 export function ViralFilm({ script, timeline, audio, broll }: ViralProps) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const { segment, index, local } = usePunch(timeline);
+  const { segment, index, local, startFrame } = usePunch(timeline);
+  const scene = sceneFor(script, timeline, index);
   const shotFrames = Math.max(1, msToFrame(segment.endMs - segment.startMs, fps));
   const push = interpolate(local, [0, shotFrames], [1, 1.12], { extrapolateRight: "clamp" });
   const isPayoff = segment.kind === "payoff";
+  const darkPayoff = isPayoff && !broll?.length;
+  const label = chapterLabel(timeline, index, script.lang);
+  const roman = segment.kind === "beat";
+  const chapter = LAYOUT.chapter;
 
   return (
     <AbsoluteFill style={{ backgroundColor: NIGHT, overflow: "hidden" }}>
-      {/* BESOIN CREDIT: Higgsfield Cinema Studio / Seedance pour de vrais plans de film. Alternative gratuite: décor en parallaxe Remotion. */}
+      {/* BESOIN CREDIT: Higgsfield Cinema Studio / Seedance pour de vrais plans de film. Alternative gratuite: B-roll ComfyUI (Wan 2.2) / Pexels, sinon ce décor en parallaxe Remotion. */}
       {broll?.length ? (
-        <BrollBackground broll={broll} timeline={timeline} dim={0.35} />
+        <BrollBackground broll={broll} timeline={timeline} dim={0.55} tint={{ color: AMBER, fromMs: timeline.segments.find((x) => x.kind === "payoff")?.startMs ?? Infinity }} />
       ) : (
         <>
-          <AbsoluteFill style={{ scale: `${push}`, background: `radial-gradient(ellipse at ${30 + (index % 3) * 20}% 40%, ${isPayoff ? AMBER : "#1d2a3a"} 0%, ${NIGHT} 70%)` }} />
-          <AbsoluteFill style={{ scale: `${1 + (push - 1) * 2.2}`, opacity: 0.35 }}>
-            <div style={{ position: "absolute", left: "-10%", right: "-10%", top: "62%", height: 380, background: "linear-gradient(transparent, rgba(255,179,71,0.25), transparent)", rotate: `${-8 + index * 3}deg` }} />
+          <AbsoluteFill style={{ scale: `${push}`, background: `radial-gradient(ellipse at ${30 + scene.variant * 20}% ${35 + scene.hue * 6}%, ${isPayoff ? AMBER : "#22344a"} 0%, ${NIGHT} 72%)` }} />
+          <AbsoluteFill style={{ scale: `${1 + (push - 1) * 2.2}`, opacity: 0.45 }}>
+            <div
+              style={{
+                position: "absolute",
+                left: "-20%",
+                right: "-20%",
+                top: `${48 + scene.variant * 9}%`,
+                height: 420,
+                background: "linear-gradient(transparent, rgba(255,179,71,0.3), transparent)",
+                rotate: `${-12 + scene.hue * 6}deg`,
+                translate: `${interpolate(local, [0, shotFrames], [-120, 120])}px 0px`,
+              }}
+            />
           </AbsoluteFill>
         </>
       )}
 
-      <AbsoluteFill style={{ top: 330, height: "auto", alignItems: "center" }}>
-        <div
-          style={{
-            fontFamily: SERIF,
-            fontSize: 64,
-            letterSpacing: "0.3em",
-            color: AMBER,
-            opacity: interpolate(local, [0, 0.2 * fps, 0.9 * fps, 1.2 * fps], [0, 1, 1, 0.35], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }),
-          }}
-        >
-          {segment.kind === "hook" ? (script.lang === "fr" ? "PROLOGUE" : "PROLOGUE") : isPayoff ? (script.lang === "fr" ? "LA RÉPONSE" : "THE ANSWER") : ROMAN[index % ROMAN.length]}
-        </div>
-      </AbsoluteFill>
+      <HookCard timeline={timeline} fontFamily={SERIF} color={SILVER} accent={AMBER} em={EM} fontWeight={400} maxSize={150} />
 
-      <Captions timeline={timeline} fontFamily={SERIF} color={SILVER} accent={AMBER} top="48%" fontSize={104} />
+      {segment.kind !== "hook" ? (
+        <div style={{ position: "absolute", top: chapter.top, left: chapter.left, width: chapter.width, height: chapter.height, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div
+            style={{
+              fontFamily: SERIF,
+              fontSize: roman ? 300 : 96,
+              letterSpacing: roman ? "0.02em" : "0.22em",
+              lineHeight: 1,
+              color: AMBER,
+              textShadow: "0 0 60px rgba(255,179,71,0.35)",
+              opacity: interpolate(local, [0, 0.15 * fps, 0.9 * fps, 1.3 * fps], [0, 1, 1, 0.22], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }),
+              scale: interpolate(local, [0, 0.9 * fps], [1.18, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.bezier(0.16, 1, 0.3, 1) }),
+            }}
+          >
+            {label}
+          </div>
+        </div>
+      ) : null}
+
+      {isPayoff ? <BigWord word={scene.word} startFrame={startFrame} fontFamily={SERIF} color={darkPayoff ? NIGHT : SILVER} em={EM} fontWeight={400} top={LAYOUT.bigWord.top + 160} stroke={!darkPayoff} /> : null}
+
+      <Captions timeline={timeline} fontFamily={SERIF} color={darkPayoff ? NIGHT : SILVER} accent={darkPayoff ? "#5a2d00" : AMBER} fontSize={118} fontWeight={400} stroke={!darkPayoff} em={EM} />
       {segment.kind === "cta" ? <SaveBadge accent={AMBER} fontFamily={SERIF} label={script.lang === "fr" ? "Garde ça" : "Save this"} /> : null}
 
       <svg width="0" height="0" style={{ position: "absolute" }}>
@@ -54,11 +81,10 @@ export function ViralFilm({ script, timeline, audio, broll }: ViralProps) {
           <feColorMatrix type="saturate" values="0" />
         </filter>
       </svg>
-      <AbsoluteFill style={{ filter: "url(#grain)", opacity: 0.12, mixBlendMode: "overlay" }} />
-      <AbsoluteFill style={{ background: "radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.75) 100%)" }} />
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 210, background: "#000" }} />
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 210, background: "#000" }} />
-      <ProgressBar color={AMBER} track="rgba(241,236,226,0.15)" />
+      <AbsoluteFill style={{ filter: "url(#grain)", opacity: 0.1, mixBlendMode: "overlay" }} />
+      <AbsoluteFill style={{ background: "radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.7) 100%)" }} />
+      <PayoffFlash timeline={timeline} color={AMBER} />
+      <ProgressBar color={AMBER} track="rgba(244,239,229,0.15)" />
       <AudioTracks audio={audio} />
     </AbsoluteFill>
   );

@@ -9,11 +9,11 @@ export function splitWords(text: string): string[] {
     .map((w) => w.replace(/\u00a0/g, " "));
 }
 
-// « pourquoi ? » reste un seul mot à l'écran (typographie française).
+// « pourquoi ? » reste un seul mot à l'écran : espace insécable (U+00A0, présente dans les 3 polices, la fine U+202F manque à Anybody et Instrument Serif), le « ? » ne part jamais seul à la ligne.
 function tokens(text: string): string[] {
   const out: string[] = [];
   for (const raw of splitWords(text)) {
-    if (/^[?!:;»…]+$/.test(raw) && out.length) out[out.length - 1] += ` ${raw}`;
+    if (/^[?!:;»…]+$/.test(raw) && out.length) out[out.length - 1] += `\u00a0${raw}`;
     else out.push(raw);
   }
   return out;

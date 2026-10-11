@@ -1,0 +1,180 @@
+{
+  "name": "SEPTIM — vidéo prête, publier avec OUI #ref",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## SEPTIM × n8n\n\n**A. Vidéo prête** : l'usine appelle ce webhook (VIRAL_WEBHOOK_URL = URL de production du nœud « Septim : événement »). La signature est vérifiée avec VIRAL_WEBHOOK_SECRET, puis le message part où tu veux (branche Telegram, Slack, e-mail… à la place de « Prévenir »).\n\n**B. Publier** : ouvre l'URL du formulaire « Publier une vidéo Septim » (sur ton téléphone), écris OUI #ref. n8n appelle l'API de l'usine. Rien n'est publié sans cette phrase.\n\nÀ régler : le secret dans « Vérifier la signature », l'adresse et le token dans « Réglages de l'usine ».",
+        "height": 380,
+        "width": 520
+      },
+      "id": "5b0d7a2e-1c1a-4f3e-9a51-0a1f0c9d0001",
+      "name": "Mode d'emploi",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-120, -420]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "septim",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "5b0d7a2e-1c1a-4f3e-9a51-0a1f0c9d0002",
+      "name": "Septim : événement",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "2f7c3d4e-8b6a-4c1d-9e2f-3a4b5c6d7e01"
+    },
+    {
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ JSON.stringify($json.body) }}",
+        "dataPropertyName": "signature",
+        "secret": "REMPLACE_PAR_TON_VIRAL_WEBHOOK_SECRET",
+        "encoding": "hex"
+      },
+      "id": "5b0d7a2e-1c1a-4f3e-9a51-0a1f0c9d0003",
+      "name": "Vérifier la signature",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ 'sha256=' + $json.signature }}",
+              "rightValue": "={{ $json.headers['x-septim-signature'] }}",
+              "operator": { "type": "string", "operation": "equals" }
+            },
+            {
+              "id": "c2",
+              "leftValue": "={{ $json.body.event }}",
+              "rightValue": "video.ready",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5b0d7a2e-1c1a-4f3e-9a51-0a1f0c9d0004",
+      "name": "Signée et prête ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "m1",
+              "name": "message",
+              "value": "=🎬 Vidéo prête #{{ $json.body.video.ref }}\n« {{ $json.body.video.hook }} »\n{{ Math.round($json.body.video.durationMs / 1000) }} s · {{ $json.body.video.template }}\n\n{{ $json.body.video.caption }}\n{{ $json.body.video.hashtags.join(' ') }}\n\nPour publier, écris OUI #{{ $json.body.video.ref }} dans le formulaire « Publier une vidéo Septim ».",
+              "type": "string"
+            },
+            {
+              "id": "m2",
+              "name": "ref",
+              "value": "={{ $json.body.video.ref }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5b0d7a2e-1c1a-4f3e-9a51-0a1f0c9d0005",
+      "name": "Message à envoyer",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [660, -80]
+    },
+    {
+      "parameters": {},
+      "id": "5b0d7a2e-1c1a-4f3e-9a51-0a1f0c9d0006",
+      "name": "Prévenir (remplace par Telegram, Slack, e-mail…)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [880, -80]
+    },
+    {
+      "parameters": {
+        "formTitle": "Publier une vidéo Septim",
+        "formDescription": "Écris OUI suivi de la référence de la vidéo, par exemple OUI #5f8a. Rien n'est publié sans cette phrase.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Confirmation",
+              "placeholder": "OUI #5f8a",
+              "requiredField": true
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "5b0d7a2e-1c1a-4f3e-9a51-0a1f0c9d0007",
+      "name": "Publier une vidéo Septim",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [0, 320],
+      "webhookId": "2f7c3d4e-8b6a-4c1d-9e2f-3a4b5c6d7e02"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "r1", "name": "septimUrl", "value": "http://127.0.0.1:4321", "type": "string" },
+            { "id": "r2", "name": "septimToken", "value": "", "type": "string" },
+            { "id": "r3", "name": "confirmation", "value": "={{ $json.Confirmation }}", "type": "string" },
+            { "id": "r4", "name": "ref", "value": "={{ ($json.Confirmation.match(/[0-9a-f]{4,}/i) || ['inconnue'])[0] }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5b0d7a2e-1c1a-4f3e-9a51-0a1f0c9d0008",
+      "name": "Réglages de l'usine",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.septimUrl }}/api/v1/videos/{{ $json.ref }}/publish",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $json.septimToken }}" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ confirm: $json.confirmation }) }}",
+        "options": {
+          "response": { "response": { "neverError": true } }
+        }
+      },
+      "id": "5b0d7a2e-1c1a-4f3e-9a51-0a1f0c9d0009",
+      "name": "Septim : publier",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 320]
+    }
+  ],
+  "connections": {
+    "Septim : événement": { "main": [[{ "node": "Vérifier la signature", "type": "main", "index": 0 }]] },
+    "Vérifier la signature": { "main": [[{ "node": "Signée et prête ?", "type": "main", "index": 0 }]] },
+    "Signée et prête ?": { "main": [[{ "node": "Message à envoyer", "type": "main", "index": 0 }], []] },
+    "Message à envoyer": { "main": [[{ "node": "Prévenir (remplace par Telegram, Slack, e-mail…)", "type": "main", "index": 0 }]] },
+    "Publier une vidéo Septim": { "main": [[{ "node": "Réglages de l'usine", "type": "main", "index": 0 }]] },
+    "Réglages de l'usine": { "main": [[{ "node": "Septim : publier", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}

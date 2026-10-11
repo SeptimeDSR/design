@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { attachWebhooks, deliverWebhook, signBody, webhookPayload } from "../webhooks";
+import { attachWebhooks, deliverWebhook, flushWebhooks, signBody, webhookPayload } from "../webhooks";
 import type { EventPayload, FactoryEvent, VideoDetail } from "../factory";
 
 const video = { id: "5f8a4d25", ref: "5f8a", status: "notified", hook: "Tu es le dernier ?", topic: "la tontine", template: "maths", lang: "fr", durationMs: 34000, voice: "piper", source: "claude", createdAt: "2026-10-05T12:00:00Z", hasVideo: true, caption: "Légende", hashtags: ["#tontine"], script: {} as never, videoPath: "/home/me/septim/.septim-viral/jobs/5f8a4d25/video.mp4", publishMode: "manual" } as VideoDetail;
@@ -70,5 +70,22 @@ describe("webhooks", () => {
     await new Promise((r) => setTimeout(r, 10));
     expect(f.calls).toHaveLength(1);
     expect(JSON.parse(f.calls[0].init.body as string).event).toBe("video.published");
+  });
+
+  it("flushWebhooks attend les livraisons en cours (une commande courte ne quitte pas avant d'avoir prévenu)", async () => {
+    const handlers = new Map<FactoryEvent, (p: EventPayload) => void>();
+    const factory = { on: (e: FactoryEvent, h: (p: EventPayload) => void) => (handlers.set(e, h), () => undefined) };
+    let delivered = false;
+    const slow = (async () => {
+      await new Promise((r) => setTimeout(r, 80));
+      delivered = true;
+      return new Response("ok", { status: 200 });
+    }) as unknown as typeof fetch;
+    attachWebhooks(factory, { VIRAL_WEBHOOK_URL: "https://hook.example" }, slow);
+    handlers.get("video.rejected")!({ video });
+    expect(delivered).toBe(false);
+    await flushWebhooks();
+    expect(delivered).toBe(true);
+    await flushWebhooks();
   });
 });

@@ -1,142 +1,108 @@
-# REPRISE — continuer le projet Septim depuis un autre compte
+# REPRISE — continuer le projet Septim (Ubuntu, nouvelle session, nouveau compte)
 
-Ce fichier contient tout ce qu'il faut pour qu'une nouvelle session Claude Code reprenne le travail exactement où il s'est arrêté, sans rien oublier.
+Dernière mise à jour : 11 octobre 2026. Branche : `claude/keen-euler-i983wb`. Version du package : **0.2.0** (à augmenter à chaque livraison : `septim.cmd` s'en sert pour savoir que l'usine Docker est périmée).
 
-1. Rendre le code disponible sur GitHub (§ 1).
-2. Ouvrir une session Claude Code sur le dépôt.
-3. Coller le prompt du § 2.
+Ce fichier suffit pour reprendre sans rien demander : l'état exact, ce qui reste (détaillé), les pièges, les règles, le prompt à coller.
 
 ---
 
-## 1. Mettre le code sur GitHub (à faire une fois, par toi)
+## 1. Installer sur Ubuntu (`dsr@SEPTIME-DSR:~/projects$`)
 
-La session précédente n'a pas pu pousser : l'app GitHub de Claude n'a pas le droit d'écrire sur `SeptimeDSR/design` (erreur 403). Le dépôt existe sur GitHub, mais il est vide.
+Le dépôt est sur GitHub : `https://github.com/SeptimeDSR/design`, branche `claude/keen-euler-i983wb`. Rien d'autre à copier : les clés vont dans `.env` (jamais dans le dépôt).
 
-Tu as reçu `septim-design.bundle`, qui contient tout l'historique git. Depuis ton PC (WSL, macOS ou Linux, avec git et ton propre compte GitHub) :
-
+**A. Prérequis (une fois)** :
 ```bash
-git clone -b claude/happy-pascal-f10qin septim-design.bundle design
-cd design
-git remote set-url origin https://github.com/SeptimeDSR/design.git
-git push -u origin claude/happy-pascal-f10qin
-git push origin claude/happy-pascal-f10qin:main      # branche par défaut du dépôt
+sudo apt update && sudo apt install -y git ffmpeg python3 python3-venv curl
+# Node 22 (nvm) : le projet exige Node >= 22
+curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+source ~/.bashrc && nvm install 22
+```
+`ffmpeg` est obligatoire pour les films. Les formats courts (Remotion) téléchargent leur navigateur au premier rendu, ou utilise `REMOTION_BROWSER_EXECUTABLE=/usr/bin/chromium`.
+
+**B. Cloner et installer** :
+```bash
+cd ~/projects
+git clone -b claude/keen-euler-i983wb https://github.com/SeptimeDSR/design septim
+cd septim
+bash scripts/install.sh --voix      # npm, commande septim, .env, diagnostic, voix Piper gratuite
+```
+Si `npm link` demande les droits : `sudo npm link`, ou `alias septim='node ~/projects/septim/bin/septim.mjs'` dans `~/.bashrc`.
+
+**C. Régler les clés (terminal)** :
+```bash
+septim env init            # assistant : Pexels, Pixabay, YouTube, Apify, Postiz, ComfyUI…
+septim env check           # teste chaque clé
+septim doctor              # ce qui tourne, les commandes pour le reste
 ```
 
-Ensuite, dans le **nouveau** compte claude.ai :
-1. connecte GitHub sur https://claude.ai/connect-github ;
-2. installe l'app Claude sur le dépôt `SeptimeDSR/design` (même page) ;
-3. lance une session Claude Code sur ce dépôt.
+**D. Lancer** :
+```bash
+septim start               # Studio + API + MCP + démon (adresse et token affichés)
+# ou seulement le Studio :
+septim studio
+```
+**E. Un film** :
+```bash
+septim video "la dette de Mireille" --duree 1h --genre drame --qualite eco
+septim taches              # avancement ; septim annuler <id> pour arrêter
+```
+**Variante Docker sur Ubuntu** : `docker compose up -d --build` (Docker Engine ou Docker Desktop avec intégration WSL). `host.docker.internal` est déjà mappé (`extra_hosts: host-gateway`) pour joindre l'Ollama et le ComfyUI de la machine. Les dossiers `musique/`, `voix/`, `certificats/` sont montés en lecture seule. Sous Linux, ouvre `http://localhost:4321/?token=…` (`docker compose logs septim`). `LANCER.bat`, `LANCER.ps1` et `septim.cmd` ne servent que sous Windows.
 
-Sans ça, la session pourra lire le code mais pas pousser.
+**Ollama / ComfyUI sous WSL** : s'ils tournent sous Windows, depuis WSL `OLLAMA_HOST=http://$(ip route | awk '/default/ {print $3}'):11434` (ou active le mode réseau « mirrored » de WSL2 : `localhost` marche alors). `septim comfy http://…:8188` dit ce que ComfyUI a installé.
 
 ---
 
-## 2. Prompt de reprise (à coller tel quel dans la nouvelle session)
+## 2. Où en est le projet
 
-```text
-Tu reprends le projet Septim (site qui retient + usine à vidéos virales SEPTIM-VIRAL-OS). Une session précédente a travaillé longtemps ; tout son état est dans le dépôt. Ne refais rien de ce qui est fait, ne redemande rien de ce qui est décidé.
+### Fait (tout est poussé, testé)
+1. **Site de rétention** (Next.js 16) et **format court** (Remotion 9:16, 3 templates, H.E.A.T) : voir l'historique `docs/handoff/ledger-septim-portes.md`.
+2. **Les 6 portes** (Studio, terminal `septim`, Claude Code, MCP stdio+HTTP, API REST + OpenAPI, webhooks, WhatsApp) sur un cœur unique `src/viral-engine/factory.ts`. Règle d'or : rien ne se publie sans « OUI #ref » d'un humain pour CETTE vidéo, aucun crédit dépensé sans accord chiffré.
+3. **Réglages** (Studio + `septim env`) : interrupteurs, clés, installations (Piper, Chatterbox, Ollama), QR WhatsApp, détection ComfyUI (`septim comfy`), Postiz.
+4. **Docker** (`Dockerfile`, `compose.yaml`, `docker/septim`) + Windows (`LANCER.bat/.ps1`, `septim.cmd` qui reconstruit l'usine tout seul si la version diffère).
+5. **Réseau qui lit le HTTPS** : `septim reseau`, dossier `certificats/`, jamais de vérification désactivée ; dossier `voix/` pour les voix téléchargées à la main.
+6. **Durée au choix** (`src/viral-engine/duration.ts`) : `--duree 45s|3min|1h30`, 15 s à 4 h. ≤ 60 s : format court Remotion ; > 60 s : film.
+7. **Films** (`src/viral-engine/film/`, 100 % ffmpeg, pas de Chromium) :
+   - `writer.ts` : Ollama écrit bible → actes → scènes → plans, point de reprise par étape (`story/`), suite demandée si une scène est trop courte ;
+   - `voice.ts` : voix Piper par plan (narrateur = voix principale, femmes = `fr_FR-siwis-medium`), pas de film muet (`requireVoice`) ;
+   - `visuals.ts` : Flux 2 klein (ComfyUI) si prêt, sinon photos Pexels/Pixabay, sinon cartes ; jamais deux fois la même photo ;
+   - `music.ts` : `VIRAL_MUSIC_DIR`, sinon ACE-Step 1.5 (ComfyUI), sinon ambiance générée ;
+   - `ffmpeg.ts`, `ass.ts` : Ken Burns (zoompan), sous-titres ASS, fondus, chapitres, collage sans réencodage ;
+   - `run.ts` : orchestration scène par scène, nettoyage des fichiers de travail, reprise ; `job.ts` : id = hash de la demande (un film « ratée » est repris, un film terminé n'est jamais écrasé) ;
+   - `comfy-film.ts` : workflows Flux 2 klein et ACE-Step 1.5, détection des fichiers manquants.
+8. **Gouvernance de fabrication** : tâches avec `progress`, annulation (`septim annuler`, `POST /api/v1/tasks/:id/cancel`, `septim_cancel_task`), estimation (`GET /api/v1/estimate`), un film long est confié à l'usine qui tourne (le terminal peut se fermer), refus avant de commencer s'il n'y a pas la place disque.
+9. **Qualité** : 611 tests vitest verts, typecheck, lint et `npm run build` propres **sur un clone neuf** (vérifié le 11/10), Studio testé au navigateur (56/56), vrais rendus ffmpeg (film de 27 s, film de 11 min en 5,6 min sur 4 cœurs), film de bout en bout par le CLI depuis un clone neuf.
 
-1. Mets-toi sur le bon code :
-   git fetch origin claude/happy-pascal-f10qin
-   Si ta session t'impose une autre branche : git checkout -B <ta-branche> origin/claude/happy-pascal-f10qin
-   Sinon : git checkout claude/happy-pascal-f10qin
-   Vérifie que git log contient « feat(viral): webhooks signés vers n'importe quel logiciel » (tâche 3 du plan).
-
-2. Lis, dans cet ordre, avant toute action :
-   - docs/REPRISE.md (ce guide de reprise : état, règles, pièges, décisions)
-   - CLAUDE.md et AGENTS.md (règles du repo ; Next.js 16 diffère de ce que tu connais)
-   - docs/superpowers/specs/2026-10-05-septim-portes-design.md (spec en cours, décisions D1–D20)
-   - docs/superpowers/plans/2026-10-05-septim-portes.md (plan : 9 tâches, Global Constraints, Review Focus)
-   - docs/handoff/ledger-septim-portes.md (registre : tâches 1 à 3 terminées, toutes les décisions)
-
-3. Le registre superpowers (dossier ignoré par git) est remis en place tout seul par le hook SessionStart (.claude/hooks/restore-ledgers.sh). Vérifie que .superpowers/sdd/2026-10-05-septim-portes/progress.md existe ; sinon :
-   mkdir -p .superpowers/sdd/2026-10-05-septim-portes
-   cp docs/handoff/ledger-septim-portes.md .superpowers/sdd/2026-10-05-septim-portes/progress.md
-   echo docs/superpowers/plans/2026-10-05-septim-portes.md > .superpowers/sdd/2026-10-05-septim-portes/plan-path
-
-4. Vérifie l'état : npm install (avec PUPPETEER_SKIP_DOWNLOAD=1), puis npm test (198 tests verts attendus), npm run typecheck, npm run lint.
-   Si les skills superpowers sont absentes : /plugin install superpowers@claude-plugins-official.
-
-5. Reprends l'exécution du plan avec la skill superpowers:executing-plans (exécution inline, par toi), à partir de la tâche 4 :
-   P4 serveur HTTP + API REST + OpenAPI · P5 serveur MCP stdio + HTTP · P6 Studio navigateur · P7 commande septim (terminal, start, studio, mcp, connect, setup) · P8 commandes /septim-viral:*, install.sh, docs/GUIDE.md complet · P9 vérification de bout en bout, tests par sous-agents (mode d'emploi suivi par un agent neuf sur un clone propre ; GREEN des commandes), revue finale par un relecteur neuf sur le modèle le plus capable, passe de corrections.
-   TDD strict : test écrit d'abord, échec observé, puis code, puis suite complète. Chaque écart au plan = une ligne « Task N: Ruling: … — pourquoi — coût si faux » dans le registre. Après chaque tâche : commit, task-done, et recopie le registre dans docs/handoff/ledger-septim-portes.md (pour qu'il survive à un nouveau changement de compte).
-
-6. Règles non négociables :
-   - jamais de publication sans la phrase « OUI #ref » d'un humain pour CETTE vidéo ;
-   - jamais de crédits dépensés (Higgsfield, Runway, Pika…) sans coût affiché et oui explicite ;
-   - commentaire « // BESOIN CREDIT: … Alternative gratuite: … » et version FREE toujours codée ;
-   - les templates du plugin septim-design sont la source de vérité : toute correction est reportée des deux côtés ;
-   - aucun secret dans le repo.
-
-7. L'utilisateur parle français, t'a délégué toutes les décisions (« décide tout pour moi »), veut le niveau des meilleurs, déteste les erreurs « commande introuvable », veut des rapports honnêtes (ce qui n'a pas été vérifié est dit). Décide, note la décision dans le registre, continue sans demander. Ne t'arrête que pour : action irréversible, action sensible (sécurité), effet hors du dépôt qui demande l'accord (push sur une autre branche, publication, dépense).
-
-8. À la fin : message final en français avec « Décisions prises pour toi » (toutes les lignes Ruling, avec leur coût) et « Petits défauts laissés » (toutes les lignes minor deferred), ce qui a été vérifié et ce qui ne l'a pas été. Push sur la branche, puis lien vers docs/GUIDE.md.
-```
+### Mesures utiles
+- ffmpeg 720p, images + zoompan + sous-titres : environ **2× la vitesse réelle** sur 4 cœurs (1 h de film ≈ 30 min de rendu). L'écriture Ollama et la voix s'y ajoutent.
+- Poids : eco ≈ 0,9 Mo/min, standard ≈ 1,8 Mo/min, hd ≈ 4 Mo/min (images réelles ; des cartes unies pèsent moins).
 
 ---
 
-## 3. État exact au moment du départ
+## 3. Ce qui reste (détaillé, par ordre de priorité)
 
-**Branche :** `claude/happy-pascal-f10qin`. Dernier commit de code : `30b0c45` (webhooks). Commit de reprise : celui qui ajoute ce fichier.
+### A. À vérifier sur la vraie machine de l'utilisateur (non vérifiable depuis le cloud)
+1. **Un vrai film avec une vraie voix Piper** (`septim setup --voix`, puis `septim video "…" --duree 10min`) : durée réelle de la voix vs estimation, qualité d'écriture du modèle Ollama choisi (essayer `VIRAL_LONG_MODEL` avec un modèle plus gros que qwen2.5:3b), temps total.
+2. **ComfyUI réel** : `septim comfy` doit montrer « Images du film : Flux 2 klein prêt » et « Musique : ACE-Step prêt ». Il manque chez l'utilisateur `qwen_3_4b.safetensors` (`models/text_encoders`) et `flux2-vae.safetensors` (`models/vae`). Les graphes de `film/comfy-film.ts` suivent les nœuds officiels (EmptyFlux2LatentImage, Flux2Scheduler, CFGGuider, SamplerCustomAdvanced ; TextEncodeAceStepAudio1.5, EmptyAceStep1.5LatentAudio) mais n'ont **jamais tourné sur un vrai ComfyUI** : en cas d'erreur 400, lire `node_errors` dans la réponse et ajuster (`COMFYUI_WORKFLOW`-style : exporter un workflow qui marche en « API format » et recopier les paramètres).
+3. **`septim reseau`** sur le réseau de l'utilisateur : Hugging Face et Apify étaient en « certificat remplacé » ; identifier l'émetteur, créer `certificats/reseau.crt`, ou déposer les voix dans `voix/`.
+4. **Windows** : exécution réelle de `LANCER.bat`, `LANCER.ps1` (nettoyage du PATH) et `septim.cmd` (reconstruction automatique `:stale`) jamais testée sous Windows.
+5. **Publication d'un film long** sur Postiz (YouTube/Facebook) : taille du fichier, délai d'envoi du CLI `postiz upload` ; un film de 1 h fait des centaines de Mo.
+6. **Docker** : l'image n'a pas été reconstruite depuis l'ajout des films dans le cloud (apt bloqué ici) ; `docker compose up -d --build` sur la machine, puis `docker compose exec septim ffmpeg -version`.
+7. Clé YouTube (erreur 400 : activer « YouTube Data API v3 ») et Apify (ne répondait pas, probablement le même problème de certificat).
 
-**Vérifié au départ :**
-- 198 tests vitest verts ;
-- typecheck, lint et build OK ;
-- les 2 plugins passent `claude plugin validate --strict` ;
-- tests navigateur du site OK (`tests/browser/`).
+### B. Améliorations connues, non faites
+1. **Voix masculine des personnages** : tous les hommes parlent avec la voix du narrateur. Ajouter une 3e voix (ex. `fr_FR-upmc-medium`) et l'attribuer aux `gender: "h"` qui ne sont pas le narrateur.
+2. **Jeter un film ne supprime pas son dossier** (`.septim-viral/jobs/<id>`) : ajouter un nettoyage (`septim jeter` + option) pour récupérer la place disque.
+3. **Zoompan légèrement saccadé** sur les zooms très lents (arrondi entier de x/y) : essayer une source 3× ou un `scale` + `crop` à pas fractionnaire.
+4. **Qualité d'écriture** : un petit modèle écrit des histoires plates. Pistes : deuxième passe « relecture/amélioration » par scène, fiche de continuité (objets, lieux, secrets) passée à chaque scène, choix automatique du plus gros modèle présent dans `ollama list`.
+5. **Vidéo IA locale pour quelques plans clés** (LTX-Video 2B distillé ≈ 4 Go, ou Wan 2.2 5B) : option `--plans-ia N` dans un film, avec le profil déjà codé dans `broll.ts` (`wan22-5b`) ; non faite pour économiser le disque.
+6. **Miniature** (`thumbnail.jpg`) du film pour YouTube : non générée.
+7. **Reprise sur coupure de l'usine** : un film dont le processus est mort passe « ratée » (tâche `settle`) ; relancer la même commande reprend. Une reprise automatique au démarrage n'existe pas.
+8. **Ollama et ComfyUI sur le même GPU** : l'écriture se termine avant les images (décharge `keep_alive: 0`), mais pas de file d'attente si deux films sont lancés (un seul à la fois, voulu).
+9. **Intermédiaires de certificats** : `septim reseau` n'exporte qu'un certificat ; une chaîne avec CA intermédiaire peut demander plusieurs fichiers dans `certificats/`.
+10. Chatterbox (voix HD) est très lourd (torch, ~2 Go) et lent sans GPU, surtout en Docker : déconseillé là.
 
-### Déjà fait (plan 1 : `docs/superpowers/plans/2026-10-05-septim-viral-os.md`, terminé et revu)
-
-- **Site de rétention (Next.js 16)** :
-  - 7 chapitres et HUD « Chapitre n sur 7 » ;
-  - compte à rebours, rail d'interruptions ;
-  - secrets aléatoires (récompense variable) ;
-  - son opt-in, fil infini (pas de stopping cue) ;
-  - aperçu vivant de l'usine (Players Remotion avec bouton pause) ;
-  - visible sans JS, contrastes AA, mouvement réduit respecté.
-- **Usine `src/viral-engine/`** :
-  - tendances (Google Trends, YouTube, Apify) ;
-  - script H.E.A.T (Ollama qwen2.5, ou script écrit par Claude via `--script`) ;
-  - linter viral (`viral-checklist.json`) ;
-  - voix Piper / Kokoro / silencieuse ;
-  - rendu Remotion 9:16, 3 templates (`story`, `maths`, `film`) ;
-  - message « Vidéo prête… Réponds OUI #ref » (WhatsApp ou console), boîte d'envoi pour que seul le démon parle à WhatsApp ;
-  - publication Postiz avec registre par plateforme (jamais deux fois) ;
-  - bandit de Thompson qui apprend des vues à 48 h, `LESSONS.md` ;
-  - démon cron 6 h ; diagnostic `npm run viral:doctor`.
-- **Plugins Claude Code** (marketplace `septim` à la racine) :
-  - `/septim-design:septim-design` (+ frontend-design, hero-shot, cinematic-dolly, templates) ;
-  - `/septim-viral:viral` ;
-  - testés par sous-agents (RED/GREEN, voir `docs/skill-tests.md`).
-- **Hook `SessionStart`** (`.claude/hooks/session-start.sh`) : installe les dépendances et les plugins dans chaque session cloud, pour éviter « commande introuvable ».
-
-### Plan 2 en cours : `docs/superpowers/plans/2026-10-05-septim-portes.md`
-
-| Tâche | État | Contenu |
-| --- | --- | --- |
-| P1 | ✅ `29af0fb` | `lock.ts` (verrou de fichier entre processus, écriture atomique), `store` (job corrompu ignoré, `updateState` sous verrou, `resolveRef` qui refuse l'ambiguïté, `normalizeRef`), `publishWithLedger` verrouillé et qui relit le job, WhatsApp déconnecté → le processus quitte et pm2 relance |
-| P2 | ✅ `0f8d8be` | `factory.ts`, cœur unique : tâches persistées dans `.septim-viral/tasks/`, file d'un rendu à la fois, confirmation `OUI #ref`, événements ; `errors.ts` (`FactoryError`, `STATUS`) |
-| P3 | ✅ `30b0c45` | `webhooks.ts` : HMAC-SHA256, 3 essais, `attachWebhooks(factory, env)` |
-| P4 | à faire | `src/viral-engine/server/` : `startServer`, `ROUTES`, `openapi`, garde-fous Host/Origin/token/415/413, vidéo en Range, Studio statique |
-| P5 | à faire | `mcp.ts` : `npm i @modelcontextprotocol/sdk` (1.32.x vérifié), 9 outils, 2 ressources, prompt `nouvelle_video`, stdio + HTTP sans état |
-| P6 | à faire | Studio HTML/CSS/JS dans `src/viral-engine/studio/` + test Playwright |
-| P7 | à faire | `bin/septim.mjs` + `septim.ts` + `connect.ts` + `setup.ts` ; `cli.ts` exporte `runCli` ; `septim start` = démon + serveur |
-| P8 | à faire | `plugins/septim-viral/commands/{studio,videos,publier,aide}.md`, `scripts/install.sh`, `docs/GUIDE.md`, `docs/n8n-septim.json`, `.mcp.json` racine, test `docs.test.ts` |
-| P9 | à faire | vrai rendu via l'API, MCP réel, sous-agent « mode d'emploi », GREEN des commandes, revue finale, bundle |
-
-### Interfaces déjà livrées (à utiliser telles quelles)
-
-- `createFactory(deps?: Partial<{env, runJob, publish, notify, probe}>)` renvoie :
-  - `createVideo(req)`, `redo(ref)`, `getTask(id)`, `listTasks()`, `idle()` ;
-  - `listVideos({status?, limit?})`, `getVideo(ref)`, `videoFile(ref)` ;
-  - `lintScript(script, opts?)` ;
-  - `publish(ref, confirm)`, `reject(ref)` ;
-  - `doctor()`, `lessons()` ;
-  - `on(event, handler)`, où le handler reçoit `{video?, task?, error?}` (voir Ruling Task 2) ;
-  - `home`.
-- `FactoryError(code, message, details?)` porte un `.status`. Codes : `bad_request` 400, `unauthorized` 401, `forbidden` 403, `not_found` 404, `ambiguous_ref` 409, `conflict` 409, `payload_too_large` 413, `unsupported_media_type` 415, `confirmation_required` 428.
-- `attachWebhooks(factory, env, fetchImpl?)`, `webhookPayload(event, payload, publicUrl?)`, `signBody(body, secret)`.
-- `store.updateState(fn)`, `store.resolveRef(ref)`, `normalizeRef(s)`, `tryLock(path, staleMs)`, `withLock(path, fn)`, `writeJsonAtomic(path, data)`.
+### C. Anciens « petits défauts » (voir `docs/handoff/ledger-septim-portes.md`, lignes `Final:`)
+La durée du script court est estimée (pas mesurée sur la vraie voix), la règle « aucun mot de la réponse dans le hook » n'est pas appliquée, `render.ts` garde en cache un bundle raté, etc. Liste complète dans le registre.
 
 ---
 
@@ -144,105 +110,60 @@ Tu reprends le projet Septim (site qui retient + usine à vidéos virales SEPTIM
 
 | Chemin | Rôle |
 | --- | --- |
-| `src/app/`, `src/components/retention/` | le site (chapitres, HUD, rail, secrets, son, fil infini, ViralPhone) |
-| `src/remotion/` | compositions Remotion ; `src/remotion/viral/` : templates `story`, `maths`, `film` (imports relatifs uniquement) |
-| `src/viral-engine/` | l'usine (TDD, `npm test`) ; `__tests__/` et `__tests__/fixtures/` |
-| `src/viral-engine/viral-checklist.json` | toutes les règles virales chiffrées |
-| `plugins/septim-design/`, `plugins/septim-viral/` | plugins Claude Code ; `templates/` est la source de vérité des composants génériques |
-| `.claude-plugin/marketplace.json` | marketplace `septim` |
-| `.claude/hooks/session-start.sh`, `.claude/settings.json` | installation automatique en session cloud |
-| `.claude/INVENTAIRE-DESIGN-2026.md` | inventaire des outils, prix, ce qui n'existe pas |
-| `docs/superpowers/specs/`, `docs/superpowers/plans/` | specs et plans (plan 1 terminé, plan 2 en cours) |
-| `docs/handoff/ledger-septim-portes.md` | registre du plan 2, versionné |
-| `docs/skill-tests.md` | résultats des tests de skills par sous-agents |
-| `tests/browser/` | tests Playwright du site (voir leur README) |
-| `ecosystem.config.cjs` | démon pm2 |
-| `.env.example` | toutes les variables (à compléter en P8) |
+| `src/app/`, `src/components/retention/` | le site |
+| `src/remotion/viral/` | templates des formats courts (imports relatifs uniquement) |
+| `src/viral-engine/` | l'usine : `factory.ts` (cœur), `pipeline.ts` (court), `duration.ts`, `features.ts` (Réglages), `septim.ts` (terminal), `mcp.ts`, `server/` (API), `studio/` (UI), `remote.ts` |
+| `src/viral-engine/film/` | le moteur de films (voir § 2.7) |
+| `src/viral-engine/__tests__/` | 49 fichiers de tests (`film-*.test.ts`, `factory-film.test.ts`, `cli-film.test.ts`…) |
+| `plugins/septim-design/`, `plugins/septim-viral/` | plugins Claude Code ; `references/film.md` = format d'un film |
+| `docs/GUIDE.md` | mode d'emploi complet (un test vérifie qu'il cite chaque commande, outil MCP, route, variable) |
+| `docs/handoff/ledger-septim-portes.md` | registre de toutes les décisions (Ruling) et défauts (minor) |
+| `Dockerfile`, `compose.yaml`, `docker/septim` | Docker ; `LANCER.*`, `septim.cmd` : Windows |
+| `scripts/install.sh` | installation Linux/WSL/macOS |
+| `tests/studio/` | test navigateur du Studio (`SRC_JOB=<dossier d'un job rendu> bash tests/studio/run-studio-test.sh`) |
 
-**Non versionné (local seulement) :**
-- `.septim-viral/` : jobs rendus, `state.json`, scripts ;
-- `deliverables/` : bundle, archive des plugins, `demo-tontine-maths.mp4` ;
-- `.superpowers/` : registre de travail.
+Non versionné : `.septim-viral/` (jobs, état, venv Piper), `deliverables/`, `.superpowers/`, `.env`.
 
 ---
 
-## 5. Pièges connus (déjà rencontrés, ne pas les redécouvrir)
+## 5. Pièges connus
 
 | Piège | Solution |
 | --- | --- |
-| `tsc` casse sur un clone neuf (`LayoutProps` introuvable) | `npm run typecheck` (= `next typegen && tsc --noEmit`) |
-| `package.json` n'a pas `"type": "module"` : pas de top-level await dans un `.ts` lancé par tsx | envelopper dans une fonction async, ou `void promesse` |
-| Un test qui lit `.septim-viral/…` casse sur un clone neuf (dossier ignoré) | fixtures dans `src/viral-engine/__tests__/fixtures/` |
-| Le MCP stdio ne doit rien écrire sur stdout | le `notify` par défaut de la fabrique écrit sur stderr ; en P5, rediriger `console.log` vers stderr au démarrage du serveur stdio |
-| `pkill -f "next start"` se tue lui-même | `for p in $(pgrep -f '^next-server'); do kill $p; done` |
-| Playwright dans le conteneur cloud | `PW=$(npm root -g)/playwright`, ne jamais lancer `playwright install` |
-| Rendus Remotion en cloud | `REMOTION_BROWSER_EXECUTABLE`, posé par le hook ; un rendu dure environ 2 min |
-| Voix française absente du conteneur | rendu muet (« voix silent ») ; chez l'utilisateur : `pip install piper-tts` + voix `fr_FR-tom-medium` |
-| `npm audit` : `extract-zip` sans correctif (via whatsapp-web.js) | `PUPPETEER_SKIP_DOWNLOAD=1` + Google Chrome (`WHATSAPP_CHROME_PATH`) ; `basic-ftp` forcé dans `overrides` |
-| Plugin installé en cours de session invisible des agents lancés ensuite | le hook SessionStart installe au démarrage ; sinon, lire le SKILL.md sur le disque |
-| Le push GitHub refusé (403) | voir § 1 ; ne jamais pousser ailleurs que sur la branche de travail |
-| Tests navigateur qui écrivent des captures dans `undefined/` | `SP` a maintenant un défaut (dossier temporaire) |
-| Next 16 : lire `node_modules/next/dist/docs/` avant d'écrire du Next | règle d'AGENTS.md |
+| `tsc` casse sur un clone neuf | `npm run typecheck` (= `next typegen && tsc --noEmit`) |
+| Pas de top-level await dans un `.ts` lancé par tsx (CommonJS) | fonction async |
+| Un test qui lit `.septim-viral/…` casse sur un clone neuf | fixtures dans `__tests__/fixtures/` |
+| Le MCP stdio ne doit rien écrire sur stdout | tout sur stderr |
+| `pkill -f vitest` tue son propre shell (la ligne de commande contient « vitest ») | ne jamais tuer par nom ; `kill <pid>` |
+| `amix` de ffmpeg 5.1 (Debian) n'a pas `normalize` | `volume=2` après `amix` (déjà fait) |
+| `zoompan` : `-loop 1 -t 10` donne 250 images d'entrée × d sorties | une seule image d'entrée (`-framerate 1 -loop 1 -t 1`), déjà fait |
+| CSP du Studio : pas d'attribut `style` | largeur par `el.style.width` (voir `meter()`) |
+| Le test docs exige : variable lue → dans `.env.example` ; route → dans GUIDE ; outil MCP → dans GUIDE ; commande de HELP → dans GUIDE | à chaque ajout, mettre à jour les trois |
+| Next 16 diffère de ce que tu connais | lire `node_modules/next/dist/docs/` avant d'écrire du Next |
+| Pas d'apt ni de Hugging Face dans le cloud de développement | Docker/Piper non testables là-bas |
 
 ---
 
-## 6. Décisions déjà prises (ne pas les rediscuter)
+## 6. Règles non négociables
 
-Toutes celles du plan 2 sont dans `docs/handoff/ledger-septim-portes.md` et dans le spec (D1–D20). Celles du plan 1, en résumé :
-
-1. Débit de parole fixé à 3,0 mots/s en français et 3,2 en anglais : à 2,5, le hook d'exemple de l'utilisateur dépassait 3 s.
-2. Le script de secours raccourcit sa réponse pour qu'elle arrive à au moins 80 % de la vidéo.
-3. kokoro-js reste optionnel (lourd, anglais seulement).
-4. Les vidéos WhatsApp partent en document sans Google Chrome.
-5. Pas de Google Trends pour le Cameroun ; YouTube le couvre avec une clé gratuite.
-6. Palette du site : nuit #121640, ndop #24307a, craie #e9ecf2, camwood #b4432b, raphia #e8c15a, brume #8f97c8 ; police Anybody (axe de largeur).
-7. Les plugins s'installent depuis le dossier cloné, par le hook SessionStart.
-8. Pas de MCP Apify dans le plugin : il démarrerait à chaque session sans clé.
-9. Rétention sans piège : son opt-in, aucune donnée collectée, pause des vidéos, mouvement réduit respecté.
-10. WhatsApp non officiel accepté, avec un seul destinataire. Si les réponses ne passent pas : `npm run viral -- --publish <ref>`.
+- jamais de publication sans « OUI #ref » écrit par un humain pour CETTE vidéo ;
+- jamais de crédits dépensés (Higgsfield, Runway, Pika…) sans coût affiché et oui explicite ; FREE d'abord, commentaire `// BESOIN CREDIT: … Alternative gratuite: …` ;
+- aucun secret dans le dépôt ; la vérification TLS n'est jamais désactivée ;
+- TDD : test écrit d'abord, échec vu, puis code ; chaque décision = une ligne dans le registre ;
+- push seulement sur `claude/keen-euler-i983wb`, pas de PR sans demande ;
+- l'utilisateur parle français, ne veut pas de questions (« décide tout »), veut des commandes exactes pas à pas, des rapports honnêtes (ce qui n'est pas vérifié est dit) ; Ubuntu/WSL (`dsr@SEPTIME-DSR:~/projects`), disque limité, Ollama et ComfyUI déjà installés avec leurs modèles (qwen2.5:3b, flux-2-klein-4b-fp8, ace_step_1.5_turbo_aio, wan2.2_vae…).
 
 ---
 
-## 7. Petits défauts connus, laissés pour plus tard
+## 7. Prompt de reprise (à coller tel quel dans une nouvelle session Claude Code)
 
-- La durée du script est vérifiée sur une estimation, pas sur la vraie voix.
-- La règle « aucun mot de la réponse dans le hook » n'est pas appliquée.
-- `render.ts` :
-  - garde en cache un bundle qui a échoué ;
-  - ne nettoie pas ses copies temporaires ;
-  - dépend du dossier courant (P7 le règle avec `chdir` dans `bin/septim.mjs`).
-- Avec un script écrit par Claude, le bandit crédite une formule tirée au hasard.
-- Le diagnostic annonce Kokoro pour le français.
-- Dans le template film, les chapitres commencent à « II ».
-- Son du site :
-  - `start`/`stop` sont appelés dans un updater, ce qui double le son en StrictMode dev ;
-  - les rampes de gain n'ont pas d'ancre, d'où un clic à l'arrêt.
-- `stretch-driver` : boucle rAF jamais au repos.
-- `chapter-hud` : « 7 chapitres » est écrit en dur ; les templates sont livrés avec les textes de Septim.
-- Kokoro est rechargé à chaque segment ; la requête Ollama n'est jamais interrompue.
-- Les jobs anglais tirent des sujets de secours en français.
-- Les versions de Remotion sont mélangées (`^` et exactes).
-- Le hook utilise `npm install` (peut réécrire le lockfile).
+```text
+Tu reprends le projet Septim (usine à vidéos : formats courts Remotion + films de 1 min à 4 h en ffmpeg). Ne refais rien de ce qui est fait, ne redemande rien de ce qui est décidé.
 
-**Corrigés depuis par P1 :**
-- `job.json` écrit de façon atomique ;
-- mises à jour du bandit perdues ;
-- WhatsApp sourd après une déconnexion ;
-- références ambiguës, qui donnent maintenant une erreur au lieu de prendre la plus récente.
-
----
-
-## 8. Vérifier que tout va bien
-
-```bash
-PUPPETEER_SKIP_DOWNLOAD=1 npm install
-npm test                         # 198 verts au départ
-npm run typecheck && npm run lint && npm run build
-claude plugin validate --strict plugins/septim-design
-claude plugin validate --strict plugins/septim-viral
-claude plugin validate --strict .
-npm run viral:doctor             # état de l'usine + commandes pour ce qui manque
-npm run viral -- "la tontine" --template maths --script src/viral-engine/__tests__/fixtures/tontine.json --no-notify   # vrai rendu (~2 min)
+1. git fetch origin claude/keen-euler-i983wb && git checkout claude/keen-euler-i983wb. Lis dans cet ordre : docs/REPRISE.md (état, ce qui reste, pièges, règles), CLAUDE.md et AGENTS.md, docs/handoff/ledger-septim-portes.md (toutes les décisions), docs/GUIDE.md (mode d'emploi).
+2. Vérifie : PUPPETEER_SKIP_DOWNLOAD=1 npm install, puis npm test (611 verts attendus), npm run typecheck, npm run lint. Il faut ffmpeg (sudo apt install ffmpeg).
+3. Travaille la section « 3. Ce qui reste » de docs/REPRISE.md : d'abord ce que tu peux faire ici (B.1 voix masculine, B.2 nettoyage au jeter, B.4 qualité d'écriture, B.6 miniature), ensuite prépare pour l'utilisateur les commandes exactes pour A (vérifications sur sa machine).
+4. TDD strict, une ligne « Ruling »/« minor » dans le registre par décision, commit + push sur claude/keen-euler-i983wb après chaque tâche, mets à jour docs/REPRISE.md et augmente la version du package à chaque livraison.
+5. Règles : jamais de publication sans « OUI #ref » d'un humain ; jamais de crédit dépensé sans accord chiffré ; FREE d'abord ; pas de secret dans le dépôt ; Windows et ComfyUI réels ne sont pas testables depuis le cloud : dis-le, ne l'invente pas.
+6. L'utilisateur parle français, veut des commandes exactes pas à pas pour Ubuntu (dsr@SEPTIME-DSR:~/projects), des rapports honnêtes, et t'a délégué toutes les décisions. Termine par : « Décisions prises pour toi », « Petits défauts laissés », ce qui est vérifié / pas vérifié.
 ```
-
-Tests navigateur du site : `tests/browser/README.md`.

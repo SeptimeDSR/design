@@ -56,7 +56,8 @@ export function buildTimeline(script: ViralScript, durationsMs?: number[]): Time
   return { segments, durationMs: cursor };
 }
 
-export function lintScript(script: ViralScript, timeline: Timeline): LintIssue[] {
+// targetSec : durée choisie ; on accepte de 0,6 à 1,4 fois (borné à 15–75 s). Absent : la fourchette du réglage viral.
+export function lintScript(script: ViralScript, timeline: Timeline, opts: { targetSec?: number } = {}): LintIssue[] {
   const issues: LintIssue[] = [...lintHook(script.hook, script.lang)];
 
   for (const s of timeline.segments) {
@@ -75,7 +76,7 @@ export function lintScript(script: ViralScript, timeline: Timeline): LintIssue[]
     issues.push({ rule: "cta.missing", message: "Le CTA doit pousser à sauvegarder." });
   }
 
-  const [min, max] = RULES.targetSeconds;
+  const [min, max] = opts.targetSec ? [Math.max(12, Math.round(opts.targetSec * 0.6)), Math.min(80, Math.round(opts.targetSec * 1.4))] : RULES.targetSeconds;
   if (timeline.durationMs < min * 1000 || timeline.durationMs > max * 1000) {
     issues.push({ rule: "duration.out_of_range", message: `Durée ${Math.round(timeline.durationMs / 1000)} s, attendu ${min}–${max} s.` });
   }

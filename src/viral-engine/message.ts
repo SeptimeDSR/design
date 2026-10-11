@@ -11,9 +11,9 @@ export function postText(job: Job): string {
 
 const NAMES: Record<Platform, string> = { tiktok: "TikTok", youtube: "YouTube", instagram: "Instagram", facebook: "Facebook" };
 
-export function formatReadyMessage(job: Job, mode: PublishMode, platforms: Platform[]): string {
+export function formatReadyMessage(job: Job, mode: PublishMode, platforms: Platform[], ref = jobRef(job)): string {
   const sound = job.trend?.sound ? `\n🎵 Son tendance à ajouter dans l'app : ${job.trend.sound}` : "";
-  const ref = `OUI #${jobRef(job)}`;
+  const yes = `OUI #${ref}`;
   const names = platforms.map((p) => NAMES[p]).join(", ");
   const privateNote =
     mode === "postiz-self" && platforms.some((p) => p === "tiktok" || p === "youtube")
@@ -21,10 +21,10 @@ export function formatReadyMessage(job: Job, mode: PublishMode, platforms: Platf
       : "";
   const action =
     mode === "manual"
-      ? `Réponds ${ref} et je te renvoie la légende prête à coller (tu postes depuis ton téléphone avec le son tendance).`
-      : `Réponds ${ref} pour publier sur ${names}${privateNote}.`;
+      ? `Réponds ${yes} et je te renvoie la légende prête à coller (tu postes depuis ton téléphone avec le son tendance).`
+      : `Réponds ${yes} pour publier sur ${names}${privateNote}.`;
   return [
-    `${BOT_PREFIX} · Vidéo prête boss #${jobRef(job)}`,
+    `${BOT_PREFIX} · Vidéo prête boss #${ref}`,
     "",
     `« ${job.script.hook} »`,
     `Template ${job.script.template} · ${Math.round(job.timeline.durationMs / 1000)} s · voix ${job.ttsEngine}${job.source === "fallback" ? " · script de secours" : ""}`,
@@ -36,6 +36,6 @@ export function formatReadyMessage(job: Job, mode: PublishMode, platforms: Platf
   ].join("\n");
 }
 
-export function formatFailedMessage(job: Job): string {
-  return `${BOT_PREFIX} · Rendu raté #${jobRef(job)} sur « ${job.script.topic} » : ${job.error ?? "erreur inconnue"}. Je réessaie au prochain cycle.`;
+export function formatFailedMessage(job: Job, ref = jobRef(job)): string {
+  return `${BOT_PREFIX} · Rendu raté #${ref} sur « ${job.script.topic} » : ${job.error ?? "erreur inconnue"}. Je réessaie au prochain cycle.`;
 }

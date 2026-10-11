@@ -1,9 +1,20 @@
 {
   "name": "septim-viral",
-  "version": "1.0.0",
-  "description": "SEPTIM-VIRAL-OS : usine à vidéos courtes virales. Claude écrit le script H.E.A.T, Remotion rend gratuitement, WhatsApp demande « je publie ? », Postiz publie sur OUI.",
-  "author": { "name": "SeptimeDSR" },
+  "version": "1.1.0",
+  "description": "SEPTIM-VIRAL-OS : usine à vidéos courtes virales. Claude écrit le script H.E.A.T, Remotion rend gratuitement, rien n'est publié sans « OUI #ref ». Commandes /septim-viral:viral, :videos, :publier, :studio, :aide.",
+  "author": {
+    "name": "SeptimeDSR"
+  },
   "homepage": "https://github.com/SeptimeDSR/design",
   "repository": "https://github.com/SeptimeDSR/design",
-  "keywords": ["viral", "tiktok", "reels", "shorts", "remotion", "whatsapp", "postiz", "hook"]
+  "keywords": [
+    "viral",
+    "tiktok",
+    "reels",
+    "shorts",
+    "remotion",
+    "whatsapp",
+    "postiz",
+    "hook"
+  ]
 }
